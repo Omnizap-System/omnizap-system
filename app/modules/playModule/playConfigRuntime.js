@@ -9,6 +9,76 @@ const CONFIG_PATH = path.join(__dirname, 'commandConfig.json');
 
 const DEFAULT_TEXTS = {
   usage_header: '',
+  error_prefix: '❌ Erro: ',
+  generic_error: 'Erro inesperado ao processar sua solicitação.',
+  user_error_timeout: 'A operação demorou mais que o esperado. Tente novamente.',
+  user_error_technical_generic: 'Não foi possível processar sua solicitação agora. Tente novamente em instantes.',
+  admin_error_title: 'Erro no módulo play (diagnóstico).',
+  wait_audio: '⏳ Processando sua mídia...',
+  wait_video: '⏳ Processando sua mídia...',
+  ready_title_audio: '🎵 Áudio pronto!',
+  ready_title_video: '🎬 Vídeo pronto!',
+  video_fallback_to_audio: '⚠️ Este link retornou somente áudio. Enviando no formato de áudio.',
+  anti_bot_with_cookies: 'YouTube solicitou verificação anti-bot. Atualize o arquivo .secrets/cookies.txt e tente novamente.',
+  anti_bot_with_browser_profile: 'YouTube solicitou verificação anti-bot. Verifique o perfil informado em PLAY_YTDLP_COOKIES_FROM_BROWSER e tente novamente.',
+  anti_bot_without_cookies: 'YouTube solicitou verificação anti-bot. Configure PLAY_YTDLP_COOKIES_PATH com um cookies.txt válido e tente novamente.',
+  usage_fallback_audio: '🎵 Uso: <prefix>play <link do YouTube ou termo de busca>',
+  usage_fallback_video: '🎬 Uso: <prefix>playvid <link do YouTube ou termo de busca>',
+  invalid_media_type: 'Tipo de mídia inválido.',
+  binary_exec_failed: 'Falha ao executar <command>.',
+  ytdlp_error_generic: 'Falha ao processar mídia com yt-dlp.',
+  ytdlp_timeout_generic: 'Timeout ao processar mídia com yt-dlp.',
+  search_invalid_input: 'Você precisa informar um link do YouTube ou termo de busca.',
+  search_not_found: 'Nenhum resultado encontrado para a busca.',
+  search_timeout: 'Timeout ao buscar metadados do vídeo.',
+  search_failed: 'Não foi possível buscar o vídeo agora.',
+  video_unavailable: 'Não foi possível acessar este vídeo agora. Tente outro link.',
+  ffmpeg_not_found: 'ffmpeg não encontrado no servidor para processar esta mídia.',
+  download_timeout: 'Timeout ao baixar o arquivo.',
+  download_failed: 'Falha ao baixar o arquivo localmente.',
+  download_file_not_found: 'Não foi possível localizar o arquivo baixado.',
+  download_invalid_media: 'Falha ao baixar mídia válida.',
+  media_too_big: 'O arquivo excede o limite permitido de <max_mb> MB.',
+  probe_timeout: 'Timeout ao analisar o vídeo recebido.',
+  probe_failed: 'Falha ao validar o vídeo recebido.',
+  transcode_timeout: 'Timeout ao normalizar o vídeo para envio.',
+  transcode_failed: 'Falha ao converter o vídeo para um formato compatível.',
+  transcode_output_invalid: 'Falha ao gerar vídeo compatível para envio.',
+  video_without_streams: 'Não foi possível enviar como vídeo: a mídia não possui faixa de vídeo nem áudio.',
+  thumbnail_timeout: 'Timeout ao baixar a thumbnail.',
+  thumbnail_failed: 'Falha ao baixar a thumbnail.',
+  thumbnail_too_big: 'Thumbnail excede o limite permitido.',
+  http_timeout: 'Timeout na requisição HTTP.',
+  http_failed: 'Falha na requisição HTTP.',
+  content_too_big: 'Conteúdo excede o limite permitido.',
+};
+
+const DEFAULT_OPERATIONAL_LIMITS = {
+  max_search_results: 5,
+  search_cache_ttl_ms: 60000,
+  max_search_cache_entries: 500,
+  max_redirects: 2,
+  max_error_body_bytes: 65536,
+  max_meta_body_chars: 512,
+  retry_backoff_base_ms: 200,
+  search_retry_count: 1,
+  thumbnail_retry_count: 1,
+  thumbnail_timeout_ms: 15000,
+  max_thumb_bytes: 5 * 1024 * 1024,
+};
+
+const DEFAULT_EXECUTION_OPTIONS = {
+  ytdlp_base_args: ['--ignore-config', '--no-playlist', '--no-warnings', '--js-runtimes', 'node', '--extractor-args', 'youtube:player_client=android,web'],
+  estrategias_formato: {
+    audio: ['bestaudio/best', 'best'],
+    video: ['bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/best', 'bestvideo*+bestaudio/best', 'best'],
+    audio_extract: {
+      enabled: true,
+      format: 'mp3',
+      quality: '0',
+    },
+    video_merge_output_format: 'mp4',
+  },
 };
 
 const runtime = createModuleCommandConfigRuntime({
@@ -17,10 +87,56 @@ const runtime = createModuleCommandConfigRuntime({
     module: 'playModule',
     commands: [],
     textos: DEFAULT_TEXTS,
+    limites_operacionais: DEFAULT_OPERATIONAL_LIMITS,
+    opcoes_execucao: DEFAULT_EXECUTION_OPTIONS,
   },
 });
 
 const renderUsageMethod = (method, commandPrefix) => String(method || '').replaceAll('<prefix>', String(commandPrefix || '/'));
+const renderTemplate = (value, variables = {}) => {
+  let text = String(value || '');
+  for (const [key, variableValue] of Object.entries(variables || {})) {
+    text = text.replaceAll(`<${key}>`, String(variableValue ?? ''));
+  }
+  return text;
+};
+
+const toInt = (value, fallback, { min = Number.NEGATIVE_INFINITY, max = Number.POSITIVE_INFINITY } = {}) => {
+  const number = Number.parseInt(String(value ?? ''), 10);
+  if (!Number.isFinite(number)) return fallback;
+  if (number < min) return fallback;
+  if (number > max) return fallback;
+  return number;
+};
+
+const normalizeStringArray = (value, fallback = []) => {
+  if (!Array.isArray(value)) return [...fallback];
+  const normalized = value
+    .map((item) => String(item || '').trim())
+    .filter(Boolean);
+  return normalized.length ? normalized : [...fallback];
+};
+
+const normalizeExecutionOptions = (raw) => {
+  const source = raw && typeof raw === 'object' ? raw : {};
+  const defaultFormat = DEFAULT_EXECUTION_OPTIONS.estrategias_formato;
+  const rawFormat = source.estrategias_formato && typeof source.estrategias_formato === 'object' ? source.estrategias_formato : {};
+  const rawAudioExtract = rawFormat.audio_extract && typeof rawFormat.audio_extract === 'object' ? rawFormat.audio_extract : {};
+
+  return {
+    ytdlp_base_args: normalizeStringArray(source.ytdlp_base_args, DEFAULT_EXECUTION_OPTIONS.ytdlp_base_args),
+    estrategias_formato: {
+      audio: normalizeStringArray(rawFormat.audio, defaultFormat.audio),
+      video: normalizeStringArray(rawFormat.video, defaultFormat.video),
+      audio_extract: {
+        enabled: rawAudioExtract.enabled === undefined ? Boolean(defaultFormat.audio_extract.enabled) : Boolean(rawAudioExtract.enabled),
+        format: String(rawAudioExtract.format || defaultFormat.audio_extract.format || '').trim() || defaultFormat.audio_extract.format,
+        quality: String(rawAudioExtract.quality || defaultFormat.audio_extract.quality || '').trim() || defaultFormat.audio_extract.quality,
+      },
+      video_merge_output_format: String(rawFormat.video_merge_output_format || defaultFormat.video_merge_output_format || '').trim() || defaultFormat.video_merge_output_format,
+    },
+  };
+};
 
 const resolveUsageLines = (entry, variant) => {
   if (!entry || typeof entry !== 'object') return [];
@@ -55,6 +171,60 @@ export const getPlayTextConfig = () => {
     ...DEFAULT_TEXTS,
     ...raw,
   };
+};
+
+export const getPlayOperationalLimits = () => {
+  const config = getPlayModuleConfig();
+  const raw = config?.limites_operacionais && typeof config.limites_operacionais === 'object' ? config.limites_operacionais : {};
+  return {
+    max_search_results: toInt(raw.max_search_results, DEFAULT_OPERATIONAL_LIMITS.max_search_results, { min: 1, max: 10 }),
+    search_cache_ttl_ms: toInt(raw.search_cache_ttl_ms, DEFAULT_OPERATIONAL_LIMITS.search_cache_ttl_ms, { min: 1 }),
+    max_search_cache_entries: toInt(raw.max_search_cache_entries, DEFAULT_OPERATIONAL_LIMITS.max_search_cache_entries, { min: 1 }),
+    max_redirects: toInt(raw.max_redirects, DEFAULT_OPERATIONAL_LIMITS.max_redirects, { min: 0, max: 10 }),
+    max_error_body_bytes: toInt(raw.max_error_body_bytes, DEFAULT_OPERATIONAL_LIMITS.max_error_body_bytes, { min: 1024 }),
+    max_meta_body_chars: toInt(raw.max_meta_body_chars, DEFAULT_OPERATIONAL_LIMITS.max_meta_body_chars, { min: 64 }),
+    retry_backoff_base_ms: toInt(raw.retry_backoff_base_ms, DEFAULT_OPERATIONAL_LIMITS.retry_backoff_base_ms, { min: 1 }),
+    search_retry_count: toInt(raw.search_retry_count, DEFAULT_OPERATIONAL_LIMITS.search_retry_count, { min: 0, max: 5 }),
+    thumbnail_retry_count: toInt(raw.thumbnail_retry_count, DEFAULT_OPERATIONAL_LIMITS.thumbnail_retry_count, { min: 0, max: 5 }),
+    thumbnail_timeout_ms: toInt(raw.thumbnail_timeout_ms, DEFAULT_OPERATIONAL_LIMITS.thumbnail_timeout_ms, { min: 1000 }),
+    max_thumb_bytes: toInt(raw.max_thumb_bytes, DEFAULT_OPERATIONAL_LIMITS.max_thumb_bytes, { min: 1024 }),
+  };
+};
+
+export const getPlayExecutionOptions = () => {
+  const config = getPlayModuleConfig();
+  const raw = config?.opcoes_execucao && typeof config.opcoes_execucao === 'object' ? config.opcoes_execucao : {};
+  return normalizeExecutionOptions(raw);
+};
+
+export const getPlayText = (key, fallback = '') => {
+  const textConfig = getPlayTextConfig();
+  if (typeof key !== 'string' || !key.trim()) return fallback;
+  const value = textConfig[key];
+  if (typeof value !== 'string' || !value.trim()) return fallback;
+  return value;
+};
+
+export const getPlayWaitText = (type) => {
+  const normalizedType = String(type || '').toLowerCase();
+  const key = normalizedType === 'video' ? 'wait_video' : 'wait_audio';
+  const fallback = normalizedType === 'video' ? DEFAULT_TEXTS.wait_video : DEFAULT_TEXTS.wait_audio;
+  return getPlayText(key, fallback);
+};
+
+export const getPlayReadyTitle = (type) => {
+  const normalizedType = String(type || '').toLowerCase();
+  const key = normalizedType === 'video' ? 'ready_title_video' : 'ready_title_audio';
+  const fallback = normalizedType === 'video' ? DEFAULT_TEXTS.ready_title_video : DEFAULT_TEXTS.ready_title_audio;
+  return getPlayText(key, fallback);
+};
+
+export const getPlayUsageFallbackText = (type, commandPrefix = '/') => {
+  const normalizedType = String(type || '').toLowerCase();
+  const key = normalizedType === 'video' ? 'usage_fallback_video' : 'usage_fallback_audio';
+  const fallback = normalizedType === 'video' ? DEFAULT_TEXTS.usage_fallback_video : DEFAULT_TEXTS.usage_fallback_audio;
+  const template = getPlayText(key, fallback);
+  return renderTemplate(template, { prefix: commandPrefix });
 };
 
 export const getPlayUsageText = (command, { commandPrefix = '/', header, variant } = {}) => {

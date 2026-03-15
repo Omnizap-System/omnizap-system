@@ -2,7 +2,7 @@
   "schema_version": "2.0.0",
   "module": "playModule",
   "enabled": true,
-  "source_files": ["playCommand.js"],
+  "source_files": ["playCommand.js", "playCommandHandlers.js", "playCommandCore.js", "playCommandYtDlpClient.js", "playCommandConstants.js", "playConfigRuntime.js"],
   "defaults": {
     "inheritance_mode": "deep_merge_with_command_overrides",
     "compatibility_mode": "legacy_and_v2_fields",
@@ -62,8 +62,8 @@
       "janela_ms": null,
       "escopo": "sem_rate_limit_explicito"
     },
-    "dependencies": ["serviço YTDLS/Downloader", "ffmpeg", "ffprobe"],
-    "dependencias_externas": ["serviço YTDLS/Downloader", "ffmpeg", "ffprobe"],
+    "dependencies": ["yt-dlp local (binario gerenciado pelo modulo)", "ffmpeg", "ffprobe"],
+    "dependencias_externas": ["yt-dlp local (binario gerenciado pelo modulo)", "ffmpeg", "ffprobe"],
     "responses": {
       "success": "Comando executado com sucesso.",
       "usage_error": "Formato de uso inválido. Consulte metodos_de_uso.",
@@ -152,7 +152,7 @@
       "permissao_necessaria": "usuario comum",
       "limite_de_uso": "arquivo ate PLAY_MAX_MB (padrao 100 MB)",
       "local_de_uso": ["privado", "grupo"],
-      "informacoes_coletadas": ["identificador do chat (remoteJid)", "identificador do remetente (senderJid)", "texto do comando e argumentos", "contexto da mensagem (citacao e mencoes, quando existir)", "link ou termo de busca enviado no comando", "metadados de fila/download retornados pelo servico de midia", "informacoes de tamanho do arquivo para validacao de limite"],
+      "informacoes_coletadas": ["identificador do chat (remoteJid)", "identificador do remetente (senderJid)", "texto do comando e argumentos", "contexto da mensagem (citacao e mencoes, quando existir)", "link ou termo de busca enviado no comando", "metadados de busca/download retornados pelo yt-dlp local", "informacoes de tamanho do arquivo para validacao de limite"],
       "enabled": true,
       "categoria": "midia",
       "subcomandos": [],
@@ -179,7 +179,7 @@
         "janela_ms": null,
         "escopo": "sem_rate_limit_explicito"
       },
-      "dependencias_externas": ["serviço YTDLS/Downloader", "ffmpeg", "ffprobe"],
+      "dependencias_externas": ["yt-dlp local (binario gerenciado pelo modulo)", "ffmpeg", "ffprobe"],
       "efeitos_colaterais": ["baixa mídia temporária", "envia áudio no chat"],
       "respostas_padrao": {
         "sucesso": "Comando executado com sucesso.",
@@ -228,7 +228,7 @@
       },
       "permission": "usuario comum",
       "contexts": ["privado", "grupo"],
-      "collected_data": ["identificador do chat (remoteJid)", "identificador do remetente (senderJid)", "texto do comando e argumentos", "contexto da mensagem (citacao e mencoes, quando existir)", "link ou termo de busca enviado no comando", "metadados de fila/download retornados pelo servico de midia", "informacoes de tamanho do arquivo para validacao de limite"],
+      "collected_data": ["identificador do chat (remoteJid)", "identificador do remetente (senderJid)", "texto do comando e argumentos", "contexto da mensagem (citacao e mencoes, quando existir)", "link ou termo de busca enviado no comando", "metadados de busca/download retornados pelo yt-dlp local", "informacoes de tamanho do arquivo para validacao de limite"],
       "requirements": {
         "require_group": false,
         "require_group_admin": false,
@@ -290,7 +290,7 @@
           }
         }
       },
-      "dependencies": ["serviço YTDLS/Downloader", "ffmpeg", "ffprobe"],
+      "dependencies": ["yt-dlp local (binario gerenciado pelo modulo)", "ffmpeg", "ffprobe"],
       "side_effects": ["baixa mídia temporária", "envia áudio no chat"],
       "observability": {
         "event_name": "command.executed",
@@ -370,7 +370,7 @@
       "permissao_necessaria": "usuario comum",
       "limite_de_uso": "arquivo ate PLAY_MAX_MB (padrao 100 MB)",
       "local_de_uso": ["privado", "grupo"],
-      "informacoes_coletadas": ["identificador do chat (remoteJid)", "identificador do remetente (senderJid)", "texto do comando e argumentos", "contexto da mensagem (citacao e mencoes, quando existir)", "link ou termo de busca enviado no comando", "metadados de fila/download retornados pelo servico de midia", "informacoes de tamanho e formato de video para validacao"],
+      "informacoes_coletadas": ["identificador do chat (remoteJid)", "identificador do remetente (senderJid)", "texto do comando e argumentos", "contexto da mensagem (citacao e mencoes, quando existir)", "link ou termo de busca enviado no comando", "metadados de busca/download retornados pelo yt-dlp local", "informacoes de tamanho e formato de video para validacao"],
       "enabled": true,
       "categoria": "midia",
       "subcomandos": [],
@@ -397,7 +397,7 @@
         "janela_ms": null,
         "escopo": "sem_rate_limit_explicito"
       },
-      "dependencias_externas": ["serviço YTDLS/Downloader", "ffmpeg", "ffprobe"],
+      "dependencias_externas": ["yt-dlp local (binario gerenciado pelo modulo)", "ffmpeg", "ffprobe"],
       "efeitos_colaterais": ["baixa mídia temporária", "envia vídeo no chat"],
       "respostas_padrao": {
         "sucesso": "Comando executado com sucesso.",
@@ -446,7 +446,7 @@
       },
       "permission": "usuario comum",
       "contexts": ["privado", "grupo"],
-      "collected_data": ["identificador do chat (remoteJid)", "identificador do remetente (senderJid)", "texto do comando e argumentos", "contexto da mensagem (citacao e mencoes, quando existir)", "link ou termo de busca enviado no comando", "metadados de fila/download retornados pelo servico de midia", "informacoes de tamanho e formato de video para validacao"],
+      "collected_data": ["identificador do chat (remoteJid)", "identificador do remetente (senderJid)", "texto do comando e argumentos", "contexto da mensagem (citacao e mencoes, quando existir)", "link ou termo de busca enviado no comando", "metadados de busca/download retornados pelo yt-dlp local", "informacoes de tamanho e formato de video para validacao"],
       "requirements": {
         "require_group": false,
         "require_group_admin": false,
@@ -508,7 +508,7 @@
           }
         }
       },
-      "dependencies": ["serviço YTDLS/Downloader", "ffmpeg", "ffprobe"],
+      "dependencies": ["yt-dlp local (binario gerenciado pelo modulo)", "ffmpeg", "ffprobe"],
       "side_effects": ["baixa mídia temporária", "envia vídeo no chat"],
       "observability": {
         "event_name": "command.executed",
@@ -578,7 +578,75 @@
       }
     }
   ],
+  "limites_operacionais": {
+    "max_search_results": 5,
+    "search_cache_ttl_ms": 60000,
+    "max_search_cache_entries": 500,
+    "max_redirects": 2,
+    "max_error_body_bytes": 65536,
+    "max_meta_body_chars": 512,
+    "retry_backoff_base_ms": 200,
+    "search_retry_count": 1,
+    "thumbnail_retry_count": 1,
+    "thumbnail_timeout_ms": 15000,
+    "max_thumb_bytes": 5242880
+  },
+  "opcoes_execucao": {
+    "ytdlp_base_args": ["--ignore-config", "--no-playlist", "--no-warnings", "--js-runtimes", "node", "--extractor-args", "youtube:player_client=android,web"],
+    "estrategias_formato": {
+      "audio": ["bestaudio/best", "best"],
+      "video": ["bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/best", "bestvideo*+bestaudio/best", "best"],
+      "audio_extract": {
+        "enabled": true,
+        "format": "mp3",
+        "quality": "0"
+      },
+      "video_merge_output_format": "mp4"
+    }
+  },
   "textos": {
-    "usage_header": ""
+    "usage_header": "",
+    "error_prefix": "❌ Erro: ",
+    "generic_error": "Erro inesperado ao processar sua solicitação.",
+    "user_error_timeout": "A operação demorou mais que o esperado. Tente novamente.",
+    "user_error_technical_generic": "Não foi possível processar sua solicitação agora. Tente novamente em instantes.",
+    "admin_error_title": "Erro no módulo play (diagnóstico).",
+    "wait_audio": "⏳ Processando sua mídia...",
+    "wait_video": "⏳ Processando sua mídia...",
+    "ready_title_audio": "🎵 Áudio pronto!",
+    "ready_title_video": "🎬 Vídeo pronto!",
+    "video_fallback_to_audio": "⚠️ Este link retornou somente áudio. Enviando no formato de áudio.",
+    "anti_bot_with_cookies": "YouTube solicitou verificação anti-bot. Atualize o arquivo .secrets/cookies.txt e tente novamente.",
+    "anti_bot_with_browser_profile": "YouTube solicitou verificação anti-bot. Verifique o perfil informado em PLAY_YTDLP_COOKIES_FROM_BROWSER e tente novamente.",
+    "anti_bot_without_cookies": "YouTube solicitou verificação anti-bot. Configure PLAY_YTDLP_COOKIES_PATH com um cookies.txt válido e tente novamente.",
+    "usage_fallback_audio": "🎵 Uso: <prefix>play <link do YouTube ou termo de busca>",
+    "usage_fallback_video": "🎬 Uso: <prefix>playvid <link do YouTube ou termo de busca>",
+    "invalid_media_type": "Tipo de mídia inválido.",
+    "ytdlp_error_generic": "Falha ao processar mídia com yt-dlp.",
+    "ytdlp_timeout_generic": "Timeout ao processar mídia com yt-dlp.",
+    "binary_exec_failed": "Falha ao executar <command>.",
+    "search_invalid_input": "Você precisa informar um link do YouTube ou termo de busca.",
+    "search_not_found": "Nenhum resultado encontrado para a busca.",
+    "search_timeout": "Timeout ao buscar metadados do vídeo.",
+    "search_failed": "Não foi possível buscar o vídeo agora.",
+    "video_unavailable": "Não foi possível acessar este vídeo agora. Tente outro link.",
+    "ffmpeg_not_found": "ffmpeg não encontrado no servidor para processar esta mídia.",
+    "download_timeout": "Timeout ao baixar o arquivo.",
+    "download_failed": "Falha ao baixar o arquivo localmente.",
+    "download_file_not_found": "Não foi possível localizar o arquivo baixado.",
+    "download_invalid_media": "Falha ao baixar mídia válida.",
+    "media_too_big": "O arquivo excede o limite permitido de <max_mb> MB.",
+    "probe_timeout": "Timeout ao analisar o vídeo recebido.",
+    "probe_failed": "Falha ao validar o vídeo recebido.",
+    "transcode_timeout": "Timeout ao normalizar o vídeo para envio.",
+    "transcode_failed": "Falha ao converter o vídeo para um formato compatível.",
+    "transcode_output_invalid": "Falha ao gerar vídeo compatível para envio.",
+    "video_without_streams": "Não foi possível enviar como vídeo: a mídia não possui faixa de vídeo nem áudio.",
+    "thumbnail_timeout": "Timeout ao baixar a thumbnail.",
+    "thumbnail_failed": "Falha ao baixar a thumbnail.",
+    "thumbnail_too_big": "Thumbnail excede o limite permitido.",
+    "http_timeout": "Timeout na requisição HTTP.",
+    "http_failed": "Falha na requisição HTTP.",
+    "content_too_big": "Conteúdo excede o limite permitido."
   }
 }

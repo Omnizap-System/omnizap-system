@@ -7,36 +7,8 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import logger from '#logger';
 import { installYtDlpBinary } from './local/ytDlpInstaller.js';
-import {
-  DEFAULT_TIMEOUT_MS,
-  DOWNLOAD_TIMEOUT_MS,
-  YTDLP_INFO_TIMEOUT_MS,
-  YTDLP_BINARY_PATH,
-  YTDLP_COOKIES_FROM_BROWSER,
-  PROJECT_ROOT_DIR,
-  DEFAULT_COOKIES_PATH,
-  MAX_SEARCH_RESULTS,
-  MAX_MEDIA_BYTES,
-  MAX_MEDIA_MB_LABEL,
-  THUMBNAIL_TIMEOUT_MS,
-  MAX_THUMB_BYTES,
-  VIDEO_PROCESS_TIMEOUT_MS,
-  VIDEO_FORCE_TRANSCODE,
-  FFMPEG_BIN,
-  FFPROBE_BIN,
-  SEARCH_CACHE_TTL_MS,
-  MAX_SEARCH_CACHE_ENTRIES,
-  MAX_REDIRECTS,
-  MAX_ERROR_BODY_BYTES,
-  MAX_META_BODY_CHARS,
-  TRANSIENT_HTTP_STATUSES,
-  TRANSIENT_NETWORK_CODES,
-  YTDLS_ENDPOINTS,
-  ERROR_CODES,
-  KNOWN_ERROR_CODES,
-  TYPE_CONFIG,
-  PLAY_DOWNLOADS_DIR,
-} from './playCommandConstants.js';
+import { getPlayExecutionOptions, getPlayOperationalLimits, getPlayReadyTitle, getPlayText } from './playConfigRuntime.js';
+import { DEFAULT_TIMEOUT_MS, DOWNLOAD_TIMEOUT_MS, YTDLP_INFO_TIMEOUT_MS, YTDLP_BINARY_PATH, YTDLP_COOKIES_FROM_BROWSER, PROJECT_ROOT_DIR, DEFAULT_COOKIES_PATH, MAX_SEARCH_RESULTS, MAX_MEDIA_BYTES, MAX_MEDIA_MB_LABEL, THUMBNAIL_TIMEOUT_MS, MAX_THUMB_BYTES, VIDEO_PROCESS_TIMEOUT_MS, VIDEO_FORCE_TRANSCODE, FFMPEG_BIN, FFPROBE_BIN, SEARCH_CACHE_TTL_MS, MAX_SEARCH_CACHE_ENTRIES, MAX_REDIRECTS, MAX_ERROR_BODY_BYTES, MAX_META_BODY_CHARS, TRANSIENT_HTTP_STATUSES, TRANSIENT_NETWORK_CODES, YTDLS_ENDPOINTS, ERROR_CODES, KNOWN_ERROR_CODES, TYPE_CONFIG, PLAY_DOWNLOADS_DIR } from './playCommandConstants.js';
 
 const createError = (code, message, meta) => {
   const error = new Error(message);
@@ -61,30 +33,48 @@ const normalizeRequestError = (error, { timeoutMessage, fallbackMessage, fallbac
   if (isAbortError(error)) {
     return createError(ERROR_CODES.TIMEOUT, timeoutMessage, {
       rawCode: error?.code || error?.name || null,
+      technical: true,
     });
   }
   return createError(fallbackCode || ERROR_CODES.API, fallbackMessage, {
     cause: error?.message || 'unknown',
     rawCode: error?.code || error?.name || null,
+    technical: true,
   });
 };
 
 const normalizePlayError = (error) => {
   if (KNOWN_ERROR_CODES.has(error?.code) && error?.message) return error;
   if (isAbortError(error)) {
-    return createError(ERROR_CODES.TIMEOUT, 'Timeout ao processar sua solicitação.', {
+    return createError(ERROR_CODES.TIMEOUT, getPlayText('user_error_timeout', 'A operação demorou mais que o esperado. Tente novamente.'), {
       rawCode: error?.code || error?.name || null,
+      technical: true,
     });
   }
-  return createError(ERROR_CODES.API, 'Erro inesperado ao processar sua solicitação.', {
+  return createError(ERROR_CODES.API, getPlayText('user_error_technical_generic', 'Não foi possível processar sua solicitação agora. Tente novamente em instantes.'), {
     cause: error?.message || 'unknown',
     rawCode: error?.code || error?.name || null,
+    technical: true,
   });
 };
 
 const delay = (ms) => new Promise((resolve) => setTimeout(() => resolve(null), ms));
 
-const truncateText = (value, maxChars = MAX_META_BODY_CHARS) => {
+const renderTemplate = (value, variables = {}) => {
+  let text = String(value || '');
+  for (const [key, variableValue] of Object.entries(variables || {})) {
+    text = text.replaceAll(`<${key}>`, String(variableValue ?? ''));
+  }
+  return text;
+};
+
+const playText = (key, fallback, variables) => renderTemplate(getPlayText(key, fallback), variables);
+
+const getLimits = () => getPlayOperationalLimits();
+
+const getExecutionOptions = () => getPlayExecutionOptions();
+
+const truncateText = (value, maxChars = getLimits().max_meta_body_chars || MAX_META_BODY_CHARS) => {
   if (typeof value !== 'string') return '';
   if (value.length <= maxChars) return value;
   return `${value.slice(0, maxChars)}...[truncated]`;
@@ -199,8 +189,9 @@ const buildQueueStatusText = (status) => {
 const buildReadyCaption = (type, infoText) => {
   const config = TYPE_CONFIG[type];
   if (!config) return infoText || '';
-  if (!infoText) return config.readyTitle;
-  return `${config.readyTitle}\n──────────────\n${infoText}`;
+  const readyTitle = getPlayReadyTitle(type) || config.readyTitle;
+  if (!infoText) return readyTitle;
+  return `${readyTitle}\n──────────────\n${infoText}`;
 };
 
 const buildTempFilePath = (requestId, type) => {
@@ -272,7 +263,7 @@ const runBinaryCommand = (command, args, { timeoutMs = VIDEO_PROCESS_TIMEOUT_MS 
     let stdoutBytes = 0;
     let stderrBytes = 0;
     let timedOut = false;
-    const maxCapturedBytes = MAX_ERROR_BODY_BYTES * 4;
+    const maxCapturedBytes = (getLimits().max_error_body_bytes || MAX_ERROR_BODY_BYTES) * 4;
 
     const appendChunk = (chunks, chunk, bytes) => {
       if (!chunk || bytes >= maxCapturedBytes) return bytes;
@@ -322,7 +313,7 @@ const runBinaryCommand = (command, args, { timeoutMs = VIDEO_PROCESS_TIMEOUT_MS 
           return;
         }
 
-        const error = new Error(stderr || `Falha ao executar ${path.basename(command)}.`);
+        const error = new Error(stderr || playText('binary_exec_failed', `Falha ao executar ${path.basename(command)}.`, { command: path.basename(command) }));
         error.code = timedOut ? 'ETIMEDOUT' : 'EPROCESS';
         error.exitCode = code;
         error.signal = signal || null;
@@ -341,6 +332,7 @@ const normalizeBinaryError = (error, { timeoutMessage, fallbackMessage, endpoint
       requestId,
       command,
       rawCode: error?.code || null,
+      technical: true,
     });
   }
   return createError(ERROR_CODES.API, fallbackMessage, {
@@ -352,6 +344,7 @@ const normalizeBinaryError = (error, { timeoutMessage, fallbackMessage, endpoint
     exitCode: error?.exitCode ?? null,
     signal: error?.signal || null,
     cause: truncateText(error?.stderr || error?.message || 'unknown'),
+    technical: true,
   });
 };
 
@@ -371,8 +364,8 @@ const probeVideoStreams = async (filePath, requestId, endpoint) => {
     };
   } catch (error) {
     const normalized = normalizeBinaryError(error, {
-      timeoutMessage: 'Timeout ao analisar o vídeo recebido.',
-      fallbackMessage: 'Falha ao validar o vídeo recebido.',
+      timeoutMessage: playText('probe_timeout', 'Timeout ao analisar o vídeo recebido.'),
+      fallbackMessage: playText('probe_failed', 'Falha ao validar o vídeo recebido.'),
       endpoint,
       requestId,
       command: FFPROBE_BIN,
@@ -393,18 +386,20 @@ const transcodeVideoForWhatsapp = async (filePath, requestId, endpoint) => {
     const transcodedBytes = Number(stats?.size || 0);
 
     if (transcodedBytes <= 0) {
-      throw createError(ERROR_CODES.API, 'Falha ao gerar vídeo compatível para envio.', {
+      throw createError(ERROR_CODES.API, playText('transcode_output_invalid', 'Falha ao gerar vídeo compatível para envio.'), {
         endpoint,
         requestId,
         outputPath,
+        technical: true,
       });
     }
 
     if (transcodedBytes > MAX_MEDIA_BYTES) {
-      throw createError(ERROR_CODES.TOO_BIG, `O arquivo excede o limite permitido de ${MAX_MEDIA_MB_LABEL} MB.`, {
+      throw createError(ERROR_CODES.TOO_BIG, playText('media_too_big', `O arquivo excede o limite permitido de ${MAX_MEDIA_MB_LABEL} MB.`, { max_mb: MAX_MEDIA_MB_LABEL }), {
         endpoint,
         requestId,
         bytes: transcodedBytes,
+        technical: false,
       });
     }
 
@@ -413,8 +408,8 @@ const transcodeVideoForWhatsapp = async (filePath, requestId, endpoint) => {
   } catch (error) {
     await safeUnlink(outputPath);
     const normalized = normalizeBinaryError(error, {
-      timeoutMessage: 'Timeout ao normalizar o vídeo para envio.',
-      fallbackMessage: 'Falha ao converter o vídeo para um formato compatível.',
+      timeoutMessage: playText('transcode_timeout', 'Timeout ao normalizar o vídeo para envio.'),
+      fallbackMessage: playText('transcode_failed', 'Falha ao converter o vídeo para um formato compatível.'),
       endpoint,
       requestId,
       command: FFMPEG_BIN,
@@ -438,7 +433,7 @@ const readResponseBuffer = async (stream, { maxBytes = Infinity, tooBigMessage }
 
     if (Number.isFinite(maxBytes) && total > maxBytes) {
       stream.destroy();
-      throw createError(ERROR_CODES.TOO_BIG, tooBigMessage || 'Conteúdo excede o limite permitido.', { bytes: total });
+      throw createError(ERROR_CODES.TOO_BIG, tooBigMessage || playText('content_too_big', 'Conteúdo excede o limite permitido.'), { bytes: total, technical: false });
     }
 
     chunks.push(current);
@@ -447,7 +442,16 @@ const readResponseBuffer = async (stream, { maxBytes = Infinity, tooBigMessage }
   return Buffer.concat(chunks, total);
 };
 
-const httpRequest = ({ url, timeoutMs = DEFAULT_TIMEOUT_MS, maxRedirects = 0, redirectCount = 0, endpoint = 'unknown', timeoutMessage = 'Timeout na requisição HTTP.', fallbackMessage = 'Falha na requisição HTTP.', onResponse }) =>
+const httpRequest = ({
+  url,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+  maxRedirects = 0,
+  redirectCount = 0,
+  endpoint = 'unknown',
+  timeoutMessage = playText('http_timeout', 'Timeout na requisição HTTP.'),
+  fallbackMessage = playText('http_failed', 'Falha na requisição HTTP.'),
+  onResponse,
+}) =>
   new Promise((resolve, reject) => {
     const urlObj = new URL(url);
     const httpModule = resolveHttpModule(urlObj);
@@ -537,36 +541,43 @@ const httpRequest = ({ url, timeoutMs = DEFAULT_TIMEOUT_MS, maxRedirects = 0, re
     req.end();
   });
 
-const requestBuffer = async ({ url, timeoutMs = THUMBNAIL_TIMEOUT_MS, maxBytes = MAX_THUMB_BYTES, endpoint = YTDLS_ENDPOINTS.thumbnail }) =>
+const requestBuffer = async ({
+  url,
+  timeoutMs = getLimits().thumbnail_timeout_ms ?? THUMBNAIL_TIMEOUT_MS,
+  maxBytes = getLimits().max_thumb_bytes ?? MAX_THUMB_BYTES,
+  endpoint = YTDLS_ENDPOINTS.thumbnail,
+}) =>
   httpRequest({
     url,
     timeoutMs,
     endpoint,
-    maxRedirects: MAX_REDIRECTS,
-    timeoutMessage: 'Timeout ao baixar a thumbnail.',
-    fallbackMessage: 'Falha ao baixar a thumbnail.',
+    maxRedirects: getLimits().max_redirects ?? MAX_REDIRECTS,
+    timeoutMessage: playText('thumbnail_timeout', 'Timeout ao baixar a thumbnail.'),
+    fallbackMessage: playText('thumbnail_failed', 'Falha ao baixar a thumbnail.'),
     onResponse: async ({ res, status, headers, endpoint: currentEndpoint }) => {
       if (status < 200 || status >= 300) {
         res.resume();
-        throw createError(ERROR_CODES.API, 'Falha ao baixar a thumbnail.', {
+        throw createError(ERROR_CODES.API, playText('thumbnail_failed', 'Falha ao baixar a thumbnail.'), {
           endpoint: currentEndpoint,
           status,
+          technical: true,
         });
       }
 
       const contentLength = toNumberOrNull(getHeaderValue(headers, 'content-length'));
       if (contentLength !== null && contentLength > maxBytes) {
         res.resume();
-        throw createError(ERROR_CODES.TOO_BIG, 'Thumbnail excede o limite permitido.', {
+        throw createError(ERROR_CODES.TOO_BIG, playText('thumbnail_too_big', 'Thumbnail excede o limite permitido.'), {
           endpoint: currentEndpoint,
           status,
           bytes: contentLength,
+          technical: false,
         });
       }
 
       return readResponseBuffer(res, {
         maxBytes,
-        tooBigMessage: 'Thumbnail excede o limite permitido.',
+        tooBigMessage: playText('thumbnail_too_big', 'Thumbnail excede o limite permitido.'),
       });
     },
   });
@@ -601,7 +612,8 @@ const retryAsync = async (operation, { retries = 0, shouldRetry = () => false, o
       if (typeof onRetry === 'function') {
         onRetry(error, attempt);
       }
-      await delay(200 * attempt);
+      const backoffBase = getLimits().retry_backoff_base_ms ?? 200;
+      await delay(backoffBase * attempt);
     }
   }
 };
@@ -609,6 +621,7 @@ const retryAsync = async (operation, { retries = 0, shouldRetry = () => false, o
 const searchCache = new Map();
 
 const pruneSearchCache = () => {
+  const maxEntries = getLimits().max_search_cache_entries ?? MAX_SEARCH_CACHE_ENTRIES;
   const now = Date.now();
   for (const [key, entry] of searchCache) {
     if (!entry || entry.expiresAt <= now) {
@@ -616,12 +629,12 @@ const pruneSearchCache = () => {
     }
   }
 
-  if (searchCache.size <= MAX_SEARCH_CACHE_ENTRIES) {
+  if (searchCache.size <= maxEntries) {
     return;
   }
 
   const ordered = [...searchCache.entries()].sort((a, b) => (a[1]?.createdAt || 0) - (b[1]?.createdAt || 0));
-  const toRemove = searchCache.size - MAX_SEARCH_CACHE_ENTRIES;
+  const toRemove = searchCache.size - maxEntries;
   for (let i = 0; i < toRemove; i += 1) {
     searchCache.delete(ordered[i][0]);
   }
@@ -638,11 +651,12 @@ const getSearchCache = (queryKey) => {
 };
 
 const setSearchCache = (queryKey, value) => {
+  const ttlMs = getLimits().search_cache_ttl_ms ?? SEARCH_CACHE_TTL_MS;
   const now = Date.now();
   searchCache.set(queryKey, {
     value,
     createdAt: now,
-    expiresAt: now + SEARCH_CACHE_TTL_MS,
+    expiresAt: now + ttlMs,
   });
   pruneSearchCache();
 };
@@ -778,7 +792,8 @@ const resolveYtDlpCookiesPath = () => {
 };
 
 const buildYtDlpArgsBase = () => {
-  const args = ['--ignore-config', '--no-playlist', '--no-warnings', '--js-runtimes', 'node', '--extractor-args', 'youtube:player_client=android,web'];
+  const executionOptions = getExecutionOptions();
+  const args = [...(Array.isArray(executionOptions?.ytdlp_base_args) ? executionOptions.ytdlp_base_args : [])];
   const cookiesPath = resolveYtDlpCookiesPath();
   if (cookiesPath) {
     args.push('--cookies', cookiesPath);
@@ -872,36 +887,40 @@ const normalizeYtDlpError = (error, { endpoint, requestId, input, timeoutMessage
       requestId,
       input: truncateText(input || ''),
       rawCode: error?.code || null,
+      technical: true,
     });
   }
 
   if (low.includes('no matches found') || low.includes('unsupported url')) {
-    return createError(ERROR_CODES.NOT_FOUND, 'Nenhum resultado encontrado para a busca.', {
+    return createError(ERROR_CODES.NOT_FOUND, playText('search_not_found', 'Nenhum resultado encontrado para a busca.'), {
       endpoint,
       requestId,
       input: truncateText(input || ''),
       cause: truncateText(combined),
       rawCode: error?.code || null,
+      technical: false,
     });
   }
 
   if (low.includes('sign in to confirm') || low.includes('private video') || low.includes('video unavailable')) {
-    return createError(ERROR_CODES.API, 'Não foi possível acessar este vídeo agora. Tente outro link.', {
+    return createError(ERROR_CODES.API, playText('video_unavailable', 'Não foi possível acessar este vídeo agora. Tente outro link.'), {
       endpoint,
       requestId,
       input: truncateText(input || ''),
       cause: truncateText(combined),
       rawCode: error?.code || null,
+      technical: false,
     });
   }
 
   if (low.includes('ffmpeg') && low.includes('not found')) {
-    return createError(ERROR_CODES.API, 'ffmpeg não encontrado no servidor para processar esta mídia.', {
+    return createError(ERROR_CODES.API, playText('ffmpeg_not_found', 'ffmpeg não encontrado no servidor para processar esta mídia.'), {
       endpoint,
       requestId,
       input: truncateText(input || ''),
       cause: truncateText(combined),
       rawCode: error?.code || null,
+      technical: true,
     });
   }
 
@@ -913,6 +932,7 @@ const normalizeYtDlpError = (error, { endpoint, requestId, input, timeoutMessage
     exitCode: error?.exitCode ?? null,
     signal: error?.signal || null,
     cause: truncateText(combined || 'unknown'),
+    technical: true,
   });
 };
 
@@ -934,8 +954,8 @@ const runYtDlp = async ({ args, endpoint, requestId, input, timeoutMs = DEFAULT_
       endpoint,
       requestId,
       input,
-      timeoutMessage: timeoutMessage || 'Timeout ao processar mídia com yt-dlp.',
-      fallbackMessage: fallbackMessage || 'Falha ao processar mídia com yt-dlp.',
+      timeoutMessage: timeoutMessage || playText('ytdlp_timeout_generic', 'Timeout ao processar mídia com yt-dlp.'),
+      fallbackMessage: fallbackMessage || playText('ytdlp_error_generic', 'Falha ao processar mídia com yt-dlp.'),
     });
   }
 };
@@ -943,7 +963,10 @@ const runYtDlp = async ({ args, endpoint, requestId, input, timeoutMs = DEFAULT_
 const fetchSearchResult = async (query) => {
   const normalized = typeof query === 'string' ? query.trim() : '';
   if (!normalized) {
-    throw createError(ERROR_CODES.INVALID_INPUT, 'Você precisa informar um link do YouTube ou termo de busca.', { endpoint: YTDLS_ENDPOINTS.search });
+    throw createError(ERROR_CODES.INVALID_INPUT, playText('search_invalid_input', 'Você precisa informar um link do YouTube ou termo de busca.'), {
+      endpoint: YTDLS_ENDPOINTS.search,
+      technical: false,
+    });
   }
 
   const cacheKey = normalized.toLowerCase();
@@ -954,7 +977,8 @@ const fetchSearchResult = async (query) => {
 
   const endpoint = YTDLS_ENDPOINTS.search;
   const isUrlLookup = /^https?:\/\//i.test(normalized);
-  const lookup = isUrlLookup ? normalized : `ytsearch${MAX_SEARCH_RESULTS}:${normalized}`;
+  const maxSearchResults = getLimits().max_search_results ?? MAX_SEARCH_RESULTS;
+  const lookup = isUrlLookup ? normalized : `ytsearch${maxSearchResults}:${normalized}`;
 
   const payload = await retryAsync(
     async () => {
@@ -965,8 +989,8 @@ const fetchSearchResult = async (query) => {
         endpoint,
         input: normalized,
         timeoutMs: YTDLP_INFO_TIMEOUT_MS,
-        timeoutMessage: 'Timeout ao buscar metadados do vídeo.',
-        fallbackMessage: 'Não foi possível buscar o vídeo agora.',
+        timeoutMessage: playText('search_timeout', 'Timeout ao buscar metadados do vídeo.'),
+        fallbackMessage: playText('search_failed', 'Não foi possível buscar o vídeo agora.'),
       });
 
       const parsed = parseJsonOutput(stdout);
@@ -976,7 +1000,10 @@ const fetchSearchResult = async (query) => {
       const info = normalizedEntries[0] || null;
 
       if (!info?.url) {
-        throw createError(ERROR_CODES.NOT_FOUND, 'Nenhum resultado encontrado para a busca.', { endpoint });
+        throw createError(ERROR_CODES.NOT_FOUND, playText('search_not_found', 'Nenhum resultado encontrado para a busca.'), {
+          endpoint,
+          technical: false,
+        });
       }
 
       return {
@@ -986,7 +1013,7 @@ const fetchSearchResult = async (query) => {
       };
     },
     {
-      retries: 1,
+      retries: getLimits().search_retry_count ?? 1,
       shouldRetry: isTransientError,
       onRetry: (error, attempt) => {
         logger.warn('Play busca local: retry acionado.', {
@@ -1007,7 +1034,10 @@ const resolveYoutubeLink = async (query) => {
   const normalized = query ? query.trim() : '';
 
   if (!normalized) {
-    throw createError(ERROR_CODES.INVALID_INPUT, 'Você precisa informar um link do YouTube ou termo de busca.', { endpoint: YTDLS_ENDPOINTS.search });
+    throw createError(ERROR_CODES.INVALID_INPUT, playText('search_invalid_input', 'Você precisa informar um link do YouTube ou termo de busca.'), {
+      endpoint: YTDLS_ENDPOINTS.search,
+      technical: false,
+    });
   }
 
   if (/^https?:\/\//i.test(normalized)) {
@@ -1016,8 +1046,9 @@ const resolveYoutubeLink = async (query) => {
 
   const searchResult = await fetchSearchResult(normalized);
   if (!searchResult?.resultado?.url) {
-    throw createError(ERROR_CODES.NOT_FOUND, 'Nenhum resultado encontrado para a busca.', {
+    throw createError(ERROR_CODES.NOT_FOUND, playText('search_not_found', 'Nenhum resultado encontrado para a busca.'), {
       endpoint: YTDLS_ENDPOINTS.search,
+      technical: false,
     });
   }
 
@@ -1028,7 +1059,10 @@ const resolveYoutubeCandidates = async (query) => {
   const normalized = query ? query.trim() : '';
 
   if (!normalized) {
-    throw createError(ERROR_CODES.INVALID_INPUT, 'Você precisa informar um link do YouTube ou termo de busca.', { endpoint: YTDLS_ENDPOINTS.search });
+    throw createError(ERROR_CODES.INVALID_INPUT, playText('search_invalid_input', 'Você precisa informar um link do YouTube ou termo de busca.'), {
+      endpoint: YTDLS_ENDPOINTS.search,
+      technical: false,
+    });
   }
 
   if (/^https?:\/\//i.test(normalized)) {
@@ -1058,8 +1092,9 @@ const resolveYoutubeCandidates = async (query) => {
   }
 
   if (!urls.length) {
-    throw createError(ERROR_CODES.NOT_FOUND, 'Nenhum resultado encontrado para a busca.', {
+    throw createError(ERROR_CODES.NOT_FOUND, playText('search_not_found', 'Nenhum resultado encontrado para a busca.'), {
       endpoint: YTDLS_ENDPOINTS.search,
+      technical: false,
     });
   }
 
@@ -1075,12 +1110,12 @@ const isYouTubeBotCheckCause = (error) => {
 const buildYouTubeBotCheckUserMessage = () => {
   const cookiesPath = resolveYtDlpCookiesPath();
   if (cookiesPath) {
-    return 'YouTube solicitou verificação anti-bot. Atualize o arquivo .secrets/cookies.txt e tente novamente.';
+    return getPlayText('anti_bot_with_cookies', 'YouTube solicitou verificação anti-bot. Atualize o arquivo .secrets/cookies.txt e tente novamente.');
   }
   if (YTDLP_COOKIES_FROM_BROWSER) {
-    return 'YouTube solicitou verificação anti-bot. Verifique o perfil informado em PLAY_YTDLP_COOKIES_FROM_BROWSER e tente novamente.';
+    return getPlayText('anti_bot_with_browser_profile', 'YouTube solicitou verificação anti-bot. Verifique o perfil informado em PLAY_YTDLP_COOKIES_FROM_BROWSER e tente novamente.');
   }
-  return 'YouTube solicitou verificação anti-bot. Configure PLAY_YTDLP_COOKIES_PATH com um cookies.txt válido e tente novamente.';
+  return getPlayText('anti_bot_without_cookies', 'YouTube solicitou verificação anti-bot. Configure PLAY_YTDLP_COOKIES_PATH com um cookies.txt válido e tente novamente.');
 };
 
 const fetchVideoInfo = async (query, fallback) => {
@@ -1184,6 +1219,41 @@ const cleanupDownloadedArtifacts = async (basePath) => {
   await Promise.allSettled(targets.map((name) => safeUnlink(path.join(dir, name))));
 };
 
+const buildDownloadAttemptArgsList = ({ type, outputTemplate, link }) => {
+  const executionOptions = getExecutionOptions();
+  const formatOptions = executionOptions?.estrategias_formato || {};
+  const audioFormats = Array.isArray(formatOptions.audio) ? formatOptions.audio.filter(Boolean) : [];
+  const videoFormats = Array.isArray(formatOptions.video) ? formatOptions.video.filter(Boolean) : [];
+  const audioExtract = formatOptions.audio_extract && typeof formatOptions.audio_extract === 'object' ? formatOptions.audio_extract : {};
+  const mergeOutputFormat = String(formatOptions.video_merge_output_format || '').trim();
+
+  if (type === 'audio') {
+    return audioFormats.map((format) => {
+      const args = ['--no-progress', '-o', outputTemplate, '-f', format];
+      if (audioExtract.enabled !== false) {
+        args.push('-x');
+        if (audioExtract.format) {
+          args.push('--audio-format', String(audioExtract.format));
+        }
+        if (audioExtract.quality) {
+          args.push('--audio-quality', String(audioExtract.quality));
+        }
+      }
+      args.push(link);
+      return args;
+    });
+  }
+
+  return videoFormats.map((format) => {
+    const args = ['--no-progress', '-o', outputTemplate, '-f', format];
+    if (mergeOutputFormat) {
+      args.push('--merge-output-format', mergeOutputFormat);
+    }
+    args.push(link);
+    return args;
+  });
+};
+
 const requestDownloadToFile = async (link, type, requestId) => {
   const endpoint = YTDLS_ENDPOINTS.download;
   const safeId = String(requestId || 'req')
@@ -1193,18 +1263,7 @@ const requestDownloadToFile = async (link, type, requestId) => {
   const outputTemplate = `${basePath}.%(ext)s`;
   const preferredExt = type === 'audio' ? 'mp3' : 'mp4';
   let filePath = null;
-
-  const attemptArgsList =
-    type === 'audio'
-      ? [
-          ['--no-progress', '-o', outputTemplate, '-f', 'bestaudio/best', '-x', '--audio-format', 'mp3', '--audio-quality', '0', link],
-          ['--no-progress', '-o', outputTemplate, '-f', 'best', '-x', '--audio-format', 'mp3', '--audio-quality', '0', link],
-        ]
-      : [
-          ['--no-progress', '-o', outputTemplate, '-f', 'bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/best', '--merge-output-format', 'mp4', link],
-          ['--no-progress', '-o', outputTemplate, '-f', 'bestvideo*+bestaudio/best', '--merge-output-format', 'mp4', link],
-          ['--no-progress', '-o', outputTemplate, '-f', 'best', '--merge-output-format', 'mp4', link],
-        ];
+  const attemptArgsList = buildDownloadAttemptArgsList({ type, outputTemplate, link });
 
   try {
     let downloadCompleted = false;
@@ -1223,8 +1282,8 @@ const requestDownloadToFile = async (link, type, requestId) => {
           requestId,
           input: link,
           timeoutMs: DOWNLOAD_TIMEOUT_MS,
-          timeoutMessage: 'Timeout ao baixar o arquivo.',
-          fallbackMessage: 'Falha ao baixar o arquivo localmente.',
+          timeoutMessage: playText('download_timeout', 'Timeout ao baixar o arquivo.'),
+          fallbackMessage: playText('download_failed', 'Falha ao baixar o arquivo localmente.'),
         });
         downloadCompleted = true;
         lastError = null;
@@ -1255,9 +1314,10 @@ const requestDownloadToFile = async (link, type, requestId) => {
 
     filePath = await findDownloadedFileByBase(basePath, preferredExt);
     if (!filePath) {
-      throw createError(ERROR_CODES.API, 'Não foi possível localizar o arquivo baixado.', {
+      throw createError(ERROR_CODES.API, playText('download_file_not_found', 'Não foi possível localizar o arquivo baixado.'), {
         endpoint,
         requestId,
+        technical: true,
       });
     }
 
@@ -1267,18 +1327,20 @@ const requestDownloadToFile = async (link, type, requestId) => {
     let finalMediaType = type;
 
     if (finalBytes <= 0) {
-      throw createError(ERROR_CODES.API, 'Falha ao baixar mídia válida.', {
+      throw createError(ERROR_CODES.API, playText('download_invalid_media', 'Falha ao baixar mídia válida.'), {
         endpoint,
         requestId,
         filePath,
+        technical: true,
       });
     }
 
     if (finalBytes > MAX_MEDIA_BYTES) {
-      throw createError(ERROR_CODES.TOO_BIG, `O arquivo excede o limite permitido de ${MAX_MEDIA_MB_LABEL} MB.`, {
+      throw createError(ERROR_CODES.TOO_BIG, playText('media_too_big', `O arquivo excede o limite permitido de ${MAX_MEDIA_MB_LABEL} MB.`, { max_mb: MAX_MEDIA_MB_LABEL }), {
         endpoint,
         requestId,
         bytes: finalBytes,
+        technical: false,
       });
     }
 
@@ -1297,12 +1359,13 @@ const requestDownloadToFile = async (link, type, requestId) => {
             audioCodec: streamInfo.audioCodec || null,
           });
         } else {
-          throw createError(ERROR_CODES.API, 'Não foi possível enviar como vídeo: a mídia não possui faixa de vídeo nem áudio.', {
+          throw createError(ERROR_CODES.API, playText('video_without_streams', 'Não foi possível enviar como vídeo: a mídia não possui faixa de vídeo nem áudio.'), {
             endpoint,
             requestId,
             hasAudio: streamInfo.hasAudio,
             videoCodec: streamInfo.videoCodec,
             audioCodec: streamInfo.audioCodec,
+            technical: true,
           });
         }
       }
@@ -1340,8 +1403,8 @@ const requestDownloadToFile = async (link, type, requestId) => {
             endpoint,
             requestId,
             input: link,
-            timeoutMessage: 'Timeout ao baixar o arquivo.',
-            fallbackMessage: 'Falha ao baixar o arquivo.',
+            timeoutMessage: playText('download_timeout', 'Timeout ao baixar o arquivo.'),
+            fallbackMessage: playText('download_failed', 'Falha ao baixar o arquivo localmente.'),
           });
     throw withErrorMeta(normalized, { endpoint, filePath });
   }
@@ -1352,12 +1415,12 @@ const fetchThumbnailBuffer = async (url) =>
     () =>
       httpClient.requestBuffer({
         url,
-        timeoutMs: THUMBNAIL_TIMEOUT_MS,
-        maxBytes: MAX_THUMB_BYTES,
+        timeoutMs: getLimits().thumbnail_timeout_ms ?? THUMBNAIL_TIMEOUT_MS,
+        maxBytes: getLimits().max_thumb_bytes ?? MAX_THUMB_BYTES,
         endpoint: YTDLS_ENDPOINTS.thumbnail,
       }),
     {
-      retries: 1,
+      retries: getLimits().thumbnail_retry_count ?? 1,
       shouldRetry: isTransientError,
       onRetry: (error, attempt) => {
         logger.warn('Play thumbnail: retry acionado.', {
@@ -1394,14 +1457,4 @@ const fileUtils = {
   safeUnlink,
 };
 
-export {
-  createError,
-  withErrorMeta,
-  normalizePlayError,
-  truncateText,
-  ytdlsClient,
-  formatters,
-  fileUtils,
-  isYouTubeBotCheckCause,
-  buildYouTubeBotCheckUserMessage,
-};
+export { createError, withErrorMeta, normalizePlayError, truncateText, ytdlsClient, formatters, fileUtils, isYouTubeBotCheckCause, buildYouTubeBotCheckUserMessage };

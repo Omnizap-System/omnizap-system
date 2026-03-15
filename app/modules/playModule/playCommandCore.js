@@ -2,19 +2,9 @@ import crypto from 'node:crypto';
 import logger from '#logger';
 import { sendAndStore } from '../../services/messaging/messagePersistenceService.js';
 import { getAdminJid } from '../../config/index.js';
-import { getPlayUsageText } from './playConfigRuntime.js';
+import { getPlayText, getPlayUsageFallbackText, getPlayUsageText, getPlayWaitText } from './playConfigRuntime.js';
 import { DEFAULT_COMMAND_PREFIX, ERROR_CODES, KNOWN_ERROR_CODES, TYPE_CONFIG, YTDLS_ENDPOINTS } from './playCommandConstants.js';
-import {
-  createError,
-  withErrorMeta,
-  normalizePlayError,
-  truncateText,
-  ytdlsClient,
-  formatters,
-  fileUtils,
-  isYouTubeBotCheckCause,
-  buildYouTubeBotCheckUserMessage,
-} from './playCommandYtDlpClient.js';
+import { createError, withErrorMeta, normalizePlayError, truncateText, ytdlsClient, formatters, fileUtils, isYouTubeBotCheckCause, buildYouTubeBotCheckUserMessage } from './playCommandYtDlpClient.js';
 
 const adminJid = getAdminJid();
 
@@ -27,20 +17,52 @@ const buildRequestId = () => {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 };
 
+const isTechnicalError = (error) => Boolean(error?.meta?.technical);
+
 const getUserErrorMessage = (error) => {
-  if (!error) return 'Erro inesperado ao processar sua solicitação.';
+  const genericError = getPlayText('generic_error', 'Erro inesperado ao processar sua solicitação.');
+  if (isTechnicalError(error)) {
+    if (error?.code === ERROR_CODES.TIMEOUT) {
+      return getPlayText('user_error_timeout', 'A operação demorou mais que o esperado. Tente novamente.');
+    }
+    return getPlayText('user_error_technical_generic', 'Não foi possível processar sua solicitação agora. Tente novamente em instantes.');
+  }
+  if (!error) return genericError;
   if (KNOWN_ERROR_CODES.has(error?.code) && error?.message) return error.message;
-  return 'Erro inesperado ao processar sua solicitação.';
+  return genericError;
+};
+
+const buildAdminFailureText = (error, context = {}) => {
+  const adminTitle = getPlayText('admin_error_title', 'Erro no módulo play (diagnóstico).');
+  const cause = truncateText(error?.meta?.cause || error?.stack || error?.message || '', 1200);
+  const lines = [
+    adminTitle,
+    `Chat: ${context?.remoteJid || 'n/a'}`,
+    `Request: ${context?.requestId || error?.meta?.requestId || 'n/a'}`,
+    `Tipo: ${context?.type || error?.meta?.type || 'n/a'}`,
+    `Code: ${error?.code || 'n/a'}`,
+    `Endpoint: ${error?.meta?.endpoint || 'n/a'}`,
+    `Status: ${error?.meta?.status || 'n/a'}`,
+    `RawCode: ${error?.meta?.rawCode || 'n/a'}`,
+    `ExitCode: ${error?.meta?.exitCode ?? 'n/a'}`,
+    `Signal: ${error?.meta?.signal || 'n/a'}`,
+    `Input: ${truncateText(error?.meta?.input || '', 300) || 'n/a'}`,
+    `FilePath: ${error?.meta?.filePath || 'n/a'}`,
+    `Mensagem usuário: ${getUserErrorMessage(error)}`,
+    `Causa técnica: ${cause || 'n/a'}`,
+  ];
+  return lines.join('\n');
 };
 
 const notifyFailure = async (sock, remoteJid, messageInfo, expirationMessage, error, context) => {
   const errorMessage = getUserErrorMessage(error);
+  const errorPrefix = getPlayText('error_prefix', '❌ Erro: ');
 
-  await sendAndStore(sock, remoteJid, { text: `❌ Erro: ${errorMessage}` }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
+  await sendAndStore(sock, remoteJid, { text: `${errorPrefix}${errorMessage}` }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
 
   if (adminJid) {
     await sendAndStore(sock, adminJid, {
-      text: `Erro no módulo play.\nChat: ${remoteJid}\nRequest: ${context?.requestId || 'n/a'}\nTipo: ${context?.type || 'n/a'}\nEndpoint: ${error?.meta?.endpoint || 'n/a'}\nStatus: ${error?.meta?.status || 'n/a'}\nErro: ${errorMessage}\nCode: ${error?.code || 'n/a'}`,
+      text: buildAdminFailureText(error, { ...(context || {}), remoteJid }),
     });
   }
 };
@@ -51,7 +73,7 @@ const processPlayRequest = async ({ sock, remoteJid, messageInfo, expirationMess
   const config = TYPE_CONFIG[type];
 
   if (!config) {
-    throw createError(ERROR_CODES.INVALID_INPUT, 'Tipo de mídia inválido.');
+    throw createError(ERROR_CODES.INVALID_INPUT, getPlayText('invalid_media_type', 'Tipo de mídia inválido.'), { technical: false });
   }
 
   logger.info('Play request iniciado.', {
@@ -65,7 +87,7 @@ const processPlayRequest = async ({ sock, remoteJid, messageInfo, expirationMess
 
   try {
     const candidateLinks = await ytdlsClient.resolveYoutubeCandidates(text);
-    await sendAndStore(sock, remoteJid, { text: config.waitText }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
+    await sendAndStore(sock, remoteJid, { text: getPlayWaitText(type) || config.waitText }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
 
     let downloadResult = null;
     let videoInfo = null;
@@ -96,6 +118,7 @@ const processPlayRequest = async ({ sock, remoteJid, messageInfo, expirationMess
           throw withErrorMeta(createError(ERROR_CODES.API, buildYouTubeBotCheckUserMessage()), {
             endpoint: error?.meta?.endpoint || YTDLS_ENDPOINTS.download,
             cause: error?.meta?.cause || error?.message || '',
+            technical: false,
           });
         }
 
@@ -109,9 +132,10 @@ const processPlayRequest = async ({ sock, remoteJid, messageInfo, expirationMess
     if (!downloadResult) {
       throw (
         lastDownloadError ||
-        createError(ERROR_CODES.API, 'Falha ao baixar o arquivo localmente.', {
+        createError(ERROR_CODES.API, getPlayText('download_failed', 'Falha ao baixar o arquivo localmente.'), {
           endpoint: YTDLS_ENDPOINTS.download,
           requestId,
+          technical: true,
         })
       );
     }
@@ -134,7 +158,12 @@ const processPlayRequest = async ({ sock, remoteJid, messageInfo, expirationMess
     });
 
     if (fallbackToAudio) {
-      await sendAndStore(sock, remoteJid, { text: '⚠️ Este link retornou somente áudio. Enviando no formato de áudio.' }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
+      await sendAndStore(
+        sock,
+        remoteJid,
+        { text: getPlayText('video_fallback_to_audio', '⚠️ Este link retornou somente áudio. Enviando no formato de áudio.') },
+        { quoted: messageInfo, ephemeralExpiration: expirationMessage },
+      );
     }
 
     if (deliveredType === 'audio') {
@@ -280,9 +309,7 @@ export const handleTypedPlayCommand = async ({ sock, remoteJid, messageInfo, exp
   try {
     if (!text?.trim()) {
       const commandName = resolveCommandNameByType(type);
-      const usageText =
-        getPlayUsageText(commandName, { commandPrefix }) ||
-        (type === 'audio' ? `🎵 Uso: ${commandPrefix}play <link do YouTube ou termo de busca>` : `🎬 Uso: ${commandPrefix}playvid <link do YouTube ou termo de busca>`);
+      const usageText = getPlayUsageText(commandName, { commandPrefix }) || getPlayUsageFallbackText(type, commandPrefix);
 
       await sendAndStore(sock, remoteJid, { text: usageText }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
       return;
