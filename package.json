@@ -124,7 +124,7 @@
     "@tailwindcss/cli": "^4.2.1",
     "ajv": "^8.18.0",
     "daisyui": "^5.5.19",
-    "eslint": "^9.39.2",
+    "eslint": "^10.0.2",
     "prettier": "^3.8.1",
     "tailwindcss": "^4.2.1",
     "vite": "^6.4.1"
