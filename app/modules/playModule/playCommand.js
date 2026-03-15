@@ -19,6 +19,7 @@ const DEFAULT_TIMEOUT_MS = Number.parseInt(process.env.PLAY_TIMEOUT_MS || '90000
 const DOWNLOAD_TIMEOUT_MS = Number.parseInt(process.env.PLAY_DOWNLOAD_TIMEOUT_MS || '1800000', 10);
 const YTDLP_INFO_TIMEOUT_MS = Number.parseInt(process.env.PLAY_YTDLP_INFO_TIMEOUT_MS || '120000', 10);
 const YTDLP_BINARY_PATH = (process.env.PLAY_YTDLP_BINARY_PATH || DEFAULT_YTDLP_BINARY_PATH).trim();
+const YTDLP_COOKIES_FROM_BROWSER = (process.env.PLAY_YTDLP_COOKIES_FROM_BROWSER || '').trim();
 const PLAY_MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
 const PLAY_LOCAL_DIR = path.join(PLAY_MODULE_DIR, 'local');
 const PLAY_DOWNLOADS_DIR = path.join(PLAY_LOCAL_DIR, 'downloads');
@@ -728,22 +729,90 @@ const ensureYtDlpReady = async () => {
   return YTDLP_BINARY_PATH;
 };
 
+const YOUTUBE_AUTH_COOKIE_NAMES = new Set(['SID', 'SSID', 'HSID', 'SAPISID', 'APISID', '__Secure-1PSID', '__Secure-3PSID', '__Secure-1PAPISID', '__Secure-3PAPISID']);
 let warnedInvalidCookiesPath = false;
+let warnedMissingCookiesPath = false;
+let warnedWeakCookiesPath = false;
+
+const inspectYtDlpCookiesFile = (cookiePath) => {
+  try {
+    const raw = fs.readFileSync(cookiePath, 'utf8');
+    const lines = raw.split(/\r?\n/);
+    let totalEntries = 0;
+    let authCookieCount = 0;
+    let hasYoutubeDomain = false;
+    let hasGoogleDomain = false;
+
+    for (const line of lines) {
+      if (!line || line.startsWith('#')) continue;
+      const parts = line.split('\t');
+      if (parts.length < 7) continue;
+      totalEntries += 1;
+
+      const domain = String(parts[0] || '').toLowerCase();
+      const cookieName = String(parts[5] || '').trim();
+      if (domain.includes('youtube.com')) hasYoutubeDomain = true;
+      if (domain.includes('google.com')) hasGoogleDomain = true;
+      if (YOUTUBE_AUTH_COOKIE_NAMES.has(cookieName)) authCookieCount += 1;
+    }
+
+    return {
+      ok: true,
+      totalEntries,
+      authCookieCount,
+      hasYoutubeDomain,
+      hasGoogleDomain,
+      isLikelyAuthenticated: totalEntries > 0 && authCookieCount > 0 && hasYoutubeDomain,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error?.message || 'unknown',
+      totalEntries: 0,
+      authCookieCount: 0,
+      hasYoutubeDomain: false,
+      hasGoogleDomain: false,
+      isLikelyAuthenticated: false,
+    };
+  }
+};
 
 const resolveYtDlpCookiesPath = () => {
   const configuredPath = (process.env.PLAY_YTDLP_COOKIES_PATH || '').trim();
-  const cookiePath = configuredPath || DEFAULT_COOKIES_PATH;
+  const rawCookiePath = configuredPath || DEFAULT_COOKIES_PATH;
 
-  if (!cookiePath) return null;
+  if (!rawCookiePath) return null;
+  const cookiePath = path.isAbsolute(rawCookiePath) ? rawCookiePath : path.resolve(PROJECT_ROOT_DIR, rawCookiePath);
   if (!fs.existsSync(cookiePath)) {
-    if (configuredPath && !warnedInvalidCookiesPath) {
-      warnedInvalidCookiesPath = true;
+    if (!warnedMissingCookiesPath) {
+      warnedMissingCookiesPath = true;
       logger.warn('Play local: arquivo de cookies configurado não encontrado.', {
         endpoint: YTDLS_ENDPOINTS.download,
         cookiePath,
+        configuredPath: Boolean(configuredPath),
       });
     }
     return null;
+  }
+
+  const cookiesDiagnostics = inspectYtDlpCookiesFile(cookiePath);
+  if (!cookiesDiagnostics.ok && !warnedInvalidCookiesPath) {
+    warnedInvalidCookiesPath = true;
+    logger.warn('Play local: falha ao ler arquivo de cookies do yt-dlp.', {
+      endpoint: YTDLS_ENDPOINTS.download,
+      cookiePath,
+      cause: cookiesDiagnostics.error,
+    });
+  } else if (cookiesDiagnostics.ok && !cookiesDiagnostics.isLikelyAuthenticated && !warnedWeakCookiesPath) {
+    warnedWeakCookiesPath = true;
+    logger.warn('Play local: cookies carregados, mas parecem incompletos para autenticação no YouTube.', {
+      endpoint: YTDLS_ENDPOINTS.download,
+      cookiePath,
+      totalEntries: cookiesDiagnostics.totalEntries,
+      authCookieCount: cookiesDiagnostics.authCookieCount,
+      hasYoutubeDomain: cookiesDiagnostics.hasYoutubeDomain,
+      hasGoogleDomain: cookiesDiagnostics.hasGoogleDomain,
+    });
   }
 
   return cookiePath;
@@ -754,6 +823,8 @@ const buildYtDlpArgsBase = () => {
   const cookiesPath = resolveYtDlpCookiesPath();
   if (cookiesPath) {
     args.push('--cookies', cookiesPath);
+  } else if (YTDLP_COOKIES_FROM_BROWSER) {
+    args.push('--cookies-from-browser', YTDLP_COOKIES_FROM_BROWSER);
   }
   return args;
 };
@@ -1040,6 +1111,17 @@ const isYouTubeBotCheckCause = (error) => {
   const cause = String(error?.meta?.cause || '').toLowerCase();
   const message = String(error?.message || '').toLowerCase();
   return cause.includes('sign in to confirm') || message.includes('sign in to confirm');
+};
+
+const buildYouTubeBotCheckUserMessage = () => {
+  const cookiesPath = resolveYtDlpCookiesPath();
+  if (cookiesPath) {
+    return 'YouTube solicitou verificação anti-bot. Atualize o arquivo .secrets/cookies.txt e tente novamente.';
+  }
+  if (YTDLP_COOKIES_FROM_BROWSER) {
+    return 'YouTube solicitou verificação anti-bot. Verifique o perfil informado em PLAY_YTDLP_COOKIES_FROM_BROWSER e tente novamente.';
+  }
+  return 'YouTube solicitou verificação anti-bot. Configure PLAY_YTDLP_COOKIES_PATH com um cookies.txt válido e tente novamente.';
 };
 
 const fetchVideoInfo = async (query, fallback) => {
@@ -1413,21 +1495,28 @@ const processPlayRequest = async ({ sock, remoteJid, messageInfo, expirationMess
         break;
       } catch (error) {
         lastDownloadError = error;
-        const hasNextCandidate = index < candidateLinks.length - 1;
-        if (!hasNextCandidate || !isYouTubeBotCheckCause(error)) {
-          throw error;
+        if (isYouTubeBotCheckCause(error)) {
+          const cookiesPath = resolveYtDlpCookiesPath();
+          logger.warn('Play download: bloqueio anti-bot detectado; abortando novas tentativas de candidato.', {
+            requestId,
+            remoteJid,
+            type,
+            endpoint: error?.meta?.endpoint || YTDLS_ENDPOINTS.download,
+            attempt: index + 1,
+            candidateLink,
+            cookiesPath: cookiesPath || null,
+            cause: truncateText(error?.meta?.cause || error?.message || ''),
+          });
+          throw withErrorMeta(createError(ERROR_CODES.API, buildYouTubeBotCheckUserMessage()), {
+            endpoint: error?.meta?.endpoint || YTDLS_ENDPOINTS.download,
+            cause: error?.meta?.cause || error?.message || '',
+          });
         }
 
-        logger.warn('Play download: vídeo bloqueado por anti-bot, tentando próximo resultado.', {
-          requestId,
-          remoteJid,
-          type,
-          endpoint: error?.meta?.endpoint || YTDLS_ENDPOINTS.download,
-          attempt: index + 1,
-          nextAttempt: index + 2,
-          candidateLink,
-          cause: truncateText(error?.meta?.cause || error?.message || ''),
-        });
+        const hasNextCandidate = index < candidateLinks.length - 1;
+        if (!hasNextCandidate) {
+          throw error;
+        }
       }
     }
 
