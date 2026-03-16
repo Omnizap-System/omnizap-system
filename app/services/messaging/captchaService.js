@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import logger from '#logger';
 import { getJidUser } from '../../config/index.js';
 import { isUserAdmin, updateGroupParticipants } from '../../config/index.js';
@@ -200,7 +201,7 @@ const handleCaptchaTimeout = async (groupId, userId) => {
   const entry = groupMap?.get(userId);
   if (!entry) return;
 
-  if (Date.now() < entry.expiresAt) {
+  if (__timeNowMs() < entry.expiresAt) {
     return;
   }
 
@@ -377,7 +378,7 @@ export const registerCaptchaChallenge = ({ groupId, participantJid, messageKey, 
     cleanupMessageStateForEntry(existingMatch.entry);
   }
 
-  const expiresAt = Date.now() + CAPTCHA_TIMEOUT_MS;
+  const expiresAt = __timeNowMs() + CAPTCHA_TIMEOUT_MS;
   const messageId = messageKey?.id || null;
   const normalizedText = normalizeMessageText(messageText);
   const messageStateKey = messageId && normalizedText ? buildMessageStateKey(groupId, messageId) : null;

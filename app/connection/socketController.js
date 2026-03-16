@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import makeWASocket, { DisconnectReason, Browsers, getAggregateVotesInPollMessage, areJidsSameUser, WAMessageStatus, WAMessageStubType, delayCancellable, getStatusFromReceiptType, promiseTimeout } from '@whiskeysockets/baileys';
 
 import NodeCache from 'node-cache';
@@ -715,7 +716,7 @@ const registerBaileysEventLoggers = (sock) => {
         action: 'baileys_event',
         event: eventName,
         ...summary,
-        timestamp: new Date().toISOString(),
+        timestamp: __timeNowIso(),
       });
     });
   }
@@ -922,7 +923,7 @@ const registerBaileysEventJournal = (sock, generation) => {
           message_id: refs.messageId,
           participant_id: refs.participantId,
           payload_summary: summary,
-          event_timestamp: new Date(),
+          event_timestamp: __timeNow(),
         });
       } catch (error) {
         logger.warn('Falha ao enfileirar evento Baileys para journal.', {
@@ -1079,7 +1080,7 @@ const resetReconnectState = () => {
  * @returns {number} O número da próxima tentativa.
  */
 const getNextReconnectAttempt = () => {
-  const now = Date.now();
+  const now = __timeNowMs();
   if (!reconnectWindowStartedAt || now - reconnectWindowStartedAt >= BAILEYS_RECONNECT_ATTEMPT_RESET_MS) {
     reconnectWindowStartedAt = now;
     connectionAttempts = 0;
@@ -1107,7 +1108,7 @@ const scheduleReconnect = (delay) => {
           action: 'reconnect_schedule_failure',
           errorMessage: error?.message,
           stack: error?.stack,
-          timestamp: new Date().toISOString(),
+          timestamp: __timeNowIso(),
         });
       });
     })
@@ -1148,7 +1149,7 @@ const releaseBaileysWriterLock = async (reason = 'unknown') => {
       reason,
       released,
       lockName: BAILEYS_SINGLE_WRITER_LOCK_NAME,
-      timestamp: new Date().toISOString(),
+      timestamp: __timeNowIso(),
     });
   } catch (error) {
     logger.warn('Falha ao liberar lock de escritor do Baileys.', {
@@ -1156,7 +1157,7 @@ const releaseBaileysWriterLock = async (reason = 'unknown') => {
       reason,
       lockName: BAILEYS_SINGLE_WRITER_LOCK_NAME,
       errorMessage: error?.message,
-      timestamp: new Date().toISOString(),
+      timestamp: __timeNowIso(),
     });
   } finally {
     try {
@@ -1196,7 +1197,7 @@ const ensureBaileysWriterLock = async () => {
         timeoutSeconds: BAILEYS_SINGLE_WRITER_LOCK_TIMEOUT_SECONDS,
         status: Number.isFinite(lockStatus) ? lockStatus : null,
         retryAfterMs: BAILEYS_SINGLE_WRITER_LOCK_RETRY_DELAY_MS,
-        timestamp: new Date().toISOString(),
+        timestamp: __timeNowIso(),
       });
       return false;
     }
@@ -1206,7 +1207,7 @@ const ensureBaileysWriterLock = async () => {
       action: 'baileys_writer_lock_acquired',
       lockName: BAILEYS_SINGLE_WRITER_LOCK_NAME,
       timeoutSeconds: BAILEYS_SINGLE_WRITER_LOCK_TIMEOUT_SECONDS,
-      timestamp: new Date().toISOString(),
+      timestamp: __timeNowIso(),
     });
     return true;
   } catch (error) {
@@ -1264,7 +1265,7 @@ const syncGroupsOnConnectionOpen = async (sock) => {
   if (!GROUP_SYNC_ON_CONNECT) {
     logger.info('Sincronização de grupos no connect desativada por configuração.', {
       action: 'groups_sync_disabled',
-      timestamp: new Date().toISOString(),
+      timestamp: __timeNowIso(),
     });
     return;
   }
@@ -1303,7 +1304,7 @@ const syncGroupsOnConnectionOpen = async (sock) => {
     batchSize: GROUP_SYNC_BATCH_SIZE,
     maxGroups: GROUP_SYNC_MAX_GROUPS > 0 ? GROUP_SYNC_MAX_GROUPS : null,
     timeoutMs: GROUP_SYNC_TIMEOUT_MS,
-    timestamp: new Date().toISOString(),
+    timestamp: __timeNowIso(),
   });
 };
 
@@ -1326,7 +1327,7 @@ export async function connectToWhatsApp() {
 
   logger.info('Iniciando conexão com o WhatsApp...', {
     action: 'connect_init',
-    timestamp: new Date().toISOString(),
+    timestamp: __timeNowIso(),
   });
   connectPromise = (async () => {
     clearReconnectTimeout();
@@ -1386,7 +1387,7 @@ export async function connectToWhatsApp() {
       if (!isCurrentSocket()) return;
       logger.debug('Atualizando credenciais de autenticação...', {
         action: 'creds_update',
-        timestamp: new Date().toISOString(),
+        timestamp: __timeNowIso(),
       });
       await saveCreds();
     });
@@ -1402,7 +1403,7 @@ export async function connectToWhatsApp() {
         status: update.connection,
         lastDisconnect: update.lastDisconnect?.error?.message || null,
         isNewLogin: update.isNewLogin || false,
-        timestamp: new Date().toISOString(),
+        timestamp: __timeNowIso(),
       });
     });
 
@@ -1707,7 +1708,7 @@ export async function connectToWhatsApp() {
             from: call.from,
             isGroup: call.isGroup || false,
             isVideo: call.isVideo || false,
-            timestamp: new Date().toISOString(),
+            timestamp: __timeNowIso(),
           });
         } catch (error) {
           logger.warn('Falha ao rejeitar chamada automaticamente.', {
@@ -1726,7 +1727,7 @@ export async function connectToWhatsApp() {
     logger.info('Conexão com o WhatsApp estabelecida com sucesso.', {
       action: 'connect_success',
       generation,
-      timestamp: new Date().toISOString(),
+      timestamp: __timeNowIso(),
     });
   })();
 
@@ -1752,7 +1753,7 @@ async function handleConnectionUpdate(update, sock) {
   if (qr) {
     logger.info('📱 QR Code gerado! Escaneie com seu WhatsApp.', {
       action: 'qr_code_generated',
-      timestamp: new Date().toISOString(),
+      timestamp: __timeNowIso(),
     });
     qrcode.generate(qr, { small: true });
   }
@@ -1774,7 +1775,7 @@ async function handleConnectionUpdate(update, sock) {
           delay: reconnectDelay,
           reasonCode: disconnectCode,
           errorMessage,
-          timestamp: new Date().toISOString(),
+          timestamp: __timeNowIso(),
         });
         activeSocket = null;
         storeActiveSocket(null);
@@ -1787,12 +1788,12 @@ async function handleConnectionUpdate(update, sock) {
           retryAfterMs: BAILEYS_RECONNECT_ATTEMPT_RESET_MS,
           reasonCode: disconnectCode,
           errorMessage,
-          timestamp: new Date().toISOString(),
+          timestamp: __timeNowIso(),
         });
         activeSocket = null;
         storeActiveSocket(null);
         connectionAttempts = 0;
-        reconnectWindowStartedAt = Date.now();
+        reconnectWindowStartedAt = __timeNowMs();
         scheduleReconnect(BAILEYS_RECONNECT_ATTEMPT_RESET_MS);
       }
     } else {
@@ -1800,7 +1801,7 @@ async function handleConnectionUpdate(update, sock) {
         action: 'connection_closed',
         reasonCode: disconnectCode,
         errorMessage,
-        timestamp: new Date().toISOString(),
+        timestamp: __timeNowIso(),
       });
       activeSocket = null;
       storeActiveSocket(null);
@@ -1811,7 +1812,7 @@ async function handleConnectionUpdate(update, sock) {
   if (connection === 'open') {
     logger.info('✅ Conectado com sucesso ao WhatsApp!', {
       action: 'connection_open',
-      timestamp: new Date().toISOString(),
+      timestamp: __timeNowIso(),
     });
 
     resetReconnectState();
@@ -1821,7 +1822,7 @@ async function handleConnectionUpdate(update, sock) {
       process.send('ready');
       logger.info('🟢 Sinal de "ready" enviado ao PM2.', {
         action: 'pm2_ready_signal',
-        timestamp: new Date().toISOString(),
+        timestamp: __timeNowIso(),
       });
     }
 
@@ -1833,7 +1834,7 @@ async function handleConnectionUpdate(update, sock) {
         errorMessage: error.message,
         stack: error.stack,
         timeoutMs: GROUP_SYNC_TIMEOUT_MS,
-        timestamp: new Date().toISOString(),
+        timestamp: __timeNowIso(),
       });
     }
   }
@@ -1864,7 +1865,7 @@ async function handleMessageUpdate(updates, sock) {
         statusName: status?.name ?? null,
         stubTypeCode: stubType?.code ?? null,
         stubTypeName: stubType?.name ?? null,
-        timestamp: new Date().toISOString(),
+        timestamp: __timeNowIso(),
       });
     }
 
@@ -1885,13 +1886,13 @@ async function handleMessageUpdate(updates, sock) {
             participant: key.participant || null,
             votesCount: Object.values(aggregatedVotes || {}).reduce((a, b) => a + b, 0),
             votes: aggregatedVotes,
-            timestamp: new Date().toISOString(),
+            timestamp: __timeNowIso(),
           });
         } else {
           logger.warn('⚠️ Mensagem da enquete não encontrada.', {
             action: 'poll_message_not_found',
             key,
-            timestamp: new Date().toISOString(),
+            timestamp: __timeNowIso(),
           });
         }
       } catch (error) {
@@ -1900,7 +1901,7 @@ async function handleMessageUpdate(updates, sock) {
           errorMessage: error.message,
           stack: error.stack,
           key,
-          timestamp: new Date().toISOString(),
+          timestamp: __timeNowIso(),
         });
       }
     }
@@ -1932,7 +1933,7 @@ async function handleGroupUpdate(updates) {
           groupId,
           groupName: updatedData.subject || oldData.subject || 'Desconhecido',
           changedFields,
-          timestamp: new Date().toISOString(),
+          timestamp: __timeNowIso(),
         });
       } catch (error) {
         logger.error('❌ Erro ao atualizar metadados do grupo', {
@@ -1940,7 +1941,7 @@ async function handleGroupUpdate(updates) {
           errorMessage: error.message,
           stack: error.stack,
           event,
-          timestamp: new Date().toISOString(),
+          timestamp: __timeNowIso(),
         });
       }
     }),
@@ -1955,7 +1956,7 @@ export function getActiveSocket() {
   logger.debug('🔍 Recuperando instância do socket ativo.', {
     action: 'get_active_socket',
     socketExists: !!activeSocket,
-    timestamp: new Date().toISOString(),
+    timestamp: __timeNowIso(),
   });
   return activeSocket;
 }
@@ -1978,7 +1979,7 @@ async function runControllerSocketMethod(methodName, ...args) {
         action: methodName,
         socketExists: !!activeSocket,
         socketOpen: isSocketOpen(activeSocket),
-        timestamp: new Date().toISOString(),
+        timestamp: __timeNowIso(),
       });
       throw new Boom('Socket do WhatsApp indisponível no momento.', { statusCode: 503 });
     }
@@ -2213,13 +2214,13 @@ export async function reconnectToWhatsApp() {
   if (activeSocket && activeSocket.ws?.readyState === WebSocket.OPEN) {
     logger.info('♻️ Forçando fechamento do socket para reconectar...', {
       action: 'force_reconnect',
-      timestamp: new Date().toISOString(),
+      timestamp: __timeNowIso(),
     });
     activeSocket.ws.close();
   } else {
     logger.warn('⚠️ Nenhum socket ativo detectado. Iniciando nova conexão manualmente.', {
       action: 'reconnect_no_active_socket',
-      timestamp: new Date().toISOString(),
+      timestamp: __timeNowIso(),
     });
     await connectToWhatsApp();
   }
@@ -2228,7 +2229,7 @@ export async function reconnectToWhatsApp() {
 if (process.argv[1] === __filename) {
   logger.info('🚀 Socket Controller iniciado diretamente via CLI.', {
     action: 'module_direct_execution',
-    timestamp: new Date().toISOString(),
+    timestamp: __timeNowIso(),
   });
 
   connectToWhatsApp().catch((err) => {
@@ -2236,7 +2237,7 @@ if (process.argv[1] === __filename) {
       action: 'direct_connection_failure',
       errorMessage: err.message,
       stack: err.stack,
-      timestamp: new Date().toISOString(),
+      timestamp: __timeNowIso(),
     });
     process.exit(1);
   });

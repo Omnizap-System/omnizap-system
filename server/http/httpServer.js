@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import http from 'node:http';
 
 import logger from '#logger';
@@ -41,7 +42,7 @@ export const startHttpServer = () => {
   const { host, port, path: metricsPath } = getMetricsServerConfig();
 
   server = http.createServer(async (req, res) => {
-    const requestStartedAt = Date.now();
+    const requestStartedAt = __timeNowMs();
     const requestId = normalizeRequestId(req.headers['x-request-id']);
     res.setHeader('X-Request-Id', requestId);
 
@@ -67,7 +68,7 @@ export const startHttpServer = () => {
 
     res.once('finish', () => {
       recordHttpRequest({
-        durationMs: Date.now() - requestStartedAt,
+        durationMs: __timeNowMs() - requestStartedAt,
         method: req.method,
         statusCode: res.statusCode,
         routeGroup,

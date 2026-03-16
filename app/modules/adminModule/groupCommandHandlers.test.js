@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import assert from 'node:assert/strict';
 import { after, afterEach, beforeEach, test } from 'node:test';
 
@@ -123,7 +124,7 @@ const createSockStub = () => {
         return {
           key: { remoteJid: jid },
           message: content,
-          messageTimestamp: Math.floor(Date.now() / 1000),
+          messageTimestamp: Math.floor(__timeNowMs() / 1000),
         };
       },
       groupParticipantsUpdate: async (groupId, participants, action) => {

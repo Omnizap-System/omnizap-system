@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 export const BIOME_KEYS = ['floresta', 'cidade', 'caverna'];
 
 export const BIOME_DEFINITIONS = {
@@ -87,7 +88,7 @@ export const resolveDefaultBiomeForGroup = (groupJid) => {
   return BIOME_DEFINITIONS[biomeKey];
 };
 
-export const resolveMissionRefs = (date = new Date()) => {
+export const resolveMissionRefs = (date = __timeNow()) => {
   const year = date.getUTCFullYear();
   const month = date.getUTCMonth();
   const day = date.getUTCDate();

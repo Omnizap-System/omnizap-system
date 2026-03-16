@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
@@ -218,7 +219,7 @@ const getCacheBucket = (cacheMap, key) => {
 
 const getCachedSnapshot = async ({ cacheMap, key, ttlSeconds, staleWhileRefresh = true, staleOnError = true, load }) => {
   const bucket = getCacheBucket(cacheMap, key);
-  const now = Date.now();
+  const now = __timeNowMs();
   const hasValue = bucket.value !== null;
   const hasFreshValue = hasValue && now < bucket.expiresAt;
 
@@ -231,7 +232,7 @@ const getCachedSnapshot = async ({ cacheMap, key, ttlSeconds, staleWhileRefresh 
       .then(load)
       .then((value) => {
         bucket.value = value;
-        bucket.expiresAt = Date.now() + ttlSeconds * 1000;
+        bucket.expiresAt = __timeNowMs() + ttlSeconds * 1000;
         return value;
       })
       .finally(() => {
@@ -598,10 +599,10 @@ const buildPackPublishStateData = async (pack, { includeUploads = true, connecti
 
 const maybeCleanupStaleDraftPacks = async () => {
   if (staleDraftCleanupState.running) return;
-  if (Date.now() - staleDraftCleanupState.lastRunAt < WEB_DRAFT_CLEANUP_RUN_INTERVAL_MS) return;
+  if (__timeNowMs() - staleDraftCleanupState.lastRunAt < WEB_DRAFT_CLEANUP_RUN_INTERVAL_MS) return;
 
   staleDraftCleanupState.running = true;
-  staleDraftCleanupState.lastRunAt = Date.now();
+  staleDraftCleanupState.lastRunAt = __timeNowMs();
 
   try {
     const rows = await executeQuery(
@@ -708,7 +709,7 @@ const saveWebPackEditToken = ({ packId, ownerJid }) => {
   webPackEditTokenMap.set(token, {
     packId,
     ownerJid,
-    expiresAt: Date.now() + PACK_WEB_EDIT_TOKEN_TTL_MS,
+    expiresAt: __timeNowMs() + PACK_WEB_EDIT_TOKEN_TTL_MS,
   });
   return token;
 };
@@ -718,7 +719,7 @@ const resolveWebPackEditToken = (token) => {
   if (!normalized) return null;
   const entry = webPackEditTokenMap.get(normalized);
   if (!entry) return null;
-  if (entry.expiresAt <= Date.now()) {
+  if (entry.expiresAt <= __timeNowMs()) {
     webPackEditTokenMap.delete(normalized);
     return null;
   }
@@ -786,7 +787,7 @@ const isPreviewVariantRequested = (url) => {
 const getStickerPreviewFromCache = (cacheKey) => {
   const entry = STICKER_PREVIEW_CACHE.get(cacheKey);
   if (!entry) return null;
-  if (entry.expiresAt <= Date.now()) {
+  if (entry.expiresAt <= __timeNowMs()) {
     STICKER_PREVIEW_CACHE.delete(cacheKey);
     return null;
   }
@@ -806,7 +807,7 @@ const saveStickerPreviewToCache = (cacheKey, buffer) => {
   }
   STICKER_PREVIEW_CACHE.set(cacheKey, {
     buffer,
-    expiresAt: Date.now() + STICKER_PREVIEW_CACHE_TTL_MS,
+    expiresAt: __timeNowMs() + STICKER_PREVIEW_CACHE_TTL_MS,
   });
 };
 
@@ -1719,7 +1720,7 @@ const buildMarketplaceStatsSnapshot = async (visibility) => {
 const getMarketplaceStatsCached = async (visibility) => {
   const normalizedVisibility = normalizeCatalogVisibility(visibility);
   const bucket = getHomeMarketplaceStatsCacheBucket(normalizedVisibility);
-  const now = Date.now();
+  const now = __timeNowMs();
   const hasValue = Boolean(bucket.value);
 
   if (hasValue && now < bucket.expiresAt) {
@@ -1730,7 +1731,7 @@ const getMarketplaceStatsCached = async (visibility) => {
     bucket.pending = withTimeout(buildMarketplaceStatsSnapshot(normalizedVisibility), 5000)
       .then((data) => {
         bucket.value = data;
-        bucket.expiresAt = Date.now() + HOME_MARKETPLACE_STATS_CACHE_SECONDS * 1000;
+        bucket.expiresAt = __timeNowMs() + HOME_MARKETPLACE_STATS_CACHE_SECONDS * 1000;
         return data;
       })
       .finally(() => {
@@ -2485,7 +2486,7 @@ const handleManagedPackRequest = async (req, res, packKey) => {
         deleted: true,
         pack_key: result?.deletedPack?.pack_key || normalizedPackKey,
         id: result?.deletedPack?.id || context.pack?.id || null,
-        deleted_at: toIsoOrNull(result?.deletedPack?.deleted_at || new Date()),
+        deleted_at: toIsoOrNull(result?.deletedPack?.deleted_at || __timeNow()),
         removed_sticker_count: Number(result?.removedCount || 0),
       });
     } catch (error) {
@@ -3468,7 +3469,7 @@ const handleUploadStickerToPackRequest = async (req, res, packKey) => {
             source_mimetype: decoded.mimetype || 'image/webp',
             upload_status: 'processing',
             attempt_count: 1,
-            last_attempt_at: new Date(),
+            last_attempt_at: __timeNow(),
           },
           connection,
         );
@@ -3481,7 +3482,7 @@ const handleUploadStickerToPackRequest = async (req, res, packKey) => {
             error_code: null,
             error_message: null,
             attempt_count: Math.max(1, Number(existingUpload.attempt_count || 0) + 1),
-            last_attempt_at: new Date(),
+            last_attempt_at: __timeNow(),
           },
           connection,
         );

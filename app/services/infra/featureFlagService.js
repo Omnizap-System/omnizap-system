@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import { createHash } from 'node:crypto';
 
 import logger from '#logger';
@@ -65,7 +66,7 @@ const loadFlagsFromDatabase = async () => {
 };
 
 export const refreshFeatureFlags = async ({ force = false } = {}) => {
-  const now = Date.now();
+  const now = __timeNowMs();
   const isFresh = now - cacheState.loadedAt < FEATURE_FLAG_CACHE_TTL_MS;
   if (!force && isFresh) return cacheState.byName;
 

@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import { createGoogleWebAuthRuntime, normalizeGoogleSubject } from './googleWebAuth/googleWebAuthRuntime.js';
 import { isWebAuthJwtEnabled, signWebAuthJwt, verifyWebAuthJwt } from './jwt/webJwtService.js';
 import userPasswordAuthService from './userPassword/index.js';
@@ -13,7 +14,7 @@ export const createStickerCatalogAuthContext = ({ executeQuery, runSqlTransactio
 
     const safeName = sanitizeText(name || '', 80, { allowEmpty: true }) || '';
     const normalizedOwnerJid = normalizeJid(ownerJid) || null;
-    const idempotencyKey = `google_web_welcome:${normalizedEmail}:${new Date().toISOString().slice(0, 10)}`;
+    const idempotencyKey = `google_web_welcome:${normalizedEmail}:${__timeNowIso().slice(0, 10)}`;
 
     void queueWelcomeEmail({
       to: normalizedEmail,

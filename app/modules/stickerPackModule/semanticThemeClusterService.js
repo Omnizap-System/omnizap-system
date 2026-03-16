@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import { createHash } from 'node:crypto';
 
 import OpenAI from 'openai';
@@ -177,7 +178,7 @@ const upsertSuggestionCacheRow = async ({ suggestionText, normalizedText, semant
 };
 
 const listSemanticClusters = async () => {
-  const now = Date.now();
+  const now = __timeNowMs();
   if (inMemoryClusterList.expiresAt > now && Array.isArray(inMemoryClusterList.items)) {
     return inMemoryClusterList.items;
   }
@@ -199,7 +200,7 @@ const listSemanticClusters = async () => {
         }))
         .filter((row) => row.id > 0 && Array.isArray(row.embedding) && row.embedding.length > 0);
       inMemoryClusterList = {
-        expiresAt: Date.now() + RESOLUTION_CACHE_TTL_MS,
+        expiresAt: __timeNowMs() + RESOLUTION_CACHE_TTL_MS,
         items: parsed,
       };
       for (const cluster of parsed) {
@@ -316,7 +317,7 @@ const resolveSemanticCluster = async (suggestionText) => {
   if (!shouldRunSemanticClustering()) return null;
 
   const memoryCached = inMemorySuggestionCache.get(normalizedSuggestion);
-  if (memoryCached && memoryCached.expiresAt > Date.now()) {
+  if (memoryCached && memoryCached.expiresAt > __timeNowMs()) {
     return memoryCached.value;
   }
 
@@ -331,7 +332,7 @@ const resolveSemanticCluster = async (suggestionText) => {
       suggestion: normalizedSuggestion,
     };
     inMemorySuggestionCache.set(normalizedSuggestion, {
-      expiresAt: Date.now() + RESOLUTION_CACHE_TTL_MS,
+      expiresAt: __timeNowMs() + RESOLUTION_CACHE_TTL_MS,
       value: payload,
     });
     return payload;
@@ -360,7 +361,7 @@ const resolveSemanticCluster = async (suggestionText) => {
       similarity: payload.similarity,
     });
     inMemorySuggestionCache.set(normalizedSuggestion, {
-      expiresAt: Date.now() + RESOLUTION_CACHE_TTL_MS,
+      expiresAt: __timeNowMs() + RESOLUTION_CACHE_TTL_MS,
       value: payload,
     });
     return payload;
@@ -388,7 +389,7 @@ const resolveSemanticCluster = async (suggestionText) => {
     similarity: 1,
   });
   inMemorySuggestionCache.set(normalizedSuggestion, {
-    expiresAt: Date.now() + RESOLUTION_CACHE_TTL_MS,
+    expiresAt: __timeNowMs() + RESOLUTION_CACHE_TTL_MS,
     value: payload,
   });
   return payload;

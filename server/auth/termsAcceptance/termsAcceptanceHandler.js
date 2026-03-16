@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import { createHash, randomUUID } from 'node:crypto';
 
 const DEFAULT_LEGAL_VERSION = '2026-03-07';
@@ -129,7 +130,7 @@ export const createTermsAcceptanceHandler = ({ executeQuery, tables, logger, sen
     }
 
     const source = normalizeTermsAcceptanceSource(payload.source) || legalDefaultAcceptanceSource;
-    const acceptedAt = new Date();
+    const acceptedAt = __timeNow();
     const acceptedAtClient = parseAcceptedAtClientDate(payload.accepted_at);
     const cookies = parseCookies(req);
     const sessionKey = normalizeTermsAcceptanceSessionKey(cookies[webSessionCookieName] || '');

@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import 'dotenv/config';
 
 import { isAdminCommand } from '../modules/adminModule/groupCommandHandlers.js';
@@ -51,7 +52,7 @@ const SITE_GROUP_LOGIN_URL = `${SITE_ORIGIN}/login`;
 let messageAnalyticsTableMissingLogged = false;
 const recentCommandExecutions = new Map();
 
-const pruneRecentCommandExecutions = (nowMs = Date.now()) => {
+const pruneRecentCommandExecutions = (nowMs = __timeNowMs()) => {
   for (const [cacheKey, expiresAt] of recentCommandExecutions.entries()) {
     if (expiresAt <= nowMs) {
       recentCommandExecutions.delete(cacheKey);
@@ -70,7 +71,7 @@ const isDuplicateCommandExecution = (chatId, messageId) => {
   const cacheKey = buildCommandExecutionCacheKey(chatId, messageId);
   if (!cacheKey) return false;
 
-  const nowMs = Date.now();
+  const nowMs = __timeNowMs();
   const expiresAt = recentCommandExecutions.get(cacheKey) || 0;
   if (expiresAt <= nowMs) {
     recentCommandExecutions.delete(cacheKey);
@@ -83,8 +84,8 @@ const isDuplicateCommandExecution = (chatId, messageId) => {
 const markCommandExecution = (chatId, messageId) => {
   const cacheKey = buildCommandExecutionCacheKey(chatId, messageId);
   if (!cacheKey) return;
-  pruneRecentCommandExecutions(Date.now());
-  recentCommandExecutions.set(cacheKey, Date.now() + MESSAGE_COMMAND_DEDUPE_TTL_MS);
+  pruneRecentCommandExecutions(__timeNowMs());
+  recentCommandExecutions.set(cacheKey, __timeNowMs() + MESSAGE_COMMAND_DEDUPE_TTL_MS);
 };
 
 const normalizeTriggerText = (value) =>

@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import { createHash, randomUUID } from 'node:crypto';
 import axios from 'axios';
 
@@ -35,7 +36,7 @@ export const createGoogleWebAuthService = ({ executeQuery, runSqlTransaction, ta
   const USER_PASSWORD_TABLE = String(tables.STICKER_WEB_USER_PASSWORD || 'web_user_password').trim() || 'web_user_password';
 
   const pruneExpiredGoogleSessions = () => {
-    const now = Date.now();
+    const now = __timeNowMs();
     for (const [token, session] of webGoogleSessionMap.entries()) {
       if (!session || Number(session.expiresAt || 0) <= now) {
         webGoogleSessionMap.delete(token);
@@ -145,15 +146,15 @@ export const createGoogleWebAuthService = ({ executeQuery, runSqlTransaction, ta
       picture: String(row.picture_url || '').trim() || null,
       ownerJid,
       ownerPhone,
-      createdAt: Number.isFinite(createdAtRaw) ? createdAtRaw : Date.now(),
+      createdAt: Number.isFinite(createdAtRaw) ? createdAtRaw : __timeNowMs(),
       expiresAt,
       lastSeenAt: Number.isFinite(lastSeenAtRaw) ? lastSeenAtRaw : 0,
-      lastDbTouchAt: Date.now(),
+      lastDbTouchAt: __timeNowMs(),
     };
   };
 
   const maybePruneExpiredGoogleSessionsFromDb = async () => {
-    const now = Date.now();
+    const now = __timeNowMs();
     if (now - googleWebSessionDbPruneAt < sessionDbPruneIntervalMs) return;
     googleWebSessionDbPruneAt = now;
     try {
@@ -368,7 +369,7 @@ export const createGoogleWebAuthService = ({ executeQuery, runSqlTransaction, ta
   const createGoogleWebSession = (claims, { ownerJid } = {}) => {
     pruneExpiredGoogleSessions();
     const token = randomUUID();
-    const now = Date.now();
+    const now = __timeNowMs();
     const resolvedOwnerJid = normalizeJid(ownerJid) || buildGoogleOwnerJid(claims.sub);
     const resolvedOwnerPhone = toWhatsAppPhoneDigits(resolvedOwnerJid) || '';
     return {
@@ -394,7 +395,7 @@ export const createGoogleWebAuthService = ({ executeQuery, runSqlTransaction, ta
 
   const issueAccessTokenForSession = (session) => {
     if (!session?.sub) return '';
-    const expiresInSeconds = Math.max(60, Math.floor((Number(session.expiresAt || 0) - Date.now()) / 1000));
+    const expiresInSeconds = Math.max(60, Math.floor((Number(session.expiresAt || 0) - __timeNowMs()) / 1000));
     return (
       signWebAuthJwt(
         {
@@ -495,7 +496,7 @@ export const createGoogleWebAuthService = ({ executeQuery, runSqlTransaction, ta
 
   const touchGoogleWebSessionActivity = (session) => {
     if (!session?.token || !session?.sub) return;
-    const now = Date.now();
+    const now = __timeNowMs();
     session.lastSeenAt = now;
     if (now - Number(session.lastDbTouchAt || 0) < sessionDbTouchIntervalMs) {
       return;

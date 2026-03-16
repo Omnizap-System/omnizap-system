@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import logger from '#logger';
 import { toIsoOrNull } from '../../http/httpRequestUtils.js';
 
@@ -109,7 +110,7 @@ export const fetchGitHubProjectSummary = async () => {
     throw new Error('GITHUB_REPOSITORY invalido');
   }
 
-  const now = Date.now();
+  const now = __timeNowMs();
   if (GITHUB_PROJECT_CACHE.value && now < GITHUB_PROJECT_CACHE.expiresAt) {
     return GITHUB_PROJECT_CACHE.value;
   }

@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import { withTimeout } from '../../http/httpRequestUtils.js';
 
 export const createStickerCatalogNonCatalogHandlers = ({ sendJson, sendText, logger, getSystemSummaryCached, systemSummaryCache, systemSummaryCacheSeconds, getReadmeSummaryCached, readmeSummaryCache, readmeSummaryCacheSeconds, getGlobalRankingSummaryCached, globalRankRefreshSeconds, globalRankCache, sanitizeRankingPayloadByBot, getActiveSocket, resolveBotUserCandidates, getMarketplaceGlobalStatsCached, marketplaceGlobalStatsCacheSeconds, marketplaceGlobalStatsCache, githubRepoInfo, githubProjectCacheSeconds, fetchGitHubProjectSummary, buildSupportInfo, buildBotContactInfo, getMarketplaceStatsCached, resolveGoogleWebSessionFromRequest, mapGoogleSessionResponseData, isAuthenticatedGoogleSession, stickerWebGoogleClientId, homeBootstrapExposeContact, trackWebVisitMetric, resolveVisitPathFromReferrer, normalizeCatalogVisibility }) => {
@@ -18,7 +19,7 @@ export const createStickerCatalogNonCatalogHandlers = ({ sendJson, sendText, log
       total_users: totalUsers,
       total_messages: totalMessages,
       total_commands: totalCommands,
-      updated_at: new Date().toISOString(),
+      updated_at: __timeNowIso(),
     };
 
     if (systemLatencyMs !== null) {

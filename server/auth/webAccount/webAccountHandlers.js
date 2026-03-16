@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import { scryptSync } from 'node:crypto';
 
 const MY_PROFILE_DEFAULT_STATS = Object.freeze({
@@ -119,7 +120,7 @@ const toPasswordRecoverySessionExpiresAt = (claims) => {
 const toPasswordRecoverySessionExpiresIn = (claims) => {
   const expUnix = Number(claims?.exp || 0);
   if (!Number.isFinite(expUnix) || expUnix <= 0) return null;
-  return Math.max(0, Math.floor(expUnix - Date.now() / 1000));
+  return Math.max(0, Math.floor(expUnix - __timeNowMs() / 1000));
 };
 
 const signPasswordRecoverySessionToken = ({ sub = '', email = '', ownerJid = '' } = {}, { isWebAuthJwtEnabled, signWebAuthJwt, passwordRecoverySessionAuthMethod, passwordRecoverySessionTtlSeconds }) => {
@@ -231,7 +232,7 @@ export const createWebAccountAuthHandlers = ({ sendJson, readJsonBody, logger, p
     return '';
   };
 
-  const maybePrunePasswordLoginIdentityThrottle = async (nowMs = Date.now()) => {
+  const maybePrunePasswordLoginIdentityThrottle = async (nowMs = __timeNowMs()) => {
     if (nowMs - passwordLoginIdentityPruneAt < 60 * 60 * 1000) return;
     passwordLoginIdentityPruneAt = nowMs;
     const staleAfterSeconds = Math.max(60 * 60, passwordLoginIdentityLockoutSeconds * 2);
@@ -264,12 +265,12 @@ export const createWebAccountAuthHandlers = ({ sendJson, readJsonBody, logger, p
       );
       const row = Array.isArray(rows) ? rows[0] : null;
       const lockedUntilMs = Date.parse(String(row?.locked_until || ''));
-      if (!Number.isFinite(lockedUntilMs) || lockedUntilMs <= Date.now()) {
+      if (!Number.isFinite(lockedUntilMs) || lockedUntilMs <= __timeNowMs()) {
         return { locked: false, retryAfterSeconds: 0 };
       }
       return {
         locked: true,
-        retryAfterSeconds: Math.max(1, Math.ceil((lockedUntilMs - Date.now()) / 1000)),
+        retryAfterSeconds: Math.max(1, Math.ceil((lockedUntilMs - __timeNowMs()) / 1000)),
       };
     } catch (error) {
       logger?.warn?.('Falha ao consultar throttle distribuido de login por identidade.', {
@@ -319,12 +320,12 @@ export const createWebAccountAuthHandlers = ({ sendJson, readJsonBody, logger, p
       );
       const row = Array.isArray(rows) ? rows[0] : null;
       const lockedUntilMs = Date.parse(String(row?.locked_until || ''));
-      if (!Number.isFinite(lockedUntilMs) || lockedUntilMs <= Date.now()) {
+      if (!Number.isFinite(lockedUntilMs) || lockedUntilMs <= __timeNowMs()) {
         return { locked: false, retryAfterSeconds: 0 };
       }
       return {
         locked: true,
-        retryAfterSeconds: Math.max(1, Math.ceil((lockedUntilMs - Date.now()) / 1000)),
+        retryAfterSeconds: Math.max(1, Math.ceil((lockedUntilMs - __timeNowMs()) / 1000)),
       };
     } catch (error) {
       logger?.warn?.('Falha ao registrar tentativa no throttle distribuido de login por identidade.', {
@@ -1199,7 +1200,7 @@ export const createWebAccountAuthHandlers = ({ sendJson, readJsonBody, logger, p
 
         let avgDaily = 0;
         if (usage.messages > 0 && usage.first_message_at) {
-          const daysDiff = Math.max(1, (Date.now() - new Date(usage.first_message_at).getTime()) / (1000 * 60 * 60 * 24));
+          const daysDiff = Math.max(1, (__timeNowMs() - new Date(usage.first_message_at).getTime()) / (1000 * 60 * 60 * 24));
           avgDaily = (usage.messages / daysDiff).toFixed(2);
         }
 

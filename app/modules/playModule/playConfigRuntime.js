@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -123,9 +124,7 @@ const toInt = (value, fallback, { min = Number.NEGATIVE_INFINITY, max = Number.P
 
 const normalizeStringArray = (value, fallback = []) => {
   if (!Array.isArray(value)) return [...fallback];
-  const normalized = value
-    .map((item) => String(item || '').trim())
-    .filter(Boolean);
+  const normalized = value.map((item) => String(item || '').trim()).filter(Boolean);
   return normalized.length ? normalized : [...fallback];
 };
 
@@ -151,7 +150,7 @@ const normalizeExecutionOptions = (raw) => {
 };
 
 const getPlayModuleConfigSnapshot = () => {
-  const now = Date.now();
+  const now = __timeNowMs();
   if (cachedModuleConfig && now < cachedSnapshotExpiresAt) {
     return cachedModuleConfig;
   }

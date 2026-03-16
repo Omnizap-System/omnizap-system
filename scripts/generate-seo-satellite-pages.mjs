@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
@@ -364,7 +365,7 @@ const run = async () => {
   const rawConfig = await fs.readFile(absoluteConfigPath, 'utf8');
   const parsedConfig = JSON.parse(rawConfig);
   const pages = Array.isArray(parsedConfig?.pages) ? parsedConfig.pages : [];
-  const generatedAt = String(parsedConfig?.generated_at || new Date().toISOString().slice(0, 10)).trim();
+  const generatedAt = String(parsedConfig?.generated_at || __timeNowIso().slice(0, 10)).trim();
 
   if (!pages.length) {
     throw new Error('config sem paginas');

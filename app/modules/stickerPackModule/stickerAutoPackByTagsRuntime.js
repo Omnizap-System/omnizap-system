@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import logger from '#logger';
 import { getActiveSocket } from '../../config/index.js';
 import { normalizeJid, resolveBotJid } from '../../config/index.js';
@@ -2888,7 +2889,7 @@ const updateAutoPackMetadata = async (packId, payload) => {
     pack_theme_key: payload.themeKey,
     pack_volume: payload.volume,
     is_auto_pack: 1,
-    last_rebalanced_at: new Date(),
+    last_rebalanced_at: __timeNow(),
   };
   if ('cover_sticker_id' in payload) {
     fields.cover_sticker_id = payload.cover_sticker_id ?? null;
@@ -2908,7 +2909,7 @@ const createAutoPackVolume = async ({ ownerJid, theme, subtheme, themeKey, group
     packThemeKey: themeKey,
     packVolume: volume,
     isAutoPack: true,
-    lastRebalancedAt: new Date(),
+    lastRebalancedAt: __timeNow(),
   });
 };
 
@@ -3323,7 +3324,7 @@ export const runStickerAutoPackByTagsCycle = async ({ enableAdditions = true, en
   }
 
   running = true;
-  const startedAt = Date.now();
+  const startedAt = __timeNowMs();
   const budgets = { added: 0, removed: 0 };
   let createdPacks = 0;
   let processedGroups = 0;
@@ -3400,7 +3401,7 @@ export const runStickerAutoPackByTagsCycle = async ({ enableAdditions = true, en
         pack_limit_skips: 0,
         processed_groups: 0,
         processed_volumes: 0,
-        duration_ms: Date.now() - startedAt,
+        duration_ms: __timeNowMs() - startedAt,
       });
       logger.debug('Auto-pack por tags: nenhum grupo elegível neste ciclo.', {
         action: 'sticker_auto_pack_by_tags_idle',
@@ -3451,7 +3452,7 @@ export const runStickerAutoPackByTagsCycle = async ({ enableAdditions = true, en
     const fillRate = budgets.added / Math.max(1, processedVolumes * TARGET_PACK_SIZE);
 
     recordStickerAutoPackCycle({
-      durationMs: Date.now() - startedAt,
+      durationMs: __timeNowMs() - startedAt,
       assetsScanned: Number(stats.assets_scanned || 0),
       assetsAdded: budgets.added,
       duplicateRate,
@@ -3468,7 +3469,7 @@ export const runStickerAutoPackByTagsCycle = async ({ enableAdditions = true, en
       pack_limit_skips: Number(packLimitSkips || 0),
       processed_groups: Number(processedGroups || 0),
       processed_volumes: Number(processedVolumes || 0),
-      duration_ms: Date.now() - startedAt,
+      duration_ms: __timeNowMs() - startedAt,
     });
 
     logger.info('Auto-pack por tags executado.', {
@@ -3492,7 +3493,7 @@ export const runStickerAutoPackByTagsCycle = async ({ enableAdditions = true, en
       cohesion_rebuild_threshold: Number(COHESION_REBUILD_THRESHOLD.toFixed(6)),
       duplicate_skips: duplicateSkips,
       pack_limit_skips: packLimitSkips,
-      duration_ms: Date.now() - startedAt,
+      duration_ms: __timeNowMs() - startedAt,
       duplicate_rate: Number(duplicateRate.toFixed(6)),
       rejection_rate: Number(rejectionRate.toFixed(6)),
       pack_fill_rate: Number(fillRate.toFixed(6)),
@@ -3537,7 +3538,7 @@ export const runStickerAutoPackByTagsCycle = async ({ enableAdditions = true, en
       pack_limit_skips: Number(packLimitSkips || 0),
       processed_groups: Number(processedGroups || 0),
       processed_volumes: Number(processedVolumes || 0),
-      duration_ms: Date.now() - startedAt,
+      duration_ms: __timeNowMs() - startedAt,
     });
   } finally {
     running = false;

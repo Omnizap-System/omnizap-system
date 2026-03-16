@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import { executeQuery, TABLES } from '../../../database/index.js';
 import { normalizeJid } from '../../config/index.js';
 import { toWhatsAppPhoneDigits } from './whatsappLoginLinkService.js';
@@ -21,7 +22,7 @@ const normalizeCacheKey = ({ ownerJid = '', ownerPhone = '' }) => {
 const getCachedGoogleLinkStatus = (cacheKey) => {
   const cached = googleLinkCheckCache.get(cacheKey);
   if (!cached) return null;
-  if (Number(cached.expiresAt || 0) <= Date.now()) {
+  if (Number(cached.expiresAt || 0) <= __timeNowMs()) {
     googleLinkCheckCache.delete(cacheKey);
     return null;
   }
@@ -31,7 +32,7 @@ const getCachedGoogleLinkStatus = (cacheKey) => {
 const setCachedGoogleLinkStatus = (cacheKey, linked) => {
   googleLinkCheckCache.set(cacheKey, {
     linked: Boolean(linked),
-    expiresAt: Date.now() + GOOGLE_LINK_CHECK_CACHE_TTL_MS,
+    expiresAt: __timeNowMs() + GOOGLE_LINK_CHECK_CACHE_TTL_MS,
   });
 };
 

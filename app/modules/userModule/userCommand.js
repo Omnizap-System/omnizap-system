@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import { executeQuery, TABLES } from '../../../database/index.js';
 import { getJidUser, getProfilePicBuffer, normalizeJid } from '../../config/index.js';
 import { isUserAdmin } from '../../config/index.js';
@@ -242,10 +243,10 @@ const formatPercent = (value, total) => {
 /**
  * Calcula a diferença inteira em dias entre dois timestamps.
  * @param {number} fromMs Timestamp inicial em milissegundos.
- * @param {number} [toMs=Date.now()] Timestamp final em milissegundos.
+ * @param {number} [toMs=__timeNowMs()] Timestamp final em milissegundos.
  * @returns {number} Quantidade de dias inteiros.
  */
-const toIntegerDays = (fromMs, toMs = Date.now()) => {
+const toIntegerDays = (fromMs, toMs = __timeNowMs()) => {
   if (!Number.isFinite(fromMs) || !Number.isFinite(toMs) || toMs < fromMs) return 0;
   return Math.floor((toMs - fromMs) / DAY_MS);
 };
@@ -873,7 +874,7 @@ const hasRecentInteraction = (lastMessage) => {
   const parsed = lastMessage instanceof Date ? lastMessage.getTime() : new Date(lastMessage).getTime();
   if (!Number.isFinite(parsed)) return false;
   const maxAgeMs = ACTIVE_DAYS_WINDOW * 24 * 60 * 60 * 1000;
-  return Date.now() - parsed <= maxAgeMs;
+  return __timeNowMs() - parsed <= maxAgeMs;
 };
 
 /**
@@ -901,7 +902,7 @@ const isTargetBlocked = async (targetIds) => {
 const formatTempoDeCasa = (firstMessage) => {
   const firstMs = toMillis(firstMessage);
   if (!Number.isFinite(firstMs)) return 'N/D';
-  const days = toIntegerDays(firstMs, Date.now());
+  const days = toIntegerDays(firstMs, __timeNowMs());
   return `${days} dia(s)`;
 };
 
@@ -913,7 +914,7 @@ const formatTempoDeCasa = (firstMessage) => {
 const formatDaysSinceLastMessage = (lastMessage) => {
   const lastMs = toMillis(lastMessage);
   if (!Number.isFinite(lastMs)) return 'N/D';
-  return `${toIntegerDays(lastMs, Date.now())} dia(s)`;
+  return `${toIntegerDays(lastMs, __timeNowMs())} dia(s)`;
 };
 
 /**

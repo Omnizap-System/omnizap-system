@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -15,7 +16,7 @@ const MANUAL = 'MANUAL';
 
 const sqlErrorRegex = /(sql syntax|syntax error|mysql|sqlite|postgres|odbc|query failed|unclosed quotation|ORA-\d+)/i;
 
-const nowIso = () => new Date().toISOString();
+const nowIso = () => __timeNowIso();
 
 const safeJson = async (value) => {
   try {
@@ -190,9 +191,9 @@ const testDdosSafe = async () => {
       const idx = cursor;
       cursor += 1;
       if (idx >= total) return;
-      const startedAt = Date.now();
+      const startedAt = __timeNowMs();
       const res = await request('/healthz');
-      const elapsed = Date.now() - startedAt;
+      const elapsed = __timeNowMs() - startedAt;
       latencies.push(elapsed);
       if (!res.ok) failures += 1;
       if (res.status >= 500) serverErrors += 1;

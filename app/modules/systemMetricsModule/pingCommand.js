@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import logger from '#logger';
 import { getSystemMetrics } from '../../utils/systemMetrics/systemMetricsModule.js';
 import { sendAndStore } from '../../services/messaging/messagePersistenceService.js';
@@ -50,7 +51,7 @@ const formatStatusLevel = (status) => `${status.emoji} ${status.label}`;
 
 const padNumber = (value) => String(value).padStart(2, '0');
 
-const formatDateTime = (date = new Date()) => `${padNumber(date.getDate())}/${padNumber(date.getMonth() + 1)}/${date.getFullYear()} ${padNumber(date.getHours())}:${padNumber(date.getMinutes())}:${padNumber(date.getSeconds())}`;
+const formatDateTime = (date = __timeNow()) => `${padNumber(date.getDate())}/${padNumber(date.getMonth() + 1)}/${date.getFullYear()} ${padNumber(date.getHours())}:${padNumber(date.getMinutes())}:${padNumber(date.getSeconds())}`;
 
 const parseLabels = (raw) => {
   if (!raw) return {};
@@ -260,7 +261,7 @@ const fetchMetricsSnapshot = async () => {
     const series = parsePrometheusText(text);
 
     const processStart = pickValue(series, 'omnizap_process_start_time_seconds');
-    const nowSec = Date.now() / 1000;
+    const nowSec = __timeNowMs() / 1000;
     const processUptime = processStart ? formatSeconds(nowSec - processStart) : 'n/a';
 
     const cpuUserSec = pickValue(series, 'omnizap_process_cpu_user_seconds_total');
@@ -369,7 +370,7 @@ const fetchMetricsSnapshot = async () => {
 
 export async function handlePingCommand({ sock, remoteJid, messageInfo, expirationMessage }) {
   try {
-    const startedAt = Date.now();
+    const startedAt = __timeNowMs();
     const systemMetrics = getSystemMetrics();
     let metricsSummary = null;
     let metricsOk = false;
@@ -388,8 +389,8 @@ export async function handlePingCommand({ sock, remoteJid, messageInfo, expirati
       metricsSummary,
       metricsOk,
       metricsError,
-      latencyMs: Date.now() - startedAt,
-      generatedAt: new Date(),
+      latencyMs: __timeNowMs() - startedAt,
+      generatedAt: __timeNow(),
     });
     await sendAndStore(sock, remoteJid, { text }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
   } catch (error) {

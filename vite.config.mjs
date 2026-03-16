@@ -9,6 +9,11 @@ const projectRoot = path.resolve(__dirname);
 export default defineConfig({
   envDir: path.join(projectRoot, '.vite-env'),
   publicDir: false,
+  resolve: {
+    alias: {
+      '#time': path.join(projectRoot, 'utils', 'time', 'timeModule.js'),
+    },
+  },
   build: {
     emptyOutDir: false,
     copyPublicDir: false,

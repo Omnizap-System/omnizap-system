@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import logger from '#logger';
 import { sendAndStore } from '../../services/messaging/messagePersistenceService.js';
 import { getJidServer, isUserJid, normalizeJid } from '../../config/index.js';
@@ -413,7 +414,7 @@ const formatErrorMessage = (error, commandPrefix) => {
  * @returns {{ limited: boolean, remainingMs: number }} Estado do limite.
  */
 const checkRateLimit = (ownerJid) => {
-  const now = Date.now();
+  const now = __timeNowMs();
   const entry = rateMap.get(ownerJid);
 
   if (!entry || entry.resetAt <= now) {

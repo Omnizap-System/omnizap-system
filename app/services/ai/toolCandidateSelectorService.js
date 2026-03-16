@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import natural from 'natural';
 import winkBm25TextSearch from 'wink-bm25-text-search';
 import logger from '#logger';
@@ -193,7 +194,7 @@ const ensureCacheSize = () => {
   }
 };
 
-const pruneCache = (nowMs = Date.now()) => {
+const pruneCache = (nowMs = __timeNowMs()) => {
   for (const [cacheKey, cacheEntry] of queryCache.entries()) {
     if (!cacheEntry || cacheEntry.expiresAt <= nowMs) {
       queryCache.delete(cacheKey);
@@ -290,7 +291,7 @@ const buildOrGetIndexSnapshot = () => {
 
   cachedIndexSnapshot = {
     signature,
-    builtAt: new Date().toISOString(),
+    builtAt: __timeNowIso(),
     bm25Ready,
     bm25Engine,
     entries,
@@ -445,7 +446,7 @@ const buildCommandConfigOverlayMaps = (states = []) => {
 };
 
 const refreshLearnedKnowledgeCache = async ({ force = false } = {}) => {
-  const nowMs = Date.now();
+  const nowMs = __timeNowMs();
   if (!force && learnedKnowledgeCache.loaded && learnedKnowledgeCache.nextRefreshAt > nowMs && learnedKnowledgeCache.version) {
     return learnedKnowledgeCache;
   }
@@ -498,7 +499,7 @@ const refreshLearnedKnowledgeCache = async ({ force = false } = {}) => {
 };
 
 const refreshCommandConfigEnrichmentCache = async ({ force = false } = {}) => {
-  const nowMs = Date.now();
+  const nowMs = __timeNowMs();
   if (!force && commandConfigEnrichmentCache.loaded && commandConfigEnrichmentCache.nextRefreshAt > nowMs && commandConfigEnrichmentCache.version) {
     return commandConfigEnrichmentCache;
   }
@@ -593,7 +594,7 @@ export const selectCandidateTools = async (userMessage, limit = TOOL_SELECTION_M
   }
 
   const normalizedMessage = normalizeText(userMessage);
-  const nowMs = Date.now();
+  const nowMs = __timeNowMs();
   pruneCache(nowMs);
   const cacheKey = buildCacheKey({
     message: normalizedMessage,

@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -154,7 +155,7 @@ function normalizeMetadataText(value, fallback = '') {
  */
 export async function addStickerMetadata(stickerPath, packName, packAuthor, replaceContext = {}) {
   const { senderName = '', userId = '' } = replaceContext;
-  const now = new Date();
+  const now = __timeNow();
   const pad = (n) => n.toString().padStart(2, '0');
   const dataAtual = `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()}`;
   const horaAtual = `${pad(now.getHours())}:${pad(now.getMinutes())}`;

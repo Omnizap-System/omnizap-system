@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import { createCanvas, loadImage } from 'canvas';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -259,7 +260,7 @@ const getCachedEmojiImage = (cacheKey) => {
   if (!entry) return undefined;
 
   const ttl = entry.image ? EMOJI_CACHE_TTL_MS : EMOJI_FAIL_TTL_MS;
-  if (Date.now() - entry.createdAt > ttl) {
+  if (__timeNowMs() - entry.createdAt > ttl) {
     EMOJI_IMAGE_CACHE.delete(cacheKey);
     return undefined;
   }
@@ -275,7 +276,7 @@ const getCachedEmojiImage = (cacheKey) => {
  * @returns {void}
  */
 const setCachedEmojiImage = (cacheKey, image) => {
-  EMOJI_IMAGE_CACHE.set(cacheKey, { image, createdAt: Date.now() });
+  EMOJI_IMAGE_CACHE.set(cacheKey, { image, createdAt: __timeNowMs() });
 };
 
 /**

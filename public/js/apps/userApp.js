@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 const DEFAULT_API_BASE_PATH = '/api';
 const DEFAULT_STICKERS_PATH = '/stickers';
 const DEFAULT_LOGIN_PATH = '/login';
@@ -555,7 +556,7 @@ if (root) {
   const formatRelativeTime = (value) => {
     const ms = Date.parse(String(value || ''));
     if (!Number.isFinite(ms)) return 'n/d';
-    const deltaMs = Date.now() - ms;
+    const deltaMs = __timeNowMs() - ms;
     const absMs = Math.abs(deltaMs);
     const suffix = deltaMs >= 0 ? 'atrás' : 'à frente';
     if (absMs < 1000) return 'agora';
@@ -2247,7 +2248,7 @@ if (root) {
 
     const normalizedType = normalizeString(type || 'metrics').toLowerCase();
     const normalizedFormat = normalizeString(format || 'json').toLowerCase();
-    const fallbackName = `admin-${normalizedType}-${Date.now()}.${normalizedFormat === 'csv' ? 'csv' : 'json'}`;
+    const fallbackName = `admin-${normalizedType}-${__timeNowMs()}.${normalizedFormat === 'csv' ? 'csv' : 'json'}`;
 
     showAdminError('');
     setButtonProcessing(triggerButton, 'Exportando...');
@@ -2303,7 +2304,7 @@ if (root) {
     const manageHref = `${state.stickersPath.replace(/\/+$/, '') || DEFAULT_STICKERS_PATH}/perfil`;
     if (ui.manageHeadLink) ui.manageHeadLink.href = manageHref;
     if (ui.manageMainLink) ui.manageMainLink.href = manageHref;
-    if (ui.currentYear) ui.currentYear.textContent = String(new Date().getFullYear());
+    if (ui.currentYear) ui.currentYear.textContent = String(__timeNow().getFullYear());
     applyEnvironmentBadge();
     restoreCompactMode();
     bindAdminCarousel();

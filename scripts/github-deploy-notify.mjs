@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 
 import { execSync } from 'node:child_process';
 import path from 'node:path';
@@ -128,7 +129,7 @@ const run = async () => {
   const baseUrl = `https://api.github.com/repos/${encodeURIComponent(repoOwner)}/${encodeURIComponent(repoName)}`;
 
   if (action === 'start') {
-    const startDescription = description || `Deploy OmniZap ${buildId || new Date().toISOString()}`;
+    const startDescription = description || `Deploy OmniZap ${buildId || __timeNowIso()}`;
     const deployment = await request(`${baseUrl}/deployments`, 'POST', {
       ref: currentRef(),
       task: 'deploy',

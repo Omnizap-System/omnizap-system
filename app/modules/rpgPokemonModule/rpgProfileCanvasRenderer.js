@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import axios from 'axios';
 import { createCanvas, loadImage } from 'canvas';
 import logger from '#logger';
@@ -75,7 +76,7 @@ const drawRoundRect = (ctx, x, y, width, height, radius, fillStyle) => {
 
 const cleanupImageCache = () => {
   if (imageCache.size <= IMAGE_CACHE_LIMIT) return;
-  const now = Date.now();
+  const now = __timeNowMs();
   for (const [key, value] of imageCache.entries()) {
     if (!value || value.expiresAt <= now) imageCache.delete(key);
   }
@@ -90,7 +91,7 @@ const resolveImage = async (url) => {
   if (!normalized) return null;
 
   const cached = imageCache.get(normalized);
-  if (cached && cached.expiresAt > Date.now()) return cached.image;
+  if (cached && cached.expiresAt > __timeNowMs()) return cached.image;
 
   try {
     const response = await axios.get(normalized, {
@@ -101,7 +102,7 @@ const resolveImage = async (url) => {
     const image = await loadImage(Buffer.from(response.data));
     imageCache.set(normalized, {
       image,
-      expiresAt: Date.now() + IMAGE_CACHE_TTL_MS,
+      expiresAt: __timeNowMs() + IMAGE_CACHE_TTL_MS,
     });
     cleanupImageCache();
     return image;

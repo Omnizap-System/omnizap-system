@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import logger from '#logger';
 import { setQueueDepth } from '../../observability/metrics.js';
 import { isFeatureEnabled } from '../../services/infra/featureFlagService.js';
@@ -71,7 +72,7 @@ const scheduleTaskIfNeeded = async (taskType) => {
   const cadence = TASK_CADENCE_MS[taskType];
   if (!cadence) return;
 
-  const now = Date.now();
+  const now = __timeNowMs();
   const nextDueAt = nextScheduleByTask.get(taskType) || 0;
   if (now < nextDueAt) return;
 

@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import { formatDuration } from '../../http/httpRequestUtils.js';
 
 const METRICS_ENDPOINT = process.env.METRICS_ENDPOINT || `http://127.0.0.1:${process.env.METRICS_PORT || 9102}${process.env.METRICS_PATH || '/metrics'}`;
@@ -124,7 +125,7 @@ export const fetchPrometheusSummary = async () => {
     const series = parsePrometheusText(text);
 
     const processStart = pickMetricValue(series, 'omnizap_process_start_time_seconds');
-    const nowSeconds = Date.now() / 1000;
+    const nowSeconds = __timeNowMs() / 1000;
     const processUptimeSeconds = Number.isFinite(processStart) ? Math.max(0, nowSeconds - processStart) : null;
 
     const lagP99 = pickMetricValue(series, 'omnizap_nodejs_eventloop_lag_p99_seconds');

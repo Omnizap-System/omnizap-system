@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -284,7 +285,7 @@ const buildCatalog = async () => {
 
   return {
     schema_version: '3.0.0',
-    generated_at: new Date().toISOString(),
+    generated_at: __timeNowIso(),
     totals: {
       modules: sortedModules.length,
       categories: categories.length,

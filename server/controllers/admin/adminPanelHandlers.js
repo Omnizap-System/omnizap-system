@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import { randomUUID, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { URLSearchParams } from 'node:url';
 
@@ -298,7 +299,7 @@ export const createStickerCatalogAdminHandlers = ({ executeQuery, tables, logger
   };
 
   const pruneExpiredAdminPanelSessions = () => {
-    const now = Date.now();
+    const now = __timeNowMs();
     if (now - adminPanelSessionPruneAt < 30_000) return;
     adminPanelSessionPruneAt = now;
     for (const [token, session] of adminPanelSessionMap.entries()) {
@@ -334,7 +335,7 @@ export const createStickerCatalogAdminHandlers = ({ executeQuery, tables, logger
 
   const createAdminPanelSession = (googleSession, { role = 'owner' } = {}) => {
     pruneExpiredAdminPanelSessions();
-    const now = Date.now();
+    const now = __timeNowMs();
     const normalizedRole = normalizeAdminPanelRole(role, 'owner');
     const token = randomUUID();
     const session = {
@@ -359,7 +360,7 @@ export const createStickerCatalogAdminHandlers = ({ executeQuery, tables, logger
     if (!token) return null;
     const session = adminPanelSessionMap.get(token);
     if (!session) return null;
-    if (Number(session.expiresAt || 0) <= Date.now()) {
+    if (Number(session.expiresAt || 0) <= __timeNowMs()) {
       adminPanelSessionMap.delete(token);
       return null;
     }
@@ -616,7 +617,7 @@ export const createStickerCatalogAdminHandlers = ({ executeQuery, tables, logger
       rollout_percent: Math.max(0, Math.min(100, Number(row?.rollout_percent ?? normalizedRollout))),
       description: sanitizeText(row?.description || '', 255, { allowEmpty: true }) || null,
       updated_by: sanitizeText(row?.updated_by || '', 120, { allowEmpty: true }) || null,
-      updated_at: toIsoOrNull(row?.updated_at) || new Date().toISOString(),
+      updated_at: toIsoOrNull(row?.updated_at) || __timeNowIso(),
     };
   };
 
@@ -759,7 +760,7 @@ export const createStickerCatalogAdminHandlers = ({ executeQuery, tables, logger
 
   const buildAdminAlertSnapshot = ({ dashboardQuick = null, systemHealth = null, systemSummary = null, systemMeta = null } = {}) => {
     const alerts = [];
-    const updatedAt = toIsoOrNull(systemSummary?.updated_at) || new Date().toISOString();
+    const updatedAt = toIsoOrNull(systemSummary?.updated_at) || __timeNowIso();
     const pushAlert = (severity, code, title, message) => {
       alerts.push({
         id: `${code}:${severity}`,
@@ -1045,7 +1046,7 @@ export const createStickerCatalogAdminHandlers = ({ executeQuery, tables, logger
       system_summary: systemSummary,
       system_meta: systemMeta,
       message_flow_daily: messageFlowDaily,
-      updated_at: new Date().toISOString(),
+      updated_at: __timeNowIso(),
     };
   };
 
@@ -1364,7 +1365,7 @@ export const createStickerCatalogAdminHandlers = ({ executeQuery, tables, logger
             action,
             success: true,
             message: 'Caches internos invalidados com sucesso.',
-            updated_at: new Date().toISOString(),
+            updated_at: __timeNowIso(),
           },
         });
         return;
@@ -1408,7 +1409,7 @@ export const createStickerCatalogAdminHandlers = ({ executeQuery, tables, logger
             success: true,
             released_processing_items: released,
             message: released > 0 ? 'Itens em processamento foram recolocados em pending.' : 'Nenhum item travado encontrado nas filas.',
-            updated_at: new Date().toISOString(),
+            updated_at: __timeNowIso(),
           },
         });
         return;
@@ -1418,7 +1419,7 @@ export const createStickerCatalogAdminHandlers = ({ executeQuery, tables, logger
         const payloadJson = JSON.stringify({
           source: 'admin_panel',
           requested_by: normalizeEmail(adminSession?.email) || normalizeGoogleSubject(adminSession?.googleSub) || 'admin',
-          requested_at: new Date().toISOString(),
+          requested_at: __timeNowIso(),
         });
         await executeQuery(
           `INSERT INTO ${TABLES.STICKER_WORKER_TASK_QUEUE}
@@ -1440,7 +1441,7 @@ export const createStickerCatalogAdminHandlers = ({ executeQuery, tables, logger
             success: true,
             enqueued_tasks: 2,
             message: 'Ciclos de classificação e curadoria foram agendados.',
-            updated_at: new Date().toISOString(),
+            updated_at: __timeNowIso(),
           },
         });
         return;
@@ -1632,7 +1633,7 @@ export const createStickerCatalogAdminHandlers = ({ executeQuery, tables, logger
         data: {
           type,
           format: 'json',
-          exported_at: new Date().toISOString(),
+          exported_at: __timeNowIso(),
           payload: exportData,
         },
       });
@@ -1705,7 +1706,7 @@ export const createStickerCatalogAdminHandlers = ({ executeQuery, tables, logger
     }
 
     const csv = buildCsv(rows, headers);
-    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+    const stamp = __timeNowIso().slice(0, 19).replace(/[:T]/g, '-');
     res.statusCode = 200;
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="admin-${type}-${stamp}.csv"`);
@@ -1862,7 +1863,7 @@ export const createStickerCatalogAdminHandlers = ({ executeQuery, tables, logger
       deleted: !result?.missing,
       pack_key: result?.deletedPack?.pack_key || context.packKey,
       id: result?.deletedPack?.id || context.fullPack?.id || null,
-      deleted_at: toIsoOrNull(result?.deletedPack?.deleted_at || new Date()),
+      deleted_at: toIsoOrNull(result?.deletedPack?.deleted_at || __timeNow()),
       removed_sticker_count: Number(result?.removedCount || 0),
     });
   };

@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
@@ -149,7 +150,7 @@ const rememberLastSticker = (ownerJid, assetId) => {
   const normalized = normalizeOwnerJid(ownerJid);
   lastStickerCache.set(normalized, {
     assetId,
-    expiresAt: Date.now() + LAST_STICKER_TTL_MS,
+    expiresAt: __timeNowMs() + LAST_STICKER_TTL_MS,
   });
 };
 
@@ -164,7 +165,7 @@ const resolveLastStickerAssetId = (ownerJid) => {
   const entry = lastStickerCache.get(normalized);
   if (!entry) return null;
 
-  if (entry.expiresAt <= Date.now()) {
+  if (entry.expiresAt <= __timeNowMs()) {
     lastStickerCache.delete(normalized);
     return null;
   }

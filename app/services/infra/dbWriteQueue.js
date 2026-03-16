@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import logger from '#logger';
 import { executeQuery, TABLES } from '../../../database/index.js';
 import { queueLidUpdate, flushLidQueue, resolveUserIdCached } from '../../config/index.js';
@@ -298,7 +299,7 @@ const normalizeTimestampForColumn = (value) => {
   if (value instanceof Date && Number.isFinite(value.getTime())) return value;
   const parsed = new Date(value);
   if (Number.isFinite(parsed.getTime())) return parsed;
-  return new Date();
+  return __timeNow();
 };
 
 const normalizeBaileysEventForQueue = (eventData) => ({
@@ -513,7 +514,7 @@ const flushMessageQueueCore = async () => {
 
 const flushChatQueueCore = async () => {
   while (chatQueue.size > 0) {
-    const now = Date.now();
+    const now = __timeNowMs();
     const ready = [];
     for (const entry of chatQueue.values()) {
       if (now < entry.nextAllowedAt) continue;
@@ -539,7 +540,7 @@ const flushChatQueueCore = async () => {
 
     try {
       await executeQuery(sql, params);
-      const writeAt = Date.now();
+      const writeAt = __timeNowMs();
       for (const entry of ready) {
         const current = chatQueue.get(entry.id);
         const cache = chatCache.get(entry.id) || {};
@@ -576,7 +577,7 @@ const flushChatQueueCore = async () => {
 const pruneBaileysEventJournal = async () => {
   if (BAILEYS_EVENT_JOURNAL_RETENTION_DAYS <= 0) return;
 
-  const now = Date.now();
+  const now = __timeNowMs();
   if (now < nextBaileysEventPruneAt) return;
   nextBaileysEventPruneAt = now + BAILEYS_EVENT_JOURNAL_PRUNE_INTERVAL_MS;
 
@@ -725,7 +726,7 @@ export function queueMessageInsert(messageData) {
 export function queueChatUpdate(chat, options = {}) {
   if (!chat || !chat.id) return false;
 
-  const now = Date.now();
+  const now = __timeNowMs();
   const isPartial = Boolean(options.partial);
   const forceName = Boolean(options.forceName);
   const cache = chatCache.get(chat.id) || {

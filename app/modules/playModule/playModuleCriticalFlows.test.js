@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -33,12 +34,7 @@ const withEnv = async (overrides, fn) => {
 test('resolve candidates deduplica URLs e ignora inválidas', () => {
   const urls = __playYtDlpClientTestUtils.extractCandidateUrlsFromSearchResult({
     resultado: { url: 'https://www.youtube.com/watch?v=abc123' },
-    resultados: [
-      { url: 'https://www.youtube.com/watch?v=abc123' },
-      { url: 'https://youtu.be/xyz987' },
-      { url: 'not-an-url' },
-      { url: 'https://www.youtube.com/watch?v=zzz000' },
-    ],
+    resultados: [{ url: 'https://www.youtube.com/watch?v=abc123' }, { url: 'https://youtu.be/xyz987' }, { url: 'not-an-url' }, { url: 'https://www.youtube.com/watch?v=zzz000' }],
   });
 
   assert.deepEqual(urls, ['https://www.youtube.com/watch?v=abc123', 'https://youtu.be/xyz987', 'https://www.youtube.com/watch?v=zzz000']);
@@ -114,7 +110,7 @@ test('notifyFailure: envia admin só para erro técnico e deduplica alertas', { 
       USER_ADMIN: '5511999999999',
     },
     async () => {
-      const mod = await import(`./playCommandCore.js?test=${Date.now()}-${Math.random().toString(16).slice(2)}`);
+      const mod = await import(`./playCommandCore.js?test=${__timeNowMs()}-${Math.random().toString(16).slice(2)}`);
       const utils = mod.__playCommandCoreTestUtils;
       utils.resetAdminAlertDedupCacheForTests();
 
@@ -125,7 +121,7 @@ test('notifyFailure: envia admin só para erro técnico e deduplica alertas', { 
           return {
             key: { remoteJid: jid },
             message: content,
-            messageTimestamp: Math.floor(Date.now() / 1000),
+            messageTimestamp: Math.floor(__timeNowMs() / 1000),
           };
         },
       };

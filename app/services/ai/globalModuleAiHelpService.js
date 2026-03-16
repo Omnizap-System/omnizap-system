@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
@@ -283,7 +284,7 @@ const ensureFeedbackStoreLoaded = async () => {
 
 const persistFeedbackStore = async () => {
   const store = await ensureFeedbackStoreLoaded();
-  store.updatedAt = new Date().toISOString();
+  store.updatedAt = __timeNowIso();
   await withFeedbackWrite(async () => {
     await fs.writeFile(GLOBAL_HELP_FEEDBACK_FILE_PATH, `${JSON.stringify(store, null, 2)}\n`, 'utf8');
   });
@@ -1340,7 +1341,7 @@ export const registerGlobalHelpCommandExecution = async ({ chatId, userId, isGro
   } else {
     entry.miss_count = Number(entry.miss_count || 0) + 1;
   }
-  entry.last_updated_at = new Date().toISOString();
+  entry.last_updated_at = __timeNowIso();
   await persistFeedbackStore();
 
   setConversationSessionIntent({

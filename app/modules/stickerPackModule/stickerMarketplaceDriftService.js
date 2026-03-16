@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import { listClassificationCategoryDistribution } from './stickerAssetClassificationRepository.js';
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -75,7 +76,7 @@ const buildDynamicWeights = (driftScore) => {
 export const getBaseMarketplaceWeights = () => BASE_WEIGHTS;
 
 export const getMarketplaceDriftSnapshot = async ({ force = false } = {}) => {
-  const now = Date.now();
+  const now = __timeNowMs();
   if (!force && now < cache.expiresAt) {
     return cache;
   }

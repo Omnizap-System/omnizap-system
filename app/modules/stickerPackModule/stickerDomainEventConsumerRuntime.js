@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import logger from '#logger';
 import { setQueueDepth } from '../../observability/metrics.js';
 import { isFeatureEnabled } from '../../services/infra/featureFlagService.js';
@@ -51,9 +52,9 @@ const enqueueTaskSafely = async ({ taskType, payload, priority, idempotencyKey }
 };
 
 const toUnixSeconds = (value) => {
-  if (!value) return Math.floor(Date.now() / 1000);
+  if (!value) return Math.floor(__timeNowMs() / 1000);
   const numeric = Date.parse(value);
-  if (!Number.isFinite(numeric)) return Math.floor(Date.now() / 1000);
+  if (!Number.isFinite(numeric)) return Math.floor(__timeNowMs() / 1000);
   return Math.floor(numeric / 1000);
 };
 

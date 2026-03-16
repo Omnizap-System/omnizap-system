@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import htm from 'htm';
@@ -150,7 +151,7 @@ const readGoogleAuthCache = () => {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     const savedAt = Number(parsed?.savedAt || 0);
-    if (savedAt && Date.now() - savedAt > GOOGLE_AUTH_CACHE_MAX_STALE_MS) {
+    if (savedAt && __timeNowMs() - savedAt > GOOGLE_AUTH_CACHE_MAX_STALE_MS) {
       localStorage.removeItem(GOOGLE_AUTH_CACHE_KEY);
       return null;
     }
@@ -161,7 +162,7 @@ const readGoogleAuthCache = () => {
     }
     if (normalized.expiresAt) {
       const expiresAt = Number(new Date(normalized.expiresAt));
-      if (Number.isFinite(expiresAt) && expiresAt <= Date.now()) {
+      if (Number.isFinite(expiresAt) && expiresAt <= __timeNowMs()) {
         localStorage.removeItem(GOOGLE_AUTH_CACHE_KEY);
         return null;
       }
@@ -183,7 +184,7 @@ const writeGoogleAuthCache = (authState) => {
       GOOGLE_AUTH_CACHE_KEY,
       JSON.stringify({
         auth: normalized,
-        savedAt: Date.now(),
+        savedAt: __timeNowMs(),
       }),
     );
   } catch {
@@ -477,7 +478,7 @@ const isRecent = (dateString) => {
   if (!dateString) return false;
   const created = new Date(dateString).getTime();
   if (!Number.isFinite(created)) return false;
-  return Date.now() - created <= 1000 * 60 * 60 * 24 * 7;
+  return __timeNowMs() - created <= 1000 * 60 * 60 * 24 * 7;
 };
 
 const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, Math.max(0, Number(ms) || 0)));
@@ -1990,7 +1991,7 @@ function StickersApp() {
       .map((pack) => {
         const engagement = getPackEngagement(pack);
         const createdAt = new Date(pack?.created_at || pack?.updated_at || 0).getTime();
-        const recentBonus = Date.now() - createdAt <= 1000 * 60 * 60 * 24 * 7 ? 18 : 0;
+        const recentBonus = __timeNowMs() - createdAt <= 1000 * 60 * 60 * 24 * 7 ? 18 : 0;
         const growth = engagement.openCount * 1.5 + engagement.likeCount * 3 - engagement.dislikeCount + recentBonus;
         return { pack, growth };
       })
@@ -2216,7 +2217,7 @@ function StickersApp() {
   };
 
   const pushProfileToast = (message, type = 'success') => {
-    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const id = `${__timeNowMs()}-${Math.random().toString(36).slice(2, 8)}`;
     setProfileToasts((prev) => [...prev, { id, message: String(message || ''), type }].slice(-5));
     window.setTimeout(() => {
       setProfileToasts((prev) => prev.filter((item) => item.id !== id));
@@ -3105,7 +3106,7 @@ function StickersApp() {
     };
     const optimistic = {
       ...previous,
-      updated_at: new Date().toISOString(),
+      updated_at: __timeNowIso(),
     };
     if (action === 'like') {
       optimistic.like_count += 1;

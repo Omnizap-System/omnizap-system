@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import { baileysConnectionLogger as logger } from './loggerConfig.js';
 import { queueMessageInsert } from '../services/infra/dbWriteQueue.js';
 import { parseEnvBool, parseEnvInt, normalizeJid, isGroupJid, isStatusJid, isBroadcastJid, isNewsletterJid, normalizeWAPresence } from './baileysConfig.js';
@@ -155,7 +156,7 @@ const resolveMessageTimestampMs = (msg) => {
       return tsNumber * 1000;
     }
   }
-  return Date.now();
+  return __timeNowMs();
 };
 
 /**

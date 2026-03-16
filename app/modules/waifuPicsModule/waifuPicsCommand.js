@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import axios from 'axios';
 
 import logger from '#logger';
@@ -278,7 +279,7 @@ const buildRateScopeKey = ({ scope, senderKey, remoteJid }) => {
   return `user:${String(senderKey || '').trim() || 'unknown'}`;
 };
 
-const pruneRateMapIfNeeded = (now = Date.now()) => {
+const pruneRateMapIfNeeded = (now = __timeNowMs()) => {
   if (userPlanRateMap.size <= USER_RATE_LIMIT_MAP_MAX_SIZE) return;
 
   for (const [key, value] of userPlanRateMap.entries()) {
@@ -302,7 +303,7 @@ const pruneRateMapIfNeeded = (now = Date.now()) => {
 const checkPlanUsageRateLimit = ({ commandKey, userPlan, scope, max, windowMs, senderKey, remoteJid }) => {
   if (!max || !windowMs) return { limited: false, remainingMs: 0 };
 
-  const now = Date.now();
+  const now = __timeNowMs();
   const scopeKey = buildRateScopeKey({ scope, senderKey, remoteJid });
   const cacheKey = `${String(commandKey || 'waifu')}:${normalizePlanName(userPlan)}:${scopeKey}`;
   const current = userPlanRateMap.get(cacheKey);

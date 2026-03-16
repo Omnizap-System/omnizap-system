@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import OpenAI from 'openai';
 import logger from '#logger';
 import { insertLearnedKeywords, insertLearnedPatterns, listPendingLearningEvents, markLearningEventsProcessed } from '../services/ai/aiLearningRepository.js';
@@ -305,7 +306,7 @@ const seedLearningFromCommandConfig = async ({ reason = 'scheduler' } = {}) => {
     };
   }
 
-  const nowMs = Date.now();
+  const nowMs = __timeNowMs();
   const registryStats = getToolRegistryStats();
   const registrySignature = String(registryStats?.signature || '');
 
@@ -385,7 +386,7 @@ const processLearningBatch = async ({ reason = 'scheduler' } = {}) => {
 
   cycleInProgress = true;
   try {
-    const startedAt = Date.now();
+    const startedAt = __timeNowMs();
     logger.info('Worker de aprendizado IA iniciado.', {
       action: 'ai_learning_worker_started',
       reason,
@@ -433,7 +434,7 @@ const processLearningBatch = async ({ reason = 'scheduler' } = {}) => {
         config_seed_executed: configSeedResult.executed,
         config_seed_skipped: configSeedResult.skipped,
         config_seed_tool_count: configSeedResult.toolCount,
-        duration_ms: Date.now() - startedAt,
+        duration_ms: __timeNowMs() - startedAt,
       });
       return;
     }
@@ -457,7 +458,7 @@ const processLearningBatch = async ({ reason = 'scheduler' } = {}) => {
         config_seed_executed: configSeedResult.executed,
         config_seed_skipped: configSeedResult.skipped,
         config_seed_tool_count: configSeedResult.toolCount,
-        duration_ms: Date.now() - startedAt,
+        duration_ms: __timeNowMs() - startedAt,
       });
       return;
     }
@@ -537,7 +538,7 @@ const processLearningBatch = async ({ reason = 'scheduler' } = {}) => {
       config_seed_executed: configSeedResult.executed,
       config_seed_skipped: configSeedResult.skipped,
       config_seed_tool_count: configSeedResult.toolCount,
-      duration_ms: Date.now() - startedAt,
+      duration_ms: __timeNowMs() - startedAt,
     });
   } finally {
     cycleInProgress = false;

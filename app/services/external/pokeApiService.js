@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import axios from 'axios';
 import logger from '#logger';
 import { recordPokeApiCacheHit } from '../../observability/metrics.js';
@@ -177,7 +178,7 @@ const cleanupExpiredEntry = (key, now) => {
 };
 
 const requestResource = async ({ path, cacheKey }) => {
-  const now = Date.now();
+  const now = __timeNowMs();
   const staleEntry = sharedCache.get(cacheKey);
   const staleData = staleEntry?.data || null;
   const cached = cleanupExpiredEntry(cacheKey, now);
@@ -207,7 +208,7 @@ const requestResource = async ({ path, cacheKey }) => {
         const data = response?.data;
         sharedCache.set(cacheKey, {
           data,
-          expiresAt: Date.now() + CACHE_TTL_MS,
+          expiresAt: __timeNowMs() + CACHE_TTL_MS,
         });
         return data;
       } catch (error) {

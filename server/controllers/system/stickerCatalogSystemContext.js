@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import { withTimeout } from '../../http/httpRequestUtils.js';
 
 export const createStickerCatalogSystemContext = ({ executeQuery, tables, logger, getSystemMetrics, getActiveSocket, resolveSocketReadyState, resolveActiveSocketBotJid, resolveCatalogBotPhone, fetchPrometheusSummary, metricsEndpoint, systemSummaryCache, systemSummaryCacheSeconds, readmeSummaryCache, readmeSummaryCacheSeconds, readmeMessageTypeSampleLimit, readmeCommandPrefix, buildMenuCaption, buildStickerMenu, buildMediaMenu, buildQuoteMenu, buildAnimeMenu, buildAiMenu, buildStatsMenu, buildAdminMenu, profilePictureUrlFromActiveSocket, normalizeJid, getJidUser, globalRankCache, globalRankRefreshSeconds, marketplaceGlobalStatsCache, marketplaceGlobalStatsCacheSeconds }) => {
@@ -125,7 +126,7 @@ export const createStickerCatalogSystemContext = ({ executeQuery, tables, logger
           http_latency_p95_ms: prometheus?.http_latency_p95_ms ?? null,
           queue_peak: prometheus?.queue_peak ?? null,
         },
-        updated_at: new Date().toISOString(),
+        updated_at: __timeNowIso(),
       },
       meta: {
         metrics_endpoint: metricsEndpoint,
@@ -138,7 +139,7 @@ export const createStickerCatalogSystemContext = ({ executeQuery, tables, logger
   };
 
   const getSystemSummaryCached = async () => {
-    const now = Date.now();
+    const now = __timeNowMs();
     const hasValue = Boolean(systemSummaryCache.value);
 
     if (hasValue && now < systemSummaryCache.expiresAt) {
@@ -149,7 +150,7 @@ export const createStickerCatalogSystemContext = ({ executeQuery, tables, logger
       systemSummaryCache.pending = withTimeout(buildSystemSummarySnapshot(), 5000)
         .then((payload) => {
           systemSummaryCache.value = payload;
-          systemSummaryCache.expiresAt = Date.now() + systemSummaryCacheSeconds * 1000;
+          systemSummaryCache.expiresAt = __timeNowMs() + systemSummaryCacheSeconds * 1000;
           return payload;
         })
         .finally(() => {
@@ -278,7 +279,7 @@ export const createStickerCatalogSystemContext = ({ executeQuery, tables, logger
       .slice(0, 8);
 
     const commands = collectAvailableMenuCommands(readmeCommandPrefix);
-    const generatedAt = new Date().toISOString();
+    const generatedAt = __timeNowIso();
 
     const totals = {
       total_users: Number(lidMapTotals?.total_users || 0),
@@ -314,7 +315,7 @@ export const createStickerCatalogSystemContext = ({ executeQuery, tables, logger
   };
 
   const getReadmeSummaryCached = async () => {
-    const now = Date.now();
+    const now = __timeNowMs();
     const hasValue = Boolean(readmeSummaryCache.value);
 
     if (hasValue && now < readmeSummaryCache.expiresAt) {
@@ -325,7 +326,7 @@ export const createStickerCatalogSystemContext = ({ executeQuery, tables, logger
       readmeSummaryCache.pending = withTimeout(buildReadmeSummarySnapshot(), 7000)
         .then((payload) => {
           readmeSummaryCache.value = payload;
-          readmeSummaryCache.expiresAt = Date.now() + readmeSummaryCacheSeconds * 1000;
+          readmeSummaryCache.expiresAt = __timeNowMs() + readmeSummaryCacheSeconds * 1000;
           return payload;
         })
         .finally(() => {
@@ -522,12 +523,12 @@ export const createStickerCatalogSystemContext = ({ executeQuery, tables, logger
       top_type: topType,
       top_type_count: topTypeCount,
       rows: rowsEnriched,
-      updated_at: new Date().toISOString(),
+      updated_at: __timeNowIso(),
     };
   };
 
   const getGlobalRankingSummaryCached = async () => {
-    const now = Date.now();
+    const now = __timeNowMs();
     const hasValue = Boolean(globalRankCache.value);
 
     if (hasValue && now < globalRankCache.expiresAt) {
@@ -538,7 +539,7 @@ export const createStickerCatalogSystemContext = ({ executeQuery, tables, logger
       globalRankCache.pending = withTimeout(buildGlobalRankingSummary(), 5000)
         .then((data) => {
           globalRankCache.value = data;
-          globalRankCache.expiresAt = Date.now() + globalRankRefreshSeconds * 1000;
+          globalRankCache.expiresAt = __timeNowMs() + globalRankRefreshSeconds * 1000;
           return data;
         })
         .finally(() => {
@@ -579,7 +580,7 @@ export const createStickerCatalogSystemContext = ({ executeQuery, tables, logger
   };
 
   const buildLastSevenUtcDateKeys = () => {
-    const now = new Date();
+    const now = __timeNow();
     const todayUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
     return Array.from({ length: 7 }).map((_, index) => {
       const date = new Date(todayUtc - (6 - index) * 24 * 60 * 60 * 1000);
@@ -718,12 +719,12 @@ export const createStickerCatalogSystemContext = ({ executeQuery, tables, logger
       clicks_last_7_days: Number(clicksLast7Days || 0),
       likes_last_7_days: Number(likesLast7Days || 0),
       series_last_7_days: seriesLast7Days,
-      updated_at: new Date().toISOString(),
+      updated_at: __timeNowIso(),
     };
   };
 
   const getMarketplaceGlobalStatsCached = async () => {
-    const now = Date.now();
+    const now = __timeNowMs();
     const hasValue = Boolean(marketplaceGlobalStatsCache.value);
     if (hasValue && now < marketplaceGlobalStatsCache.expiresAt) {
       return marketplaceGlobalStatsCache.value;
@@ -733,7 +734,7 @@ export const createStickerCatalogSystemContext = ({ executeQuery, tables, logger
       marketplaceGlobalStatsCache.pending = withTimeout(buildMarketplaceGlobalStatsSnapshot(), 5000)
         .then((data) => {
           marketplaceGlobalStatsCache.value = data;
-          marketplaceGlobalStatsCache.expiresAt = Date.now() + marketplaceGlobalStatsCacheSeconds * 1000;
+          marketplaceGlobalStatsCache.expiresAt = __timeNowMs() + marketplaceGlobalStatsCacheSeconds * 1000;
           return data;
         })
         .finally(() => {

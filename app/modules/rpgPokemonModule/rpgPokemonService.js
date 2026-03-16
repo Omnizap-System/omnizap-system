@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import { pool } from '../../../database/index.js';
 import { getJidUser, isGroupJid, normalizeJid } from '../../config/index.js';
 import logger from '#logger';
@@ -504,7 +505,7 @@ const loadPocketItems = async (pocketName) => {
 };
 
 const getShopCatalog = async ({ forceRefresh = false } = {}) => {
-  const now = Date.now();
+  const now = __timeNowMs();
   if (!forceRefresh && dynamicShopCache.items && dynamicShopCache.expiresAt > now) {
     return {
       items: dynamicShopCache.items,
@@ -544,7 +545,7 @@ const getShopCatalog = async ({ forceRefresh = false } = {}) => {
     dynamicShopCache.items = fallbackItems;
     dynamicShopCache.index = fallbackIndex;
     dynamicShopCache.aliasMap = aliasMap;
-    dynamicShopCache.expiresAt = Date.now() + Math.min(SHOP_REFRESH_MS, 10 * 60 * 1000);
+    dynamicShopCache.expiresAt = __timeNowMs() + Math.min(SHOP_REFRESH_MS, 10 * 60 * 1000);
 
     return { items: fallbackItems, index: fallbackIndex, aliasMap };
   }
@@ -616,7 +617,7 @@ const resolveTravelEncounterPool = async (locationAreaKey) => {
   if (!key) return [];
 
   const cached = areaEncounterCache.get(key);
-  if (cached && cached.expiresAt > Date.now()) {
+  if (cached && cached.expiresAt > __timeNowMs()) {
     return cached.pool;
   }
 
@@ -628,7 +629,7 @@ const resolveTravelEncounterPool = async (locationAreaKey) => {
       .slice(0, 40);
     areaEncounterCache.set(key, {
       pool,
-      expiresAt: Date.now() + SHOP_REFRESH_MS,
+      expiresAt: __timeNowMs() + SHOP_REFRESH_MS,
     });
     return pool;
   } catch (error) {
@@ -690,7 +691,7 @@ const formatMissionRewardSummary = (reward, label) => {
 };
 
 const ensureMissionStateForUpdate = async ({ ownerJid, connection }) => {
-  const refs = resolveMissionRefs(new Date());
+  const refs = resolveMissionRefs(__timeNow());
   let row = await getMissionProgressByOwnerForUpdate(ownerJid, connection);
 
   if (!row) {
@@ -792,7 +793,7 @@ const applyMissionEvent = async ({ ownerJid, eventKey, connection }) => {
       reward: DAILY_MISSION_REWARD,
       connection,
     });
-    dailyClaimedAt = new Date();
+    dailyClaimedAt = __timeNow();
     notices.push(formatMissionRewardSummary(DAILY_MISSION_REWARD, 'diária'));
   }
 
@@ -803,7 +804,7 @@ const applyMissionEvent = async ({ ownerJid, eventKey, connection }) => {
       reward: WEEKLY_MISSION_REWARD,
       connection,
     });
-    weeklyClaimedAt = new Date();
+    weeklyClaimedAt = __timeNow();
     notices.push(formatMissionRewardSummary(WEEKLY_MISSION_REWARD, 'semanal'));
   }
 
@@ -826,9 +827,9 @@ const applyMissionEvent = async ({ ownerJid, eventKey, connection }) => {
 const buildBattleChatKey = (chatJid, ownerJid) => `${chatJid}::${ownerJid}`;
 const extractSourceChatFromBattleKey = (battleChatKey) => String(battleChatKey || '').split('::')[0] || null;
 
-const nowPlusTtlDate = () => new Date(Date.now() + BATTLE_TTL_MS);
-const nowPlusRaidTtlDate = () => new Date(Date.now() + RAID_TTL_MS);
-const nowPlusPvpTtlDate = () => new Date(Date.now() + PVP_TTL_MS);
+const nowPlusTtlDate = () => new Date(__timeNowMs() + BATTLE_TTL_MS);
+const nowPlusRaidTtlDate = () => new Date(__timeNowMs() + RAID_TTL_MS);
+const nowPlusPvpTtlDate = () => new Date(__timeNowMs() + PVP_TTL_MS);
 
 const parseBattleSnapshot = (battleState) => {
   const snapshot = battleState?.enemy_snapshot_json;
@@ -844,9 +845,9 @@ const toDateSafe = (value) => {
   return date;
 };
 
-const toDurationSeconds = (startedAt, endedAt = new Date()) => {
+const toDurationSeconds = (startedAt, endedAt = __timeNow()) => {
   const start = toDateSafe(startedAt);
-  const end = toDateSafe(endedAt) || new Date();
+  const end = toDateSafe(endedAt) || __timeNow();
   if (!start) return 0;
   const delta = (end.getTime() - start.getTime()) / 1000;
   if (!Number.isFinite(delta) || delta < 0) return 0;
@@ -864,7 +865,7 @@ const recordBattleDurationFromSnapshot = ({ snapshot, outcome }) => {
 };
 
 const markSessionSample = (ownerJid) => {
-  const now = Date.now();
+  const now = __timeNowMs();
   const tracker = sessionTrackerMap.get(ownerJid);
   if (!tracker || now - tracker.lastAt > SESSION_IDLE_MS) {
     sessionTrackerMap.set(ownerJid, {
@@ -879,14 +880,14 @@ const markSessionSample = (ownerJid) => {
   recordRpgSessionDuration(durationSec);
 };
 
-const toUtcDateOnly = (value = new Date()) => {
+const toUtcDateOnly = (value = __timeNow()) => {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return null;
   return date.toISOString().slice(0, 10);
 };
 
 const getDateOnlyOffset = (days = 0) => {
-  const now = new Date();
+  const now = __timeNow();
   const atMidnightUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   atMidnightUtc.setUTCDate(atMidnightUtc.getUTCDate() + days);
   return toUtcDateOnly(atMidnightUtc);
@@ -894,14 +895,14 @@ const getDateOnlyOffset = (days = 0) => {
 
 const toDateFromDateOnly = (dateOnly, plusDays = 0) => {
   const source = String(dateOnly || '').trim();
-  if (!source) return new Date();
+  if (!source) return __timeNow();
   const date = new Date(`${source}T00:00:00.000Z`);
-  if (Number.isNaN(date.getTime())) return new Date();
+  if (Number.isNaN(date.getTime())) return __timeNow();
   date.setUTCDate(date.getUTCDate() + plusDays);
   return date;
 };
 
-const getCurrentMissionRefs = () => resolveMissionRefs(new Date());
+const getCurrentMissionRefs = () => resolveMissionRefs(__timeNow());
 
 const getCurrentWeekRefDate = () => getCurrentMissionRefs().weeklyRefDate;
 
@@ -1245,7 +1246,7 @@ const resolveOpponentJidFromArgs = async ({ actionArgs = [], mentionedJids = [] 
 const getCooldownSecondsLeft = (ownerJid) => {
   const lastAt = playerCooldownMap.get(ownerJid);
   if (!lastAt) return 0;
-  const diff = Date.now() - lastAt;
+  const diff = __timeNowMs() - lastAt;
   if (diff >= COOLDOWN_MS) return 0;
   return Math.max(1, Math.ceil((COOLDOWN_MS - diff) / 1000));
 };
@@ -1253,7 +1254,7 @@ const getCooldownSecondsLeft = (ownerJid) => {
 const getPvpCooldownSecondsLeft = (ownerJid) => {
   const lastAt = pvpCooldownMap.get(ownerJid);
   if (!lastAt) return 0;
-  const diff = Date.now() - lastAt;
+  const diff = __timeNowMs() - lastAt;
   if (diff >= PVP_CHALLENGE_COOLDOWN_MS) return 0;
   return Math.max(1, Math.ceil((PVP_CHALLENGE_COOLDOWN_MS - diff) / 1000));
 };
@@ -1263,11 +1264,11 @@ const shouldApplyCooldown = (action) => {
 };
 
 const touchCooldown = (ownerJid) => {
-  playerCooldownMap.set(ownerJid, Date.now());
+  playerCooldownMap.set(ownerJid, __timeNowMs());
 };
 
 const touchPvpCooldown = (ownerJid) => {
-  pvpCooldownMap.set(ownerJid, Date.now());
+  pvpCooldownMap.set(ownerJid, __timeNowMs());
 };
 
 const loadPokemonDisplayData = async (pokemonRow) => {
@@ -2077,7 +2078,7 @@ const handleProfile = async ({ ownerJid, chatJid, commandPrefix }) => {
     text,
     profileCanvas: {
       trainerLabel: toMentionLabel(ownerJid),
-      generatedAtLabel: toDateLabel(Date.now()),
+      generatedAtLabel: toDateLabel(__timeNowMs()),
       activePokemon: {
         displayName: activeDisplay?.displayName || activeDisplay?.name || null,
         name: activeDisplay?.name || null,
@@ -2273,7 +2274,7 @@ const handleExplore = async ({ ownerJid, chatJid, commandPrefix }) => {
 
     const battleSnapshot = {
       turn: 1,
-      startedAt: new Date().toISOString(),
+      startedAt: __timeNowIso(),
       mode: 'wild',
       biome: biome
         ? {
@@ -2397,7 +2398,7 @@ const handleGym = async ({ ownerJid, chatJid, commandPrefix }) => {
 
     const battleSnapshot = {
       turn: 1,
-      startedAt: new Date().toISOString(),
+      startedAt: __timeNowIso(),
       mode: 'gym',
       biome: biome
         ? {
@@ -2786,7 +2787,7 @@ const requireInventoryItem = async ({ ownerJid, itemKey, connection }) => {
 const getEconomyRescueSecondsLeft = (ownerJid) => {
   const lastAt = economyRescueMap.get(ownerJid);
   if (!lastAt) return 0;
-  const diff = Date.now() - lastAt;
+  const diff = __timeNowMs() - lastAt;
   if (diff >= ECONOMY_RESCUE_COOLDOWN_MS) return 0;
   return Math.max(1, Math.ceil((ECONOMY_RESCUE_COOLDOWN_MS - diff) / 1000));
 };
@@ -2813,7 +2814,7 @@ const tryApplyEconomyRescue = async ({ ownerJid, player, activePokemon = null, c
   const nextGold = currentGold + ECONOMY_RESCUE_GOLD;
   await updatePlayerGoldOnly({ jid: ownerJid, gold: nextGold }, connection);
   await addInventoryItem({ ownerJid, itemKey: 'potion', quantity: ECONOMY_RESCUE_POTION_QTY }, connection);
-  economyRescueMap.set(ownerJid, Date.now());
+  economyRescueMap.set(ownerJid, __timeNowMs());
 
   logger.info('Auxílio econômico aplicado para evitar travamento no início.', {
     ownerJid,
@@ -4421,7 +4422,7 @@ const toRaidView = (raidRow) => {
 const isDateExpired = (value) => {
   const date = toDateSafe(value);
   if (!date) return false;
-  return date.getTime() <= Date.now();
+  return date.getTime() <= __timeNowMs();
 };
 
 const formatParticipantRows = (participants = []) =>
@@ -4441,7 +4442,7 @@ const resolveRaidRewards = ({ bossLevel, totalDamage, participantDamage }) => {
 
 const buildPvpSnapshotState = ({ challengerJid, challengerPokemonId, challengerSnapshot, opponentJid, opponentPokemonId, opponentSnapshot, turnJid }) => {
   return {
-    startedAt: new Date().toISOString(),
+    startedAt: __timeNowIso(),
     turn: 1,
     players: {
       [challengerJid]: {
@@ -4919,7 +4920,7 @@ const handleRaid = async ({ ownerJid, chatJid, commandPrefix, actionArgs = [] })
         currentHp: bossMaxHp,
       };
 
-      const startedAt = new Date();
+      const startedAt = __timeNow();
       const endsAt = nowPlusRaidTtlDate();
       await upsertRaidState(
         {
@@ -5435,7 +5436,7 @@ const handlePvpQueue = async ({ ownerJid, chatJid, commandPrefix, actionArgs = [
       {
         chatJid,
         ownerJid: canonicalOwnerJid,
-        expiresAt: new Date(Date.now() + PVP_QUEUE_TTL_MS),
+        expiresAt: new Date(__timeNowMs() + PVP_QUEUE_TTL_MS),
       },
       connection,
     );
@@ -5661,7 +5662,7 @@ const handlePvp = async ({ ownerJid, chatJid, commandPrefix, actionArgs = [], me
         {
           id: challenge.id,
           status: 'active',
-          startedAt: new Date(),
+          startedAt: __timeNow(),
           expiresAt: nowPlusPvpTtlDate(),
         },
         connection,
@@ -5721,7 +5722,7 @@ const handlePvp = async ({ ownerJid, chatJid, commandPrefix, actionArgs = [], me
           status: 'finished',
           winnerJid: opponentJid,
           turnJid: null,
-          expiresAt: new Date(),
+          expiresAt: __timeNow(),
         },
         connection,
       );
@@ -5797,7 +5798,7 @@ const handlePvp = async ({ ownerJid, chatJid, commandPrefix, actionArgs = [], me
             status: 'finished',
             winnerJid: toInt(me?.pokemon?.currentHp, 0) > 0 ? canonicalOwnerJid : opponentJid,
             turnJid: null,
-            expiresAt: new Date(),
+            expiresAt: __timeNow(),
           },
           connection,
         );
@@ -5951,7 +5952,7 @@ const handlePvp = async ({ ownerJid, chatJid, commandPrefix, actionArgs = [], me
             winnerJid,
             turnJid: null,
             battleSnapshot: nextSnapshot,
-            expiresAt: new Date(),
+            expiresAt: __timeNow(),
           },
           connection,
         );
@@ -6207,7 +6208,7 @@ const handleTrade = async ({ ownerJid, chatJid, commandPrefix, actionArgs = [], 
           receiverJid,
           proposerOffer,
           receiverOffer,
-          expiresAt: new Date(Date.now() + TRADE_TTL_MS),
+          expiresAt: new Date(__timeNowMs() + TRADE_TTL_MS),
         },
         connection,
       );
@@ -6284,7 +6285,7 @@ const handleTrade = async ({ ownerJid, chatJid, commandPrefix, actionArgs = [], 
         {
           id: offer.id,
           status: 'accepted',
-          acceptedAt: new Date(),
+          acceptedAt: __timeNow(),
         },
         connection,
       );

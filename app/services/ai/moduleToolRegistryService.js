@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import fs from 'node:fs';
 import path from 'node:path';
 import logger from '#logger';
@@ -126,7 +127,7 @@ const buildRegistrySnapshot = () => {
   }
 
   cachedRegistry = {
-    builtAt: new Date().toISOString(),
+    builtAt: __timeNowIso(),
     signature,
     records: records.sort((a, b) => a.toolName.localeCompare(b.toolName)),
     toolNameToRecord,

@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import crypto from 'node:crypto';
 import logger from '#logger';
 import { sendAndStore } from '../../services/messaging/messagePersistenceService.js';
@@ -15,7 +16,7 @@ const buildRequestId = () => {
   if (typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
   }
-  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return `${__timeNowMs()}-${Math.random().toString(16).slice(2)}`;
 };
 
 const isTechnicalError = (error) => Boolean(error?.meta?.technical);
@@ -36,35 +37,13 @@ const getUserErrorMessage = (error) => {
 const buildAdminFailureText = (error, context = {}) => {
   const adminTitle = getPlayText('admin_error_title', 'Erro no módulo play (diagnóstico).');
   const cause = truncateText(error?.meta?.cause || error?.stack || error?.message || '', 1200);
-  const lines = [
-    adminTitle,
-    `Chat: ${context?.remoteJid || 'n/a'}`,
-    `Request: ${context?.requestId || error?.meta?.requestId || 'n/a'}`,
-    `Tipo: ${context?.type || error?.meta?.type || 'n/a'}`,
-    `Code: ${error?.code || 'n/a'}`,
-    `Endpoint: ${error?.meta?.endpoint || 'n/a'}`,
-    `Status: ${error?.meta?.status || 'n/a'}`,
-    `RawCode: ${error?.meta?.rawCode || 'n/a'}`,
-    `ExitCode: ${error?.meta?.exitCode ?? 'n/a'}`,
-    `Signal: ${error?.meta?.signal || 'n/a'}`,
-    `Input: ${truncateText(error?.meta?.input || '', 300) || 'n/a'}`,
-    `FilePath: ${error?.meta?.filePath || 'n/a'}`,
-    `Mensagem usuário: ${getUserErrorMessage(error)}`,
-    `Causa técnica: ${cause || 'n/a'}`,
-  ];
+  const lines = [adminTitle, `Chat: ${context?.remoteJid || 'n/a'}`, `Request: ${context?.requestId || error?.meta?.requestId || 'n/a'}`, `Tipo: ${context?.type || error?.meta?.type || 'n/a'}`, `Code: ${error?.code || 'n/a'}`, `Endpoint: ${error?.meta?.endpoint || 'n/a'}`, `Status: ${error?.meta?.status || 'n/a'}`, `RawCode: ${error?.meta?.rawCode || 'n/a'}`, `ExitCode: ${error?.meta?.exitCode ?? 'n/a'}`, `Signal: ${error?.meta?.signal || 'n/a'}`, `Input: ${truncateText(error?.meta?.input || '', 300) || 'n/a'}`, `FilePath: ${error?.meta?.filePath || 'n/a'}`, `Mensagem usuário: ${getUserErrorMessage(error)}`, `Causa técnica: ${cause || 'n/a'}`];
   return lines.join('\n');
 };
 
 const buildAdminAlertDedupKey = (error, context = {}) => {
   const causeKey = truncateText(error?.meta?.cause || error?.message || '', 160);
-  return [
-    context?.type || error?.meta?.type || 'n/a',
-    error?.code || 'n/a',
-    error?.meta?.endpoint || 'n/a',
-    error?.meta?.status || 'n/a',
-    error?.meta?.rawCode || 'n/a',
-    causeKey || 'n/a',
-  ].join('|');
+  return [context?.type || error?.meta?.type || 'n/a', error?.code || 'n/a', error?.meta?.endpoint || 'n/a', error?.meta?.status || 'n/a', error?.meta?.rawCode || 'n/a', causeKey || 'n/a'].join('|');
 };
 
 const pruneAdminAlertDedupCache = (nowMs, dedupeWindowMs) => {
@@ -86,7 +65,7 @@ const shouldNotifyAdminAlert = (error, context = {}) => {
     return true;
   }
 
-  const nowMs = Date.now();
+  const nowMs = __timeNowMs();
   const dedupeKey = buildAdminAlertDedupKey(error, context);
   const lastSentAt = adminAlertDedupCache.get(dedupeKey);
   if (Number.isFinite(lastSentAt) && nowMs - lastSentAt < dedupeWindowMs) {
@@ -116,7 +95,7 @@ const notifyFailure = async (sock, remoteJid, messageInfo, expirationMessage, er
 };
 
 const processPlayRequest = async ({ sock, remoteJid, messageInfo, expirationMessage, text, type }) => {
-  const startTime = Date.now();
+  const startTime = __timeNowMs();
   const requestId = buildRequestId();
   const config = TYPE_CONFIG[type];
 
@@ -201,17 +180,12 @@ const processPlayRequest = async ({ sock, remoteJid, messageInfo, expirationMess
       fallbackToAudio,
       endpoint: YTDLS_ENDPOINTS.download,
       selectedLink: selectedLink || null,
-      elapsedMs: Date.now() - startTime,
+      elapsedMs: __timeNowMs() - startTime,
       bytes: downloadResult.bytes || 0,
     });
 
     if (fallbackToAudio) {
-      await sendAndStore(
-        sock,
-        remoteJid,
-        { text: getPlayText('video_fallback_to_audio', '⚠️ Este link retornou somente áudio. Enviando no formato de áudio.') },
-        { quoted: messageInfo, ephemeralExpiration: expirationMessage },
-      );
+      await sendAndStore(sock, remoteJid, { text: getPlayText('video_fallback_to_audio', '⚠️ Este link retornou somente áudio. Enviando no formato de áudio.') }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
     }
 
     if (deliveredType === 'audio') {
@@ -234,7 +208,7 @@ const processPlayRequest = async ({ sock, remoteJid, messageInfo, expirationMess
             status: error?.meta?.status || null,
             code: error?.code,
             error: truncateText(error?.message || ''),
-            elapsedMs: Date.now() - startTime,
+            elapsedMs: __timeNowMs() - startTime,
           });
         }
       }
@@ -251,7 +225,7 @@ const processPlayRequest = async ({ sock, remoteJid, messageInfo, expirationMess
             requestedType: type,
             code: error?.code || null,
             error: truncateText(error?.message || ''),
-            elapsedMs: Date.now() - startTime,
+            elapsedMs: __timeNowMs() - startTime,
           });
         }
       }
@@ -267,7 +241,7 @@ const processPlayRequest = async ({ sock, remoteJid, messageInfo, expirationMess
             requestedType: type,
             code: error?.code || null,
             error: truncateText(error?.message || ''),
-            elapsedMs: Date.now() - startTime,
+            elapsedMs: __timeNowMs() - startTime,
           });
         }
       }
@@ -290,7 +264,7 @@ const processPlayRequest = async ({ sock, remoteJid, messageInfo, expirationMess
         requestedType: type,
         fallbackToAudio,
         bytes: downloadResult.bytes || 0,
-        elapsedMs: Date.now() - startTime,
+        elapsedMs: __timeNowMs() - startTime,
       });
 
       return;
@@ -316,7 +290,7 @@ const processPlayRequest = async ({ sock, remoteJid, messageInfo, expirationMess
       type: deliveredType,
       requestedType: type,
       bytes: downloadResult.bytes || 0,
-      elapsedMs: Date.now() - startTime,
+      elapsedMs: __timeNowMs() - startTime,
     });
   } catch (error) {
     if (!filePath && error?.meta?.filePath) {
@@ -335,7 +309,7 @@ const processPlayRequest = async ({ sock, remoteJid, messageInfo, expirationMess
       type,
       endpoint: normalizedError?.meta?.endpoint || null,
       status: normalizedError?.meta?.status || null,
-      elapsedMs: Date.now() - startTime,
+      elapsedMs: __timeNowMs() - startTime,
       error: truncateText(normalizedError.message || ''),
       cause: truncateText(normalizedError?.meta?.cause || ''),
       code: normalizedError.code,

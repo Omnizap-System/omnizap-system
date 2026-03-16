@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import 'dotenv/config';
 
 import { closePool, executeQuery, TABLES } from '../database/index.js';
@@ -53,7 +54,7 @@ const normalizeTag = (value, fallback) =>
     .replace(/[^a-z0-9:_-]/g, '')
     .slice(0, 60);
 
-const nowIsoDate = new Date().toISOString().slice(0, 10);
+const nowIsoDate = __timeNowIso().slice(0, 10);
 const args = parseCliArgs(process.argv.slice(2));
 
 const dryRun = parseBoolArg(args.get('--dry-run'), false);

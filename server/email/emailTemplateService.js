@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 const DEFAULT_SITE_ORIGIN = 'https://omnizap.shop';
 const DEFAULT_BRAND_NAME = 'OmniZap';
 
@@ -125,7 +126,7 @@ const renderEmailLayout = ({ payload = {}, preheader = '', heading = '', greetin
   const safeSecondaryCtaUrl = normalizeHttpUrl(secondaryCtaUrl, '');
   const safeSecurityNote = normalizeText(securityNote, 220);
   const safeFooterMessage = normalizeText(footerMessage, 220);
-  const year = new Date().getUTCFullYear();
+  const year = __timeNow().getUTCFullYear();
 
   const logoBlock = brand.brandLogoUrl ? `<img src="${escapeHtml(brand.brandLogoUrl)}" alt="${escapeHtml(brand.brandName)}" width="132" style="display:block;border:0;outline:none;text-decoration:none;height:auto;margin:0 auto;" />` : `<div style="display:inline-block;font-size:26px;font-weight:800;color:#0f172a;letter-spacing:0.2px;">${escapeHtml(brand.brandName)}</div>`;
 

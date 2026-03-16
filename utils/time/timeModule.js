@@ -8,13 +8,7 @@ function resolveTimeZone(timeZone = 'UTC') {
   return timeZone;
 }
 
-function normalizeDateTime(
-  dateInput = new Date(),
-  {
-    locale = 'pt-BR',
-    timeZone = 'UTC',
-  } = {},
-) {
+function normalizeDateTime(dateInput = new Date(), { locale = 'pt-BR', timeZone = 'UTC' } = {}) {
   const zone = resolveTimeZone(timeZone);
   let dateTime = null;
 
@@ -64,38 +58,15 @@ export function elapsedMs(startDateInput, endDateInput = new Date()) {
   return toUnixMs(endDateInput) - toUnixMs(startDateInput);
 }
 
-export function formatInTimeZone(
-  dateInput = new Date(),
-  {
-    locale = 'pt-BR',
-    timeZone = 'UTC',
-    options = {},
-  } = {},
-) {
+export function formatInTimeZone(dateInput = new Date(), { locale = 'pt-BR', timeZone = 'UTC', options = {} } = {}) {
   return normalizeDateTime(dateInput, { locale, timeZone }).toLocaleString(options);
 }
 
-export function formatTimeAmPm(
-  dateInput = new Date(),
-  {
-    locale = 'en-US',
-    timeZone = 'UTC',
-    includeSeconds = false,
-  } = {},
-) {
-  return normalizeDateTime(dateInput, { locale, timeZone }).toFormat(
-    includeSeconds ? 'hh:mm:ss a' : 'hh:mm a',
-  );
+export function formatTimeAmPm(dateInput = new Date(), { locale = 'en-US', timeZone = 'UTC', includeSeconds = false } = {}) {
+  return normalizeDateTime(dateInput, { locale, timeZone }).toFormat(includeSeconds ? 'hh:mm:ss a' : 'hh:mm a');
 }
 
-export function formatDateTimeExtenso(
-  dateInput = new Date(),
-  {
-    locale = 'pt-BR',
-    timeZone = 'UTC',
-    includeWeekday = true,
-  } = {},
-) {
+export function formatDateTimeExtenso(dateInput = new Date(), { locale = 'pt-BR', timeZone = 'UTC', includeWeekday = true } = {}) {
   return normalizeDateTime(dateInput, { locale, timeZone }).toLocaleString({
     ...(includeWeekday ? { weekday: 'long' } : {}),
     day: 'numeric',
@@ -106,20 +77,16 @@ export function formatDateTimeExtenso(
   });
 }
 
-export function formatTimeExtenso(
-  dateInput = new Date(),
-  {
-    locale = 'pt-BR',
-    timeZone = 'UTC',
-    includeSeconds = false,
-  } = {},
-) {
+export function formatTimeExtenso(dateInput = new Date(), { locale = 'pt-BR', timeZone = 'UTC', includeSeconds = false } = {}) {
   const dateTime = normalizeDateTime(dateInput, { locale, timeZone });
-  const duration = Duration.fromObject({
-    hours: dateTime.hour,
-    minutes: dateTime.minute,
-    ...(includeSeconds ? { seconds: dateTime.second } : {}),
-  }, { locale });
+  const duration = Duration.fromObject(
+    {
+      hours: dateTime.hour,
+      minutes: dateTime.minute,
+      ...(includeSeconds ? { seconds: dateTime.second } : {}),
+    },
+    { locale },
+  );
 
   return duration.toHuman({
     unitDisplay: 'long',
@@ -127,13 +94,7 @@ export function formatTimeExtenso(
   });
 }
 
-export function buildTimeFormats(
-  dateInput = new Date(),
-  {
-    locale = 'pt-BR',
-    timeZone = 'UTC',
-  } = {},
-) {
+export function buildTimeFormats(dateInput = new Date(), { locale = 'pt-BR', timeZone = 'UTC' } = {}) {
   const iso = normalizeDateTime(dateInput, { locale: 'en-US', timeZone: 'UTC' }).toUTC().toISO();
 
   return {

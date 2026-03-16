@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 const parseEnvList = (value) =>
   String(value || '')
     .split(',')
@@ -184,7 +185,7 @@ export const computePackSignals = ({ pack, engagement, packClassification, itemC
   const packScoreRaw = classificationConfidence * resolvedWeights.classification + engagementScore * resolvedWeights.engagement + qualityScore * resolvedWeights.quality + diversityScore * resolvedWeights.diversity - duplicatePenalty * 0.25;
   const packScore = Number(clamp(packScoreRaw, 0, 1.5).toFixed(6));
   const referenceDate = pack?.updated_at || pack?.created_at || null;
-  const ageMs = referenceDate ? Date.now() - Date.parse(referenceDate) : 0;
+  const ageMs = referenceDate ? __timeNowMs() - Date.parse(referenceDate) : 0;
   const ageDays = Number.isFinite(ageMs) && ageMs > 0 ? ageMs / (24 * 60 * 60 * 1000) : 0;
   const decayWindow = Math.max(1, Number(ageDecayDays) || AGE_DECAY_DAYS);
   const ageDecayFactor = Number(Math.exp(-ageDays / decayWindow).toFixed(6));

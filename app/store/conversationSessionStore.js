@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 const DEFAULT_SESSION_TTL_MS = 15 * 60 * 1000;
 const DEFAULT_HISTORY_LIMIT = 8;
 
@@ -22,7 +23,7 @@ const buildSessionKey = ({ chatId, userId, scope = 'private' } = {}) => {
   return `${safeScope}:${safeChatId}:${safeUserId}`;
 };
 
-const pruneExpiredSessions = (nowMs = Date.now()) => {
+const pruneExpiredSessions = (nowMs = __timeNowMs()) => {
   for (const [key, session] of sessions.entries()) {
     if (!session || !Number.isFinite(session.expiresAt) || session.expiresAt <= nowMs) {
       sessions.delete(key);
@@ -47,7 +48,7 @@ const getOrCreateSession = ({ chatId, userId, scope = 'private', ttlMs }) => {
   const key = buildSessionKey({ chatId, userId, scope });
   if (!key) return null;
 
-  const nowMs = Date.now();
+  const nowMs = __timeNowMs();
   const safeTtlMs = toFinitePositiveInt(ttlMs, DEFAULT_SESSION_TTL_MS, 1_000);
   const existing = sessions.get(key);
 
@@ -90,7 +91,7 @@ export const appendConversationSessionMessage = ({ chatId, userId, scope = 'priv
       role: safeRole,
       text: safeText,
       metadata: metadata && typeof metadata === 'object' ? { ...metadata } : null,
-      createdAt: new Date().toISOString(),
+      createdAt: __timeNowIso(),
     });
     const maxHistory = toFinitePositiveInt(historyLimit, DEFAULT_HISTORY_LIMIT, 1);
     if (session.history.length > maxHistory) {
@@ -98,7 +99,7 @@ export const appendConversationSessionMessage = ({ chatId, userId, scope = 'priv
     }
   }
 
-  session.updatedAt = new Date().toISOString();
+  session.updatedAt = __timeNowIso();
   return cloneSession(session);
 };
 
@@ -110,10 +111,10 @@ export const setConversationSessionIntent = ({ chatId, userId, scope = 'private'
     intent && typeof intent === 'object'
       ? {
           ...intent,
-          updatedAt: new Date().toISOString(),
+          updatedAt: __timeNowIso(),
         }
       : null;
-  session.updatedAt = new Date().toISOString();
+  session.updatedAt = __timeNowIso();
   return cloneSession(session);
 };
 

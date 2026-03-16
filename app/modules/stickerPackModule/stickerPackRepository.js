@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import { executeQuery, TABLES } from '../../../database/index.js';
 import { STICKER_DOMAIN_EVENTS } from './domainEvents.js';
 import { publishStickerDomainEvent } from './stickerDomainEventBus.js';
@@ -396,7 +397,7 @@ export async function softDeleteStickerPack(packId, connection = null) {
   return updateStickerPackFields(
     packId,
     {
-      deleted_at: new Date(),
+      deleted_at: __timeNow(),
     },
     connection,
   );

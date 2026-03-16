@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import axios from 'axios';
 import logger from '#logger';
 import groupConfigStore from '../../store/groupConfigStore.js';
@@ -179,7 +180,7 @@ const processGroupNews = async (groupId) => {
 
     const sock = getActiveSocket();
     if (!sock) {
-      const now = Date.now();
+      const now = __timeNowMs();
       if (!state.lastNotReadyLogAt || now - state.lastNotReadyLogAt > 60_000) {
         state.lastNotReadyLogAt = now;
         logger.debug('Socket nao disponivel para envio de noticias.', { groupId });
@@ -242,7 +243,7 @@ const processGroupNews = async (groupId) => {
       const updatedSentIds = trimSentIds(Array.from(sentIds));
       await groupConfigStore.updateGroupConfig(groupId, {
         newsSentIds: updatedSentIds,
-        newsLastSentAt: new Date().toISOString(),
+        newsLastSentAt: __timeNowIso(),
       });
     } catch (error) {
       if (isGroupUnavailableError(error)) {

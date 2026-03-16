@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import axios from 'axios';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
@@ -132,7 +133,7 @@ const safeUnlink = async (filePath) => {
   }
 };
 
-const buildTempFilePath = () => path.join(TEMP_DIR, `tiktok-${Date.now()}-${randomUUID()}.mp4`);
+const buildTempFilePath = () => path.join(TEMP_DIR, `tiktok-${__timeNowMs()}-${randomUUID()}.mp4`);
 
 const requestExtract = async (videoUrl) => {
   const endpoint = `${TIKTOK_EXTRACT_BASE_URL}${TIKTOK_EXTRACT_PATH.startsWith('/') ? TIKTOK_EXTRACT_PATH : `/${TIKTOK_EXTRACT_PATH}`}`;

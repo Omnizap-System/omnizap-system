@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import fs from 'node:fs/promises';
 
 export const createStickerCatalogSeoContext = ({ executeQuery, tables, listStickerPacksForCatalog, logger, sendJson, toSiteAbsoluteUrl, isPackPubliclyVisible, buildPackWebUrl, config }) => {
@@ -52,7 +53,7 @@ export const createStickerCatalogSeoContext = ({ executeQuery, tables, listStick
   const buildStickersReactBundleUrl = () => appendAssetVersionQuery('/assets/js/stickers-react.bundle.js');
 
   const buildCatalogDiscoveryLinksHtml = async () => {
-    if (SEO_DISCOVERY_CACHE.expiresAt > Date.now() && SEO_DISCOVERY_CACHE.html) {
+    if (SEO_DISCOVERY_CACHE.expiresAt > __timeNowMs() && SEO_DISCOVERY_CACHE.html) {
       return SEO_DISCOVERY_CACHE.html;
     }
 
@@ -67,7 +68,7 @@ export const createStickerCatalogSeoContext = ({ executeQuery, tables, listStick
       const links = (Array.isArray(packs) ? packs : []).filter((pack) => pack?.pack_key && isPackPubliclyVisible(pack)).slice(0, seoDiscoveryLinkLimit);
 
       if (!links.length) {
-        SEO_DISCOVERY_CACHE.expiresAt = Date.now() + seoDiscoveryCacheSeconds * 1000;
+        SEO_DISCOVERY_CACHE.expiresAt = __timeNowMs() + seoDiscoveryCacheSeconds * 1000;
         SEO_DISCOVERY_CACHE.html = '';
         return '';
       }
@@ -91,7 +92,7 @@ export const createStickerCatalogSeoContext = ({ executeQuery, tables, listStick
   </section>
 </noscript>`;
 
-      SEO_DISCOVERY_CACHE.expiresAt = Date.now() + seoDiscoveryCacheSeconds * 1000;
+      SEO_DISCOVERY_CACHE.expiresAt = __timeNowMs() + seoDiscoveryCacheSeconds * 1000;
       SEO_DISCOVERY_CACHE.html = html;
       return html;
     } catch (error) {
@@ -116,7 +117,7 @@ export const createStickerCatalogSeoContext = ({ executeQuery, tables, listStick
       __INITIAL_PACK_KEY__: escapeHtmlAttribute(initialPackKey || ''),
       __CATALOG_STYLES_PATH__: escapeHtmlAttribute(buildCatalogStylesUrl()),
       __CATALOG_SCRIPT_PATH__: escapeHtmlAttribute(buildCatalogScriptUrl()),
-      __CURRENT_YEAR__: String(new Date().getFullYear()),
+      __CURRENT_YEAR__: String(__timeNow().getFullYear()),
     };
 
     let html = template;
@@ -150,7 +151,7 @@ export const createStickerCatalogSeoContext = ({ executeQuery, tables, listStick
     const coverUrl = toSiteAbsoluteUrl(packSummary?.cover_url || fallbackCoverUrl);
     const publisher = truncateText(packSummary?.publisher || 'Criador OmniZap', 80);
     const stickerCount = Math.max(0, Number(packSummary?.sticker_count || 0));
-    const updatedAt = packSummary?.updated_at || packSummary?.created_at || new Date().toISOString();
+    const updatedAt = packSummary?.updated_at || packSummary?.created_at || __timeNowIso();
     const schemaJson = JSON.stringify(
       {
         '@context': 'https://schema.org',
@@ -337,7 +338,7 @@ export const createStickerCatalogSeoContext = ({ executeQuery, tables, listStick
       __STICKER_LOGIN_WEB_PATH__: escapeHtmlAttribute(stickerLoginWebPath),
       __STICKER_API_BASE_PATH__: escapeHtmlAttribute(stickerApiBasePath),
       __PACK_COMMAND_PREFIX__: escapeHtmlAttribute(packCommandPrefix),
-      __CURRENT_YEAR__: String(new Date().getFullYear()),
+      __CURRENT_YEAR__: String(__timeNow().getFullYear()),
     };
 
     let html = template;
@@ -348,7 +349,7 @@ export const createStickerCatalogSeoContext = ({ executeQuery, tables, listStick
   };
 
   const buildSitemapXml = async () => {
-    if (SITEMAP_CACHE.expiresAt > Date.now() && SITEMAP_CACHE.xml) {
+    if (SITEMAP_CACHE.expiresAt > __timeNowMs() && SITEMAP_CACHE.xml) {
       return SITEMAP_CACHE.xml;
     }
 
@@ -441,7 +442,7 @@ export const createStickerCatalogSeoContext = ({ executeQuery, tables, listStick
       .join('\n');
 
     const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${xmlItems}\n</urlset>\n`;
-    SITEMAP_CACHE.expiresAt = Date.now() + sitemapCacheSeconds * 1000;
+    SITEMAP_CACHE.expiresAt = __timeNowMs() + sitemapCacheSeconds * 1000;
     SITEMAP_CACHE.xml = xml;
     return xml;
   };

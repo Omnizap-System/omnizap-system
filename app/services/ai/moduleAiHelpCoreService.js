@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import OpenAI from 'openai';
@@ -579,7 +580,7 @@ export const createModuleAiHelpService = ({ moduleKey, moduleLabel = 'modulo', e
       ...cache.metrics,
       [metricKey]: Number(cache.metrics?.[metricKey] || 0) + 1,
     };
-    cache.updatedAt = new Date().toISOString();
+    cache.updatedAt = __timeNowIso();
     await writeCache(cache);
   };
 
@@ -591,7 +592,7 @@ export const createModuleAiHelpService = ({ moduleKey, moduleLabel = 'modulo', e
     const normalizedSource = normalizeCacheSource(source);
     const normalizedAnswer = clampText(answer, config.llm.maxResponseChars);
     if (!normalizedAnswer) return;
-    const now = new Date().toISOString();
+    const now = __timeNowIso();
 
     const cache = await readCache();
     cache.questionCache[key] = {
@@ -739,10 +740,10 @@ export const createModuleAiHelpService = ({ moduleKey, moduleLabel = 'modulo', e
       }
 
       const cache = await readCache();
-      const now = new Date().toISOString();
+      const now = __timeNowIso();
 
       if (!force && cache.generatedAt) {
-        const ageMs = Date.now() - new Date(cache.generatedAt).getTime();
+        const ageMs = __timeNowMs() - new Date(cache.generatedAt).getTime();
         if (Number.isFinite(ageMs) && ageMs >= 0 && ageMs < config.faq.intervalMs) {
           const commandCount = Object.keys(cache.faqByCommand || {}).length;
           const faqCount = Object.values(cache.faqByCommand || {}).reduce((acc, list) => acc + (Array.isArray(list) ? list.length : 0), 0);

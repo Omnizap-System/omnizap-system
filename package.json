@@ -8,7 +8,8 @@
   },
   "type": "module",
   "imports": {
-    "#logger": "./utils/logger/loggerModule.js"
+    "#logger": "./utils/logger/loggerModule.js",
+    "#time": "./utils/time/timeModule.js"
   },
   "packageManager": "npm@10.9.2",
   "keywords": [

@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import logger from '#logger';
 import { getToolRecord } from '../services/ai/moduleToolRegistryService.js';
 import { applyCommandConfigEnrichmentSuggestion, getCommandConfigEnrichmentCursor, listLearningEventsForCommandConfigEnrichment, saveCommandConfigEnrichmentSuggestion, updateCommandConfigEnrichmentCursor } from '../services/ai/commandConfigEnrichmentRepository.js';
@@ -53,7 +54,7 @@ const processEnrichmentBatch = async ({ reason = 'scheduler' } = {}) => {
   if (!isWorkerReady()) return;
 
   cycleInProgress = true;
-  const startedAt = Date.now();
+  const startedAt = __timeNowMs();
 
   try {
     logger.info('Worker de enriquecimento de commandConfig iniciado.', {
@@ -78,7 +79,7 @@ const processEnrichmentBatch = async ({ reason = 'scheduler' } = {}) => {
         generated_suggestions: 0,
         auto_applied: 0,
         applied_changed: 0,
-        duration_ms: Date.now() - startedAt,
+        duration_ms: __timeNowMs() - startedAt,
       });
       return;
     }
@@ -186,7 +187,7 @@ const processEnrichmentBatch = async ({ reason = 'scheduler' } = {}) => {
       auto_applied: autoApplied,
       applied_changed: appliedChanged,
       skipped_unknown_tool: skippedUnknownTool,
-      duration_ms: Date.now() - startedAt,
+      duration_ms: __timeNowMs() - startedAt,
     });
   } finally {
     cycleInProgress = false;

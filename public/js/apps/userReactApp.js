@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import htm from 'htm';
@@ -85,7 +86,7 @@ const UserApp = ({ config }) => {
 
   const daysMember = useMemo(() => {
     if (!rpgInfo.member_since) return 0;
-    const diff = new Date() - new Date(rpgInfo.member_since);
+    const diff = __timeNow() - new Date(rpgInfo.member_since);
     return Math.floor(diff / (1000 * 60 * 60 * 24));
   }, [rpgInfo.member_since]);
 

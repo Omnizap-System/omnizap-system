@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import { createHash, pbkdf2 as pbkdf2Callback, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 
@@ -312,7 +313,7 @@ export const createUserPasswordRecoveryService = ({ executeQuery, userPasswordAu
     const oldestCreatedAt = rows?.[0]?.oldest_created_at ? Date.parse(rows[0].oldest_created_at) : NaN;
     if (!Number.isFinite(oldestCreatedAt)) return safeWindowSeconds;
 
-    const elapsedSeconds = Math.max(0, Math.floor((Date.now() - oldestCreatedAt) / 1000));
+    const elapsedSeconds = Math.max(0, Math.floor((__timeNowMs() - oldestCreatedAt) / 1000));
     return Math.max(1, safeWindowSeconds - elapsedSeconds);
   };
 
@@ -334,7 +335,7 @@ export const createUserPasswordRecoveryService = ({ executeQuery, userPasswordAu
     const row = Array.isArray(rows) ? rows[0] : null;
     if (!row) return null;
     const createdAtMs = row.created_at ? Date.parse(row.created_at) : NaN;
-    const elapsedSeconds = Number.isFinite(createdAtMs) ? Math.max(0, Math.floor((Date.now() - createdAtMs) / 1000)) : resendCooldownSeconds;
+    const elapsedSeconds = Number.isFinite(createdAtMs) ? Math.max(0, Math.floor((__timeNowMs() - createdAtMs) / 1000)) : resendCooldownSeconds;
     const retryAfterSeconds = Math.max(0, resendCooldownSeconds - elapsedSeconds);
     return {
       id: Number(row.id || 0),
@@ -496,7 +497,7 @@ export const createUserPasswordRecoveryService = ({ executeQuery, userPasswordAu
           remote_ip: normalizeIp(requestMeta?.remoteIp) || null,
         },
         priority: 95,
-        idempotencyKey: `web_user_password_recovery:${knownUser.google_sub}:${normalizedPurpose}:${new Date().toISOString().slice(0, 16)}`,
+        idempotencyKey: `web_user_password_recovery:${knownUser.google_sub}:${normalizedPurpose}:${__timeNowIso().slice(0, 16)}`,
       });
     } catch (error) {
       await executeQuery(

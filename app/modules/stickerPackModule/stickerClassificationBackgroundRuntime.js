@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 
@@ -299,14 +300,14 @@ const processDeterministicReclassification = async () => {
 };
 
 export const runStickerClassificationCycle = async ({ processPending = true, processReprocess = true, processDeterministic = true } = {}) => {
-  const startedAt = Date.now();
+  const startedAt = __timeNowMs();
   const shouldProcessClassifier = classifierConfig.enabled;
   const shouldProcessDeterministic = deterministicReclassificationConfig.enabled;
 
   if (!BACKGROUND_ENABLED || (!shouldProcessClassifier && !shouldProcessDeterministic)) {
     recordStickerClassificationCycle({
       status: 'skipped',
-      durationMs: Date.now() - startedAt,
+      durationMs: __timeNowMs() - startedAt,
       processed: 0,
       classified: 0,
       failed: 0,
@@ -325,7 +326,7 @@ export const runStickerClassificationCycle = async ({ processPending = true, pro
     const processed = Number(pendingStats?.processed || 0) + Number(reprocessStats?.processed || 0) + Number(deterministicStats?.processed || 0);
     const classified = Number(pendingStats?.classified || 0) + Number(reprocessStats?.classified || 0) + Number(deterministicStats?.updated || 0);
     const failed = Number(pendingStats?.failed || 0) + Number(reprocessStats?.failed || 0) + Number(deterministicStats?.failed || 0);
-    const durationMs = Date.now() - startedAt;
+    const durationMs = __timeNowMs() - startedAt;
 
     recordStickerClassificationCycle({
       status: 'ok',
@@ -345,7 +346,7 @@ export const runStickerClassificationCycle = async ({ processPending = true, pro
   } catch (error) {
     recordStickerClassificationCycle({
       status: 'failed',
-      durationMs: Date.now() - startedAt,
+      durationMs: __timeNowMs() - startedAt,
       processed: 0,
       classified: 0,
       failed: 1,
@@ -407,7 +408,7 @@ const classifyBatch = async () => {
   }
 
   running = true;
-  const startedAt = Date.now();
+  const startedAt = __timeNowMs();
 
   try {
     const result = await runStickerClassificationCycle({
@@ -459,7 +460,7 @@ const classifyBatch = async () => {
         deterministic_reclassification_failed: Number(deterministic.failed || 0),
         deterministic_reclassification_batches: Number(deterministic.batches || 0),
         deterministic_reclassification_last_cursor: deterministic.last_cursor || null,
-        duration_ms: Date.now() - startedAt,
+        duration_ms: __timeNowMs() - startedAt,
         batch_size: BATCH_SIZE,
         concurrency: BACKGROUND_CONCURRENCY,
         gain_count: gainCount,
@@ -472,7 +473,7 @@ const classifyBatch = async () => {
       processed: Number(processed || 0),
       classified: Number(classified || 0),
       failed: Number(failed || 0),
-      duration_ms: Date.now() - startedAt,
+      duration_ms: __timeNowMs() - startedAt,
     };
   } catch (error) {
     logger.error('Falha no loop de classificação em background.', {
@@ -483,7 +484,7 @@ const classifyBatch = async () => {
       executed: true,
       reason: 'failed',
       gain_count: 0,
-      duration_ms: Date.now() - startedAt,
+      duration_ms: __timeNowMs() - startedAt,
     };
   } finally {
     running = false;

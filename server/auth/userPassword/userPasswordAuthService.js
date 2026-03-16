@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import { hashUserPassword, resolveUserPasswordPolicy, validateUserPassword, verifyUserPasswordHash } from './userPasswordCrypto.js';
 
 const clampInt = (value, fallback, min, max) => {
@@ -139,7 +140,7 @@ export const createUserPasswordAuthService = ({ executeQuery, tables = {}, logge
       return { locked: false, retryAfterSeconds: 0 };
     }
 
-    const elapsedSeconds = Math.max(0, Math.floor((Date.now() - lastFailedAtMs) / 1000));
+    const elapsedSeconds = Math.max(0, Math.floor((__timeNowMs() - lastFailedAtMs) / 1000));
     const retryAfterSeconds = Math.max(0, lockoutSeconds - elapsedSeconds);
     if (retryAfterSeconds <= 0) {
       return { locked: false, retryAfterSeconds: 0 };

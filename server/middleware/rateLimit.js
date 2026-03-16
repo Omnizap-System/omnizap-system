@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import { resolveClientIp } from '../http/clientIp.js';
 
 const rateLimitBuckets = new Map();
@@ -38,7 +39,7 @@ export const createRateLimit = ({ windowMs = 60_000, max = 60, keyPrefix = 'glob
   const safeKeyPrefix = String(keyPrefix || 'global').trim() || 'global';
 
   return (req, res) => {
-    const nowMs = Date.now();
+    const nowMs = __timeNowMs();
     pruneBuckets(safeWindowMs, nowMs);
 
     const ip = resolveClientIp(req);

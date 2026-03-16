@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import http from 'node:http';
 import https from 'node:https';
 import { URL } from 'node:url';
@@ -249,7 +250,7 @@ const buildTempFilePath = (requestId, type) => {
     .replace(/[^a-z0-9-_]+/gi, '')
     .slice(0, 48);
   const ext = type === 'audio' ? 'mp3' : 'mp4';
-  return path.join(PLAY_DOWNLOADS_DIR, `play-${safeId}-${Date.now()}.${ext}`);
+  return path.join(PLAY_DOWNLOADS_DIR, `play-${safeId}-${__timeNowMs()}.${ext}`);
 };
 
 const safeUnlink = async (filePath) => {
@@ -400,10 +401,7 @@ const normalizeBinaryError = (error, { timeoutMessage, fallbackMessage, endpoint
 
 const probeVideoStreams = async (filePath, requestId, endpoint) => {
   try {
-    const result = await runWithPlayProcessSlot(
-      () => runBinaryCommand(FFPROBE_BIN, ['-v', 'error', '-print_format', 'json', '-show_streams', filePath]),
-      { endpoint, command: FFPROBE_BIN },
-    );
+    const result = await runWithPlayProcessSlot(() => runBinaryCommand(FFPROBE_BIN, ['-v', 'error', '-print_format', 'json', '-show_streams', filePath]), { endpoint, command: FFPROBE_BIN });
     const parsed = JSON.parse(result.stdout || '{}');
     const streams = Array.isArray(parsed?.streams) ? parsed.streams : [];
     const videoStream = streams.find((stream) => stream?.codec_type === 'video') || null;
@@ -501,16 +499,7 @@ const readResponseBuffer = async (stream, { maxBytes = Infinity, tooBigMessage }
   return Buffer.concat(chunks, total);
 };
 
-const httpRequest = ({
-  url,
-  timeoutMs = DEFAULT_TIMEOUT_MS,
-  maxRedirects = 0,
-  redirectCount = 0,
-  endpoint = 'unknown',
-  timeoutMessage = playText('http_timeout', 'Timeout na requisição HTTP.'),
-  fallbackMessage = playText('http_failed', 'Falha na requisição HTTP.'),
-  onResponse,
-}) =>
+const httpRequest = ({ url, timeoutMs = DEFAULT_TIMEOUT_MS, maxRedirects = 0, redirectCount = 0, endpoint = 'unknown', timeoutMessage = playText('http_timeout', 'Timeout na requisição HTTP.'), fallbackMessage = playText('http_failed', 'Falha na requisição HTTP.'), onResponse }) =>
   new Promise((resolve, reject) => {
     const urlObj = new URL(url);
     const httpModule = resolveHttpModule(urlObj);
@@ -600,12 +589,7 @@ const httpRequest = ({
     req.end();
   });
 
-const requestBuffer = async ({
-  url,
-  timeoutMs = getLimits().thumbnail_timeout_ms ?? THUMBNAIL_TIMEOUT_MS,
-  maxBytes = getLimits().max_thumb_bytes ?? MAX_THUMB_BYTES,
-  endpoint = YTDLS_ENDPOINTS.thumbnail,
-}) =>
+const requestBuffer = async ({ url, timeoutMs = getLimits().thumbnail_timeout_ms ?? THUMBNAIL_TIMEOUT_MS, maxBytes = getLimits().max_thumb_bytes ?? MAX_THUMB_BYTES, endpoint = YTDLS_ENDPOINTS.thumbnail }) =>
   httpRequest({
     url,
     timeoutMs,
@@ -681,7 +665,7 @@ const searchCache = new Map();
 
 const pruneSearchCache = () => {
   const maxEntries = getLimits().max_search_cache_entries ?? MAX_SEARCH_CACHE_ENTRIES;
-  const now = Date.now();
+  const now = __timeNowMs();
   for (const [key, entry] of searchCache) {
     if (!entry || entry.expiresAt <= now) {
       searchCache.delete(key);
@@ -702,7 +686,7 @@ const pruneSearchCache = () => {
 const getSearchCache = (queryKey) => {
   const entry = searchCache.get(queryKey);
   if (!entry) return null;
-  if (entry.expiresAt <= Date.now()) {
+  if (entry.expiresAt <= __timeNowMs()) {
     searchCache.delete(queryKey);
     return null;
   }
@@ -711,7 +695,7 @@ const getSearchCache = (queryKey) => {
 
 const setSearchCache = (queryKey, value) => {
   const ttlMs = getLimits().search_cache_ttl_ms ?? SEARCH_CACHE_TTL_MS;
-  const now = Date.now();
+  const now = __timeNowMs();
   searchCache.set(queryKey, {
     value,
     createdAt: now,
@@ -1327,7 +1311,7 @@ const requestDownloadToFile = async (link, type, requestId) => {
   const safeId = String(requestId || 'req')
     .replace(/[^a-z0-9-_]+/gi, '')
     .slice(0, 48);
-  const basePath = path.join(PLAY_DOWNLOADS_DIR, `play-${safeId}-${Date.now()}`);
+  const basePath = path.join(PLAY_DOWNLOADS_DIR, `play-${safeId}-${__timeNowMs()}`);
   const outputTemplate = `${basePath}.%(ext)s`;
   const preferredExt = type === 'audio' ? 'mp3' : 'mp4';
   let filePath = null;

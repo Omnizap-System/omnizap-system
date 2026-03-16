@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import OpenAI from 'openai';
 import NodeCache from 'node-cache';
 import fs from 'node:fs/promises';
@@ -742,7 +743,7 @@ export async function handleCatCommand({ sock, remoteJid, messageInfo, expiratio
 
     sessionCache.set(sessionKey, {
       previousResponseId: response.id,
-      updatedAt: Date.now(),
+      updatedAt: __timeNowMs(),
     });
 
     if (!outputText) {
@@ -893,7 +894,7 @@ export async function handleCatImageCommand({ sock, remoteJid, messageInfo, expi
 
     sessionCache.set(sessionKey, {
       previousResponseId: response.id,
-      updatedAt: Date.now(),
+      updatedAt: __timeNowMs(),
     });
 
     const imageOutputs = Array.isArray(response.output) ? response.output.filter((output) => output.type === 'image_generation_call' && output.result) : [];

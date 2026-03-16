@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import axios from 'axios';
 import { createCanvas, loadImage } from 'canvas';
 import logger from '#logger';
@@ -183,7 +184,7 @@ const drawRoundRect = (ctx, x, y, width, height, radius, fillStyle) => {
 };
 
 const cleanupCache = () => {
-  const now = Date.now();
+  const now = __timeNowMs();
   for (const [key, entry] of imageCache.entries()) {
     if (!entry || entry.expiresAt <= now) {
       imageCache.delete(key);
@@ -202,7 +203,7 @@ const resolveImage = async (imageUrl) => {
 
   cleanupCache();
   const cached = imageCache.get(url);
-  if (cached && cached.expiresAt > Date.now()) return cached.image;
+  if (cached && cached.expiresAt > __timeNowMs()) return cached.image;
 
   try {
     const response = await axios.get(url, {
@@ -211,10 +212,10 @@ const resolveImage = async (imageUrl) => {
       headers: { Accept: 'image/*' },
     });
     const image = await loadImage(Buffer.from(response.data));
-    imageCache.set(url, { image, expiresAt: Date.now() + IMAGE_CACHE_TTL_MS });
+    imageCache.set(url, { image, expiresAt: __timeNowMs() + IMAGE_CACHE_TTL_MS });
     return image;
   } catch (error) {
-    imageCache.set(url, { image: null, expiresAt: Date.now() + 90_000 });
+    imageCache.set(url, { image: null, expiresAt: __timeNowMs() + 90_000 });
     logger.debug('Falha ao carregar sprite para frame de batalha.', {
       imageUrl: url,
       error: error.message,

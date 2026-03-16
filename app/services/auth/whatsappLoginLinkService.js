@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { URL } from 'node:url';
 import { getJidServer, getJidUser, normalizeJid } from '../../config/index.js';
@@ -103,7 +104,7 @@ export const toWhatsAppOwnerJid = (value) => {
   return normalizeJid(`${digits}@s.whatsapp.net`) || '';
 };
 
-export const buildWhatsAppLoginHint = (value, { nowMs = Date.now() } = {}) => {
+export const buildWhatsAppLoginHint = (value, { nowMs = __timeNowMs() } = {}) => {
   const phoneDigits = toWhatsAppPhoneDigits(value);
   if (!phoneDigits) return null;
 
@@ -141,7 +142,7 @@ export const extractWhatsAppLoginHint = (payload = {}) => {
   };
 };
 
-export const resolveWhatsAppOwnerJidFromLoginPayload = (payload, { nowMs = Date.now() } = {}) => {
+export const resolveWhatsAppOwnerJidFromLoginPayload = (payload, { nowMs = __timeNowMs() } = {}) => {
   const hint = extractWhatsAppLoginHint(payload);
   const hasPayload = Boolean(hint.wa || hint.wa_ts || hint.wa_sig);
   if (!hasPayload) {

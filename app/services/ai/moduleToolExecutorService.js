@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import logger from '#logger';
 import { getToolRecord } from './moduleToolRegistryService.js';
 import { mapToolArgsToCommandText } from './commandToolBuilderService.js';
@@ -388,7 +389,7 @@ export const executeTool = async (toolName, toolArgs, context = {}) => {
   }
 
   const mapped = mapToolArgsToCommandText(record.argumentSpecs, argsValidation.normalizedArgs);
-  const startedAt = Date.now();
+  const startedAt = __timeNowMs();
 
   let executionResult = null;
   try {
@@ -409,7 +410,7 @@ export const executeTool = async (toolName, toolArgs, context = {}) => {
     };
   }
 
-  const executionTimeMs = Date.now() - startedAt;
+  const executionTimeMs = __timeNowMs() - startedAt;
   logger.info('Execucao de tool AI concluida.', {
     action: 'ai_tool_execution',
     tool_used: record.toolName,

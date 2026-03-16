@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 /* eslint-disable no-useless-escape */
 
 /**
@@ -407,8 +408,8 @@ let dbInFlightMetric = 0;
 function createEmptyStats() {
   return {
     enabled: monitorConfig.enabled,
-    startedAt: Date.now(),
-    lastResetAt: Date.now(),
+    startedAt: __timeNowMs(),
+    lastResetAt: __timeNowMs(),
     counters: {
       total: 0,
       error: 0,
@@ -631,7 +632,7 @@ function createDbMonitorLogger({ enabled, logPath, rotateBytes, keep }) {
     } catch (error) {
       queue.push(
         JSON.stringify({
-          ts: new Date().toISOString(),
+          ts: __timeNowIso(),
           event: 'logger_error',
           errorMessage: error.message,
         }),
@@ -677,7 +678,7 @@ export function resetDbStats() {
  * @returns {object}
  */
 export function getDbStats() {
-  const now = Date.now();
+  const now = __timeNowMs();
   const sampleCount = dbStats.samples.length;
   const percentiles = calculatePercentiles();
   const histogram = {
@@ -1218,7 +1219,7 @@ function recordStats({ fingerprint, normalizedSql, type, table, durationMs, ok, 
   entry.maxMs = Math.max(entry.maxMs, durationMs);
   entry.minMs = entry.minMs === null ? durationMs : Math.min(entry.minMs, durationMs);
   entry.lastMs = durationMs;
-  entry.lastSeenAt = Date.now();
+  entry.lastSeenAt = __timeNowMs();
 
   if (rowCount !== undefined) entry.lastRowCount = rowCount;
   if (affectedRows !== undefined) entry.lastAffectedRows = affectedRows;
@@ -1231,7 +1232,7 @@ function recordStats({ fingerprint, normalizedSql, type, table, durationMs, ok, 
  */
 function buildMonitorLogEntry({ event, durationMs, type, table, fingerprint, normalizedSql, sql, rowCount, affectedRows, traceId, error, params }) {
   const entry = {
-    ts: new Date().toISOString(),
+    ts: __timeNowIso(),
     event,
     durationMs: durationMs !== undefined && durationMs !== null ? Number(durationMs.toFixed(2)) : null,
     type: type ?? null,

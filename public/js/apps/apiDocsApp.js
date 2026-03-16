@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
@@ -30,7 +31,7 @@ function StatusPanel() {
     let active = true;
 
     const load = async () => {
-      const start = Date.now();
+      const start = __timeNowMs();
       try {
         const response = await fetch('/api/home-bootstrap');
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -43,7 +44,7 @@ function StatusPanel() {
         setState({
           loading: false,
           ok: true,
-          latencyMs: Date.now() - start,
+          latencyMs: __timeNowMs() - start,
           cpu: Number.isFinite(Number(host.cpu_percent)) ? `${Number(host.cpu_percent).toFixed(2)}%` : 'n/d',
           ram: host.memory_used && host.memory_total ? `${host.memory_used} / ${host.memory_total} (${Number(host.memory_percent || 0).toFixed(2)}%)` : 'n/d',
           uptime: process.uptime || 'n/d',

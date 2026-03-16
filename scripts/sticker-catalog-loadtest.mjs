@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import http from 'node:http';
 import https from 'node:https';
 import { performance } from 'node:perf_hooks';
@@ -106,7 +107,7 @@ const runRequest = (pathName) =>
 
 const runWorker = async ({ deadlineMs, workerIndex, stats }) => {
   let requestIndex = workerIndex % requestPaths.length;
-  while (Date.now() < deadlineMs) {
+  while (__timeNowMs() < deadlineMs) {
     const pathName = requestPaths[requestIndex % requestPaths.length];
     requestIndex += 1;
 
@@ -129,7 +130,7 @@ const runWorker = async ({ deadlineMs, workerIndex, stats }) => {
 };
 
 const main = async () => {
-  const startedAt = Date.now();
+  const startedAt = __timeNowMs();
   const deadlineMs = startedAt + durationSeconds * 1000;
   const stats = {
     total: 0,
@@ -154,7 +155,7 @@ const main = async () => {
     ),
   );
 
-  const elapsedSeconds = Math.max(0.001, (Date.now() - startedAt) / 1000);
+  const elapsedSeconds = Math.max(0.001, (__timeNowMs() - startedAt) / 1000);
   const sortedLatencies = [...stats.latencies].sort((a, b) => a - b);
   const p50 = quantile(sortedLatencies, 0.5);
   const p90 = quantile(sortedLatencies, 0.9);
@@ -165,7 +166,7 @@ const main = async () => {
 
   const summary = {
     started_at: new Date(startedAt).toISOString(),
-    ended_at: new Date().toISOString(),
+    ended_at: __timeNowIso(),
     base_url: baseUrl,
     duration_seconds: Number(elapsedSeconds.toFixed(3)),
     concurrency,

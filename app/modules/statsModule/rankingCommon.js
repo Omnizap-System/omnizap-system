@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import { createCanvas, loadImage } from 'canvas';
 import { executeQuery } from '../../../database/index.js';
 import { getJidUser, getProfilePicBuffer, normalizeJid } from '../../config/index.js';
@@ -179,17 +180,17 @@ const getCachedProfilePic = (jid) => {
   const entry = PROFILE_PIC_CACHE.get(jid);
   if (!entry) return null;
   const lastAccess = entry.lastAccess || entry.createdAt || 0;
-  if (Date.now() - lastAccess > PROFILE_CACHE_TTL_MS) {
+  if (__timeNowMs() - lastAccess > PROFILE_CACHE_TTL_MS) {
     PROFILE_PIC_CACHE.delete(jid);
     return null;
   }
-  entry.lastAccess = Date.now();
+  entry.lastAccess = __timeNowMs();
   return entry.buffer || null;
 };
 
 const setCachedProfilePic = (jid, buffer) => {
   if (!jid || !buffer) return;
-  PROFILE_PIC_CACHE.set(jid, { buffer, createdAt: Date.now(), lastAccess: Date.now() });
+  PROFILE_PIC_CACHE.set(jid, { buffer, createdAt: __timeNowMs(), lastAccess: __timeNowMs() });
   if (PROFILE_PIC_CACHE.size > PROFILE_CACHE_LIMIT) {
     const oldestKey = Array.from(PROFILE_PIC_CACHE.entries()).sort((a, b) => (a[1].lastAccess || a[1].createdAt || 0) - (b[1].lastAccess || b[1].createdAt || 0))[0]?.[0];
     if (oldestKey) PROFILE_PIC_CACHE.delete(oldestKey);
@@ -1292,7 +1293,7 @@ export const renderRankingImage = async ({ sock, remoteJid, rows, totalMessages,
   }
 
   const footerY = height - 36;
-  const updatedAt = formatDate(new Date());
+  const updatedAt = formatDate(__timeNow());
   ctx.fillStyle = 'rgba(148, 163, 184, 0.7)';
   ctx.font = uiFont(15, 500);
   ctx.textAlign = 'left';

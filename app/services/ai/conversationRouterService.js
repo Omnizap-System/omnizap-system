@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import logger from '#logger';
 import { isSameJidUser } from '../../config/index.js';
 import { responderPerguntaGlobal } from './globalModuleAiHelpService.js';
@@ -119,7 +120,7 @@ const hasBotKeywordTrigger = (text) => {
   return tokens.length <= 3;
 };
 
-const pruneGroupCooldown = (nowMs = Date.now()) => {
+const pruneGroupCooldown = (nowMs = __timeNowMs()) => {
   for (const [key, expiresAt] of groupCooldownCache.entries()) {
     if (!Number.isFinite(expiresAt) || expiresAt <= nowMs) {
       groupCooldownCache.delete(key);
@@ -207,7 +208,7 @@ const shouldSkipForGroupCooldown = ({ chatId, senderJid }) => {
   if (!key) return false;
 
   pruneGroupCooldown();
-  const nowMs = Date.now();
+  const nowMs = __timeNowMs();
   const expiresAt = groupCooldownCache.get(key) || 0;
   if (expiresAt > nowMs) return true;
   return false;
@@ -217,7 +218,7 @@ const markGroupCooldown = ({ chatId, senderJid }) => {
   const key = buildGroupCooldownKey({ chatId, senderJid });
   if (!key) return;
   pruneGroupCooldown();
-  groupCooldownCache.set(key, Date.now() + GROUP_COOLDOWN_MS);
+  groupCooldownCache.set(key, __timeNowMs() + GROUP_COOLDOWN_MS);
 };
 
 const buildIntentFromAnswer = (answer) => ({

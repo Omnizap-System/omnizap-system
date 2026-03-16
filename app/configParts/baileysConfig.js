@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 /* eslint-disable no-unused-vars */
 /* eslint-disable no-useless-escape */
 import { fetchLatestBaileysVersion, downloadContentFromMessage, jidNormalizedUser, jidEncode, jidDecode, areJidsSameUser, normalizeMessageContent, isJidMetaAI, isPnUser, isLidUser, isJidBroadcast, isJidGroup, isJidStatusBroadcast, isJidNewsletter, isHostedPnUser, isHostedLidUser, isJidBot, SERVER_JID, PSA_WID, STORIES_JID, META_AI_JID, delay } from '@whiskeysockets/baileys';
@@ -837,9 +838,9 @@ export const downloadMediaMessage = async (message, type, outputPath) => {
   try {
     const stream = await downloadContentFromMessage(message, type);
 
-    const fileId = message.key?.id || Date.now();
+    const fileId = message.key?.id || __timeNowMs();
     const extension = getMediaExtension(type);
-    const fileName = `${Date.now()}-${fileId}.${extension}`;
+    const fileName = `${__timeNowMs()}-${fileId}.${extension}`;
     const filePath = path.join(outputPath, fileName);
 
     await pipeline(Readable.from(stream), createWriteStream(filePath));
@@ -1033,7 +1034,7 @@ const updateLidQueueMetric = () => {
  * Retorna timestamp atual em ms.
  * @returns {number}
  */
-const now = () => Date.now();
+const now = () => __timeNowMs();
 
 const normalizeLid = (lid) => {
   if (!lid || !isLidJid(lid)) return null;

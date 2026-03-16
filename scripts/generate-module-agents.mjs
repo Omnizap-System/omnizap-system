@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -8,7 +9,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, '..');
 const modulesRoot = path.join(repoRoot, 'app', 'modules');
-const nowIso = new Date().toISOString();
+const nowIso = __timeNowIso();
 
 const normalizeBoolLabel = (value) => (value ? 'sim' : 'nao');
 

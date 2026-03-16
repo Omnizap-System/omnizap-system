@@ -1,17 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import {
-  buildTimeFormats,
-  elapsedMs,
-  formatDateTimeExtenso,
-  formatTimeAmPm,
-  formatTimeExtenso,
-  now,
-  nowIso,
-  toUnixMs,
-  toUnixSeconds,
-} from './timeModule.js';
+import { buildTimeFormats, elapsedMs, formatDateTimeExtenso, formatTimeAmPm, formatTimeExtenso, now, nowIso, toUnixMs, toUnixSeconds } from './timeModule.js';
 
 const FIXED_ISO = '2026-03-16T15:45:30.000Z';
 

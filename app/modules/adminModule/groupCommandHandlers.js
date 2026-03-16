@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import { handleMenuAdmCommand } from '../menuModule/menus.js';
 import { downloadMediaMessage, getJidServer, isLidJid, isSameJidUser, isWhatsAppJid, LID_USER_JID_SERVERS, normalizeJid, WHATSAPP_USER_JID_SERVERS } from '../../config/index.js';
 import { isUserAdmin, createGroup, acceptGroupInvite, getGroupInfo, getGroupRequestParticipantsList, updateGroupAddMode, updateGroupSettings, updateGroupParticipants, leaveGroup, getGroupInviteCode, revokeGroupInviteCode, getGroupInfoFromInvite, updateGroupRequestParticipants, updateGroupSubject, updateGroupDescription, toggleEphemeral } from '../../config/index.js';
@@ -582,7 +583,7 @@ export async function handleAdminCommand({ command, args, text, sock, messageInf
         minutes = clampStickerFocusChatWindowMinutes(parsed, DEFAULT_STICKER_FOCUS_CHAT_WINDOW_MINUTES);
       }
 
-      const untilMs = Date.now() + minutes * 60 * 1000;
+      const untilMs = __timeNowMs() + minutes * 60 * 1000;
       await groupConfigStore.updateGroupConfig(remoteJid, {
         stickerFocusChatWindowUntilMs: untilMs,
       });

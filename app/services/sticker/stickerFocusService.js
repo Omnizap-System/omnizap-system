@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import { jidNormalizedUser } from '@whiskeysockets/baileys';
 
 const normalizeJid = (jid) => {
@@ -150,14 +151,14 @@ export const clampStickerFocusChatWindowMinutes = (value, fallback = DEFAULT_STI
 
 export const minutesToMs = (minutes) => Math.max(0, Math.floor(Number(minutes) || 0) * 60 * 1000);
 
-export const resolveStickerFocusState = (groupConfig = {}, now = Date.now()) => {
+export const resolveStickerFocusState = (groupConfig = {}, now = __timeNowMs()) => {
   const rawCooldown = groupConfig?.stickerFocusMessageCooldownMinutes ?? groupConfig?.stickerFocusTextCooldownMinutes;
   const messageCooldownMinutes = clampStickerFocusMessageCooldownMinutes(rawCooldown);
   const rawAllowance = groupConfig?.stickerFocusMessageAllowance ?? groupConfig?.stickerFocusMessageAllowanceCount;
   const messageAllowanceCount = clampStickerFocusMessageAllowance(rawAllowance);
   const messageCooldownMs = minutesToMs(messageCooldownMinutes);
   const chatWindowUntilMs = parseTimestampMs(groupConfig?.stickerFocusChatWindowUntilMs);
-  const safeNow = Number.isFinite(now) ? now : Date.now();
+  const safeNow = Number.isFinite(now) ? now : __timeNowMs();
   const chatWindowRemainingMs = Math.max(0, chatWindowUntilMs - safeNow);
 
   return {
@@ -245,7 +246,7 @@ const normalizeAllowanceHistory = (historyValue) => {
   return [];
 };
 
-export const canSendMessageInStickerFocus = ({ groupId, senderJid, messageCooldownMs, messageAllowanceCount = DEFAULT_STICKER_FOCUS_MESSAGE_ALLOWANCE, now = Date.now() }) => {
+export const canSendMessageInStickerFocus = ({ groupId, senderJid, messageCooldownMs, messageAllowanceCount = DEFAULT_STICKER_FOCUS_MESSAGE_ALLOWANCE, now = __timeNowMs() }) => {
   const senderKey = buildSenderKey({ groupId, senderJid });
   if (!senderKey) {
     return {
@@ -268,7 +269,7 @@ export const canSendMessageInStickerFocus = ({ groupId, senderJid, messageCooldo
     };
   }
 
-  const safeNow = Number.isFinite(now) ? now : Date.now();
+  const safeNow = Number.isFinite(now) ? now : __timeNowMs();
   const history = normalizeAllowanceHistory(sharedMessageAllowance.get(senderKey)).filter((timestamp) => safeNow - timestamp < normalizedCooldownMs);
   if (history.length > 0) {
     sharedMessageAllowance.set(senderKey, history);
@@ -294,12 +295,12 @@ export const canSendMessageInStickerFocus = ({ groupId, senderJid, messageCooldo
   };
 };
 
-export const registerMessageUsageInStickerFocus = ({ groupId, senderJid, messageCooldownMs = minutesToMs(DEFAULT_STICKER_FOCUS_MESSAGE_COOLDOWN_MINUTES), messageAllowanceCount = DEFAULT_STICKER_FOCUS_MESSAGE_ALLOWANCE, now = Date.now() }) => {
+export const registerMessageUsageInStickerFocus = ({ groupId, senderJid, messageCooldownMs = minutesToMs(DEFAULT_STICKER_FOCUS_MESSAGE_COOLDOWN_MINUTES), messageAllowanceCount = DEFAULT_STICKER_FOCUS_MESSAGE_ALLOWANCE, now = __timeNowMs() }) => {
   const senderKey = buildSenderKey({ groupId, senderJid });
   if (!senderKey) return;
   const normalizedCooldownMs = Math.max(0, Math.floor(Number(messageCooldownMs) || 0));
   const normalizedAllowanceCount = clampStickerFocusMessageAllowance(messageAllowanceCount);
-  const safeNow = Number.isFinite(now) ? now : Date.now();
+  const safeNow = Number.isFinite(now) ? now : __timeNowMs();
   const history = normalizeAllowanceHistory(sharedMessageAllowance.get(senderKey));
   const recentHistory = normalizedCooldownMs > 0 ? history.filter((timestamp) => safeNow - timestamp < normalizedCooldownMs) : history;
   recentHistory.push(safeNow);
@@ -307,10 +308,10 @@ export const registerMessageUsageInStickerFocus = ({ groupId, senderJid, message
   sharedMessageAllowance.set(senderKey, trimmedHistory);
 };
 
-export const shouldSendStickerFocusWarning = ({ groupId, senderJid, now = Date.now() }) => {
+export const shouldSendStickerFocusWarning = ({ groupId, senderJid, now = __timeNowMs() }) => {
   const senderKey = buildSenderKey({ groupId, senderJid });
   if (!senderKey) return true;
-  const safeNow = Number.isFinite(now) ? now : Date.now();
+  const safeNow = Number.isFinite(now) ? now : __timeNowMs();
   const lastWarningAt = Number(sharedWarningThrottle.get(senderKey) || 0);
   if (!lastWarningAt || safeNow - lastWarningAt >= STICKER_FOCUS_WARNING_COOLDOWN_MS) {
     sharedWarningThrottle.set(senderKey, safeNow);
@@ -329,7 +330,7 @@ export const MAX_STICKER_FOCUS_TEXT_ALLOWANCE = MAX_STICKER_FOCUS_MESSAGE_ALLOWA
 export const DEFAULT_STICKER_FOCUS_TEXT_ALLOWANCE = DEFAULT_STICKER_FOCUS_MESSAGE_ALLOWANCE;
 export const clampStickerFocusTextAllowance = clampStickerFocusMessageAllowance;
 export const isPlainTextMessageForStickerFocus = ({ messageInfo, extractedText, mediaEntries = [] }) => resolveStickerFocusMessageClassification({ messageInfo, extractedText, mediaEntries }).messageType === 'text';
-export const canSendTextInStickerFocus = ({ groupId, senderJid, textCooldownMs, textAllowanceCount, now = Date.now() }) =>
+export const canSendTextInStickerFocus = ({ groupId, senderJid, textCooldownMs, textAllowanceCount, now = __timeNowMs() }) =>
   canSendMessageInStickerFocus({
     groupId,
     senderJid,
@@ -337,7 +338,7 @@ export const canSendTextInStickerFocus = ({ groupId, senderJid, textCooldownMs, 
     messageAllowanceCount: textAllowanceCount,
     now,
   });
-export const registerTextUsageInStickerFocus = ({ groupId, senderJid, textCooldownMs, textAllowanceCount, now = Date.now() }) =>
+export const registerTextUsageInStickerFocus = ({ groupId, senderJid, textCooldownMs, textAllowanceCount, now = __timeNowMs() }) =>
   registerMessageUsageInStickerFocus({
     groupId,
     senderJid,

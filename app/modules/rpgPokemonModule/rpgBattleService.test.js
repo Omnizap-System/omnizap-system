@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -15,7 +16,7 @@ const ensurePokeApiCache = () => {
 const setCache = (cache, key, data) => {
   cache.set(key, {
     data,
-    expiresAt: Date.now() + 60 * 60 * 1000,
+    expiresAt: __timeNowMs() + 60 * 60 * 1000,
   });
 };
 

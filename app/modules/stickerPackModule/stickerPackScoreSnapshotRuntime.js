@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import { executeQuery, TABLES } from '../../../database/index.js';
 import logger from '#logger';
 import { getEmptyStickerPackEngagement, getStickerPackEngagementByPackId } from './stickerPackEngagementRepository.js';
@@ -155,7 +156,7 @@ export const runStickerPackScoreSnapshotCycle = async () => {
   }
 
   running = true;
-  const startedAt = Date.now();
+  const startedAt = __timeNowMs();
   let scanned = 0;
   let written = 0;
   let fullRebuildExecuted = false;
@@ -199,7 +200,7 @@ export const runStickerPackScoreSnapshotCycle = async () => {
       pending_pack_ids: pendingPackIds.size,
       full_rebuild_executed: fullRebuildExecuted,
       full_rebuild_every_cycles: SNAPSHOT_FULL_REBUILD_EVERY_CYCLES,
-      duration_ms: Date.now() - startedAt,
+      duration_ms: __timeNowMs() - startedAt,
       batch_size: SNAPSHOT_BATCH_SIZE,
       targeted_batch_size: SNAPSHOT_TARGETED_BATCH_SIZE,
     });
@@ -212,7 +213,7 @@ export const runStickerPackScoreSnapshotCycle = async () => {
       removed,
       pending_pack_ids: pendingPackIds.size,
       full_rebuild_executed: fullRebuildExecuted,
-      duration_ms: Date.now() - startedAt,
+      duration_ms: __timeNowMs() - startedAt,
     };
   } catch (error) {
     logger.error('Falha no ciclo de snapshot de score de packs.', {
@@ -226,7 +227,7 @@ export const runStickerPackScoreSnapshotCycle = async () => {
       written,
       pending_pack_ids: pendingPackIds.size,
       full_rebuild_executed: fullRebuildExecuted,
-      duration_ms: Date.now() - startedAt,
+      duration_ms: __timeNowMs() - startedAt,
     };
   } finally {
     running = false;

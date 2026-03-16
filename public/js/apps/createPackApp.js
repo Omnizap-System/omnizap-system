@@ -1,3 +1,4 @@
+import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import htm from 'htm';
@@ -98,7 +99,7 @@ const readGoogleAuthCache = () => {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     const savedAt = Number(parsed?.savedAt || 0);
-    if (savedAt && Date.now() - savedAt > GOOGLE_AUTH_CACHE_MAX_STALE_MS) {
+    if (savedAt && __timeNowMs() - savedAt > GOOGLE_AUTH_CACHE_MAX_STALE_MS) {
       localStorage.removeItem(GOOGLE_AUTH_CACHE_KEY);
       return null;
     }
@@ -109,7 +110,7 @@ const readGoogleAuthCache = () => {
     }
     if (normalized.expiresAt) {
       const expiresAt = Number(new Date(normalized.expiresAt));
-      if (Number.isFinite(expiresAt) && expiresAt <= Date.now()) {
+      if (Number.isFinite(expiresAt) && expiresAt <= __timeNowMs()) {
         localStorage.removeItem(GOOGLE_AUTH_CACHE_KEY);
         return null;
       }
@@ -131,7 +132,7 @@ const writeGoogleAuthCache = (authState) => {
       GOOGLE_AUTH_CACHE_KEY,
       JSON.stringify({
         auth: normalized,
-        savedAt: Date.now(),
+        savedAt: __timeNowMs(),
       }),
     );
   } catch {
@@ -216,7 +217,7 @@ const writeUploadTask = (payload) => {
       PACK_UPLOAD_TASK_KEY,
       JSON.stringify({
         ...payload,
-        updatedAt: Date.now(),
+        updatedAt: __timeNowMs(),
       }),
     );
   } catch {
@@ -630,7 +631,7 @@ function CreatePackApp() {
         const restored = parsed.files
           .filter((item) => item && typeof item.dataUrl === 'string' && typeof item.name === 'string')
           .map((item) => ({
-            id: String(item.id || `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`),
+            id: String(item.id || `${__timeNowMs()}-${Math.random().toString(36).slice(2, 9)}`),
             file: {
               name: String(item.name || 'sticker.webp'),
               size: Number(item.size || 0),
@@ -707,7 +708,7 @@ function CreatePackApp() {
         hash: String(item?.hash || ''),
         dataUrl: item.dataUrl,
       })),
-      updatedAt: Date.now(),
+      updatedAt: __timeNowMs(),
     };
 
     try {
@@ -880,7 +881,7 @@ function CreatePackApp() {
       selected.map(async (file) => {
         const dataUrl = await fileToDataUrl(file);
         return {
-          id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+          id: `${__timeNowMs()}-${Math.random().toString(36).slice(2, 9)}`,
           file,
           hash: await computeDataUrlSha256(dataUrl),
           mediaKind:
