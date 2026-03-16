@@ -329,6 +329,7 @@ export const executeMessageCommandRoute = async ({ command, args = [], text = ''
           messageInfo,
           expirationMessage,
           senderJid,
+          senderIdentity,
           args: safeArgs,
           isGroupMessage,
           commandPrefix,

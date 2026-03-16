@@ -39,6 +39,52 @@ const SOCIAL_DST_EXPR = `JSON_UNQUOTE(
 const buildUsageText = (commandPrefix = DEFAULT_COMMAND_PREFIX) => getUserUsageText('user', { commandPrefix }) || ['Formato de uso:', `${commandPrefix}user perfil <id|telefone>`, '', 'Dica:', '• Você pode mencionar alguém.', '• Ou responder a mensagem do usuário desejado.'].join('\n');
 
 /**
+ * Extrai metadados do remetente considerando payload novo do pipeline/socket.
+ * @param {object} params
+ * @param {object} [params.messageInfo]
+ * @param {string|null} [params.senderJid]
+ * @param {string|object|null} [params.senderIdentity]
+ * @returns {string|object|null}
+ */
+const resolveSenderSource = ({ messageInfo, senderJid, senderIdentity }) => {
+  const key = messageInfo?.key || {};
+
+  if (senderIdentity && typeof senderIdentity === 'object') {
+    return {
+      participant: senderIdentity.participant || key.participant || null,
+      participantAlt: senderIdentity.participantAlt || key.participantAlt || key.remoteJidAlt || null,
+      jid: senderIdentity.jid || senderJid || null,
+      remoteJid: key.remoteJid || null,
+      remoteJidAlt: key.remoteJidAlt || null,
+    };
+  }
+
+  return {
+    participant: key.participant || null,
+    participantAlt: key.participantAlt || key.remoteJidAlt || null,
+    jid: senderJid || (typeof senderIdentity === 'string' ? senderIdentity : null),
+    remoteJid: key.remoteJid || null,
+    remoteJidAlt: key.remoteJidAlt || null,
+  };
+};
+
+const hasResolvableIdentity = (value) => {
+  if (!value) return false;
+  if (typeof value === 'string') return Boolean(value.trim());
+  if (typeof value !== 'object') return false;
+
+  return Boolean(
+    value?.jid ||
+      value?.lid ||
+      value?.participant ||
+      value?.participantAlt ||
+      value?.remoteJid ||
+      value?.remoteJidAlt ||
+      value?.id,
+  );
+};
+
+/**
  * Extrai o `contextInfo` da mensagem, incluindo estruturas aninhadas.
  * @param {object} messageInfo Estrutura da mensagem recebida pelo bot.
  * @returns {object|null} `contextInfo` encontrado ou `null` quando indisponível.
@@ -91,24 +137,34 @@ const parseTargetArgument = (rawValue) => {
  * Define qual usuário será usado como alvo (menção, argumento, reply ou remetente).
  * @param {object} messageInfo Mensagem usada para inferir contexto.
  * @param {string|null} senderJid JID do remetente do comando.
+ * @param {string|object|null} senderIdentity Identidade recebida do pipeline (participant/participantAlt/jid).
  * @param {string} targetArg Argumento explícito passado no comando.
  * @returns {{ source: string | object | null, invalidExplicitTarget: boolean }} Fonte escolhida e sinalizador de argumento inválido.
  */
-const resolveCandidateTarget = (messageInfo, senderJid, targetArg) => {
+const resolveCandidateTarget = (messageInfo, senderJid, senderIdentity, targetArg) => {
   const contextInfo = getContextInfo(messageInfo);
   const mentioned = Array.isArray(contextInfo?.mentionedJid) ? contextInfo.mentionedJid.find(Boolean) || null : null;
   const parsedTarget = parseTargetArgument(targetArg);
+  const quotedMessageKey = contextInfo?.quotedMessageKey && typeof contextInfo.quotedMessageKey === 'object' ? contextInfo.quotedMessageKey : null;
   const repliedSource =
-    contextInfo?.participant || contextInfo?.participantAlt
+    contextInfo?.participant || contextInfo?.participantAlt || quotedMessageKey?.participant || quotedMessageKey?.participantAlt
       ? {
-          participant: contextInfo.participant || null,
-          participantAlt: contextInfo.participantAlt || null,
+          participant: contextInfo?.participant || quotedMessageKey?.participant || null,
+          participantAlt: contextInfo?.participantAlt || quotedMessageKey?.participantAlt || null,
+          remoteJid: quotedMessageKey?.remoteJid || null,
+          remoteJidAlt: quotedMessageKey?.remoteJidAlt || null,
         }
       : null;
+  const senderSource = resolveSenderSource({
+    messageInfo,
+    senderJid,
+    senderIdentity,
+  });
   const hasContextTarget = Boolean(mentioned || repliedSource);
+  const normalizedSenderSource = hasResolvableIdentity(senderSource) ? senderSource : senderJid || null;
 
   return {
-    source: mentioned || parsedTarget.jid || repliedSource || senderJid || null,
+    source: mentioned || parsedTarget.jid || repliedSource || normalizedSenderSource || null,
     invalidExplicitTarget: parsedTarget.invalid && !hasContextTarget,
   };
 };
@@ -1017,20 +1073,19 @@ const resolveMentionJid = (ids = []) => ids.find((id) => isWhatsAppUserId(id)) |
  * @param {object} params.messageInfo Mensagem original usada como contexto.
  * @param {number|undefined} params.expirationMessage Configuração de expiração de mensagem.
  * @param {string} params.senderJid JID de quem executou o comando.
+ * @param {string|object|null} [params.senderIdentity=null] Identidade enriquecida do remetente (participant/participantAlt/jid).
  * @param {string[]} [params.args=[]] Argumentos recebidos após o comando.
  * @param {boolean} params.isGroupMessage Indica se o contexto é grupo.
  * @param {string} [params.commandPrefix=DEFAULT_COMMAND_PREFIX] Prefixo de comandos.
  * @returns {Promise<void>} Finaliza após responder ao usuário.
  */
-export async function handleUserCommand({ sock, remoteJid, messageInfo, expirationMessage, senderJid, args = [], isGroupMessage, commandPrefix = DEFAULT_COMMAND_PREFIX }) {
-  const subcommand = args?.[0]?.toLowerCase() || '';
-  if (subcommand !== 'perfil' && subcommand !== 'profile') {
-    await sendAndStore(sock, remoteJid, { text: buildUsageText(commandPrefix) }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
-    return;
-  }
-
-  const explicitTargetArg = args.slice(1).join(' ').trim();
-  const { source, invalidExplicitTarget } = resolveCandidateTarget(messageInfo, senderJid, explicitTargetArg);
+export async function handleUserCommand({ sock, remoteJid, messageInfo, expirationMessage, senderJid, senderIdentity = null, args = [], isGroupMessage, commandPrefix = DEFAULT_COMMAND_PREFIX }) {
+  const firstArg = String(args?.[0] || '')
+    .trim()
+    .toLowerCase();
+  const hasExplicitSubcommand = firstArg === 'perfil' || firstArg === 'profile';
+  const explicitTargetArg = hasExplicitSubcommand ? args.slice(1).join(' ').trim() : args.join(' ').trim();
+  const { source, invalidExplicitTarget } = resolveCandidateTarget(messageInfo, senderJid, senderIdentity, explicitTargetArg);
   if (invalidExplicitTarget) {
     await sendAndStore(sock, remoteJid, { text: `❌ ID ou telefone inválido.\n\n${buildUsageText(commandPrefix)}` }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
     return;
@@ -1045,11 +1100,12 @@ export async function handleUserCommand({ sock, remoteJid, messageInfo, expirati
     const senderIds = await resolveSenderIdsForTarget(canonicalTarget);
     const normalizedTargetIds = Array.from(new Set([canonicalTarget, ...senderIds].map((value) => normalizeJid(value) || value).filter(Boolean)));
     const mentionJid = resolveMentionJid(normalizedTargetIds);
-    const senderCanonical = resolveUserIdCached({
-      jid: senderJid,
-      lid: senderJid,
-      participantAlt: null,
+    const senderSource = resolveSenderSource({
+      messageInfo,
+      senderJid,
+      senderIdentity,
     });
+    const senderCanonical = await resolveCanonicalTarget(senderSource);
     const rankingTargetId = mentionJid || canonicalTarget;
 
     const [stats, ranking, latestPushName, premiumUsers, blocked, groupAdmin] = await Promise.all([fetchUserStats({ canonicalId: rankingTargetId, senderIds: normalizedTargetIds }), fetchUserRanking(rankingTargetId), fetchLatestPushName(normalizedTargetIds), premiumUserStore.getPremiumUsers(), isTargetBlocked(normalizedTargetIds), isGroupMessage ? isUserAdmin(remoteJid, mentionJid || canonicalTarget) : Promise.resolve(false)]);
