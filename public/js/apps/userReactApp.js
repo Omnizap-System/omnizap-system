@@ -31,6 +31,18 @@ const UserApp = ({ config }) => {
   const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  // Lock scroll when mobile menu is open
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isMobileMenuOpen]);
+
   useEffect(() => {
     const observer =
       typeof globalThis.IntersectionObserver === 'function'
@@ -124,10 +136,10 @@ const UserApp = ({ config }) => {
       </div>
 
       <!-- Backdrop for mobile sidebar -->
-      <div onClick=${() => setMobileMenuOpen(false)} className=${`fixed inset-0 z-[90] bg-[#020617]/80 lg:hidden transition-opacity duration-300 ${isMobileMenuOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}></div>
+      <div onClick=${() => setMobileMenuOpen(false)} className=${`fixed inset-0 z-[50] bg-[#020617]/80 lg:hidden transition-opacity duration-300 ${isMobileMenuOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}></div>
 
       <!-- Navbar -->
-      <header className="sticky top-0 z-[80] border-b border-white/5 bg-[#020617]/80 backdrop-blur-xl">
+      <header className="sticky top-0 z-[40] border-b border-white/5 bg-[#020617]/80 backdrop-blur-xl">
         <div className="px-4 lg:px-8">
           <div className="flex h-16 items-center justify-between gap-4">
             <div className="flex items-center gap-4">
@@ -153,10 +165,18 @@ const UserApp = ({ config }) => {
         </div>
       </header>
 
-      <div className="flex relative z-10">
+      <div className="flex relative">
         <!-- Sidebar -->
-        <aside className=${`fixed lg:sticky top-[65px] h-[calc(100vh-65px)] z-[100] lg:z-40 bg-[#020617] border-r border-white/5 sidebar-transition overflow-y-auto no-scrollbar ${isMobileMenuOpen ? 'translate-x-0 w-[280px]' : '-translate-x-full lg:translate-x-0'} ${isSidebarCollapsed ? 'lg:w-[85px]' : 'lg:w-[280px]'}`}>
+        <aside className=${`fixed lg:sticky top-0 lg:top-[65px] h-full lg:h-[calc(100vh-65px)] z-[60] lg:z-30 bg-[#020617] border-r border-white/5 sidebar-transition overflow-y-auto no-scrollbar ${isMobileMenuOpen ? 'translate-x-0 w-[280px]' : '-translate-x-full lg:translate-x-0'} ${isSidebarCollapsed ? 'lg:w-[85px]' : 'lg:w-[280px]'}`}>
           <div className="p-4 flex flex-col h-full">
+            <!-- Mobile Header inside Sidebar -->
+            <div className="lg:hidden flex items-center justify-between mb-6 px-2">
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30">Menu do Sistema</span>
+              <button onClick=${() => setMobileMenuOpen(false)} className="btn btn-ghost btn-square btn-sm hover:bg-white/5">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
             <!-- Profile Snippet -->
             <div className=${`mb-6 p-4 rounded-3xl bg-white/[0.03] border border-white/5 transition-all overflow-hidden ${isSidebarCollapsed ? 'items-center px-2' : ''}`}>
               <div className=${`flex items-center gap-4 ${isSidebarCollapsed ? 'flex-col' : ''}`}>
