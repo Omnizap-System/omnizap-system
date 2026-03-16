@@ -7,8 +7,7 @@ import { STICKER_PACK_ERROR_CODES, StickerPackError } from './stickerPackErrors.
 import { captureIncomingStickerAsset, resolveStickerAssetForCommand } from './stickerStorageService.js';
 import { buildStickerPackMessage, sendStickerPackWithFallback } from './stickerPackMessageService.js';
 import { sanitizeText } from './stickerPackUtils.js';
-import { executeQuery, TABLES } from '../../../database/index.js';
-import { extractSenderInfoFromMessage, extractUserIdInfo, resolveUserId } from '../../config/index.js';
+import { extractSenderInfoFromMessage, extractUserIdInfo, normalizePnToJid, primeLidCache, resolveCanonicalWhatsAppJid, resolveUserId, resolveUserIdCached } from '../../config/index.js';
 import { toWhatsAppPhoneDigits } from '../../services/auth/whatsappLoginLinkService.js';
 
 /**
@@ -19,6 +18,7 @@ const RATE_MAX_ACTIONS = Math.max(1, Number(process.env.STICKER_PACK_RATE_MAX_AC
 const MAX_PACK_ITEMS = Math.max(1, Number(process.env.STICKER_PACK_MAX_ITEMS) || 30);
 const MAX_PACK_NAME_LENGTH = 120;
 const LID_SERVERS = new Set(['lid', 'hosted.lid']);
+const OWNER_ID_SERVERS = new Set(['s.whatsapp.net', 'c.us', 'hosted', ...LID_SERVERS]);
 
 const rateMap = new Map();
 
@@ -457,7 +457,9 @@ const readSingleArgument = (input) => {
 };
 
 const buildOwnerLookupJids = (value) => {
-  const normalized = normalizeJid(value) || '';
+  const normalizedValue = normalizeJid(value) || '';
+  const normalizedPn = normalizePnToJid(normalizedValue);
+  const normalized = normalizeJid(normalizedPn || normalizedValue) || normalizedPn || normalizedValue;
   if (!normalized || !normalized.includes('@')) return [];
   const lookup = new Set([normalized]);
   const digits = toWhatsAppPhoneDigits(normalized);
@@ -468,12 +470,39 @@ const buildOwnerLookupJids = (value) => {
   return Array.from(lookup).filter(Boolean);
 };
 
-const appendOwnerCandidate = (candidateSet, lookupSet, value) => {
-  const normalized = normalizeJid(value) || '';
+const appendOwnerCandidate = (candidateSet, value) => {
+  const normalizedValue = normalizeJid(value) || '';
+  const normalizedPn = normalizePnToJid(normalizedValue);
+  const normalized = normalizeJid(normalizedPn || normalizedValue) || normalizedPn || normalizedValue;
   if (!normalized || !normalized.includes('@')) return;
+  const server = getJidServer(normalized);
+  if (!server || !OWNER_ID_SERVERS.has(server)) return;
   candidateSet.add(normalized);
   for (const lookupJid of buildOwnerLookupJids(normalized)) {
-    lookupSet.add(lookupJid);
+    candidateSet.add(lookupJid);
+  }
+};
+
+const appendOwnerCandidatesFromSource = (candidateSet, source) => {
+  if (!source) return;
+
+  const info = extractUserIdInfo(source);
+  appendOwnerCandidate(candidateSet, resolveUserIdCached(info));
+  appendOwnerCandidate(candidateSet, info.jid);
+  appendOwnerCandidate(candidateSet, info.lid);
+  appendOwnerCandidate(candidateSet, info.participantAlt);
+  appendOwnerCandidate(candidateSet, info.raw);
+
+  if (typeof source === 'object') {
+    appendOwnerCandidate(candidateSet, source.id);
+    appendOwnerCandidate(candidateSet, source.jid);
+    appendOwnerCandidate(candidateSet, source.lid);
+    appendOwnerCandidate(candidateSet, source.participant);
+    appendOwnerCandidate(candidateSet, source.participantAlt);
+    appendOwnerCandidate(candidateSet, source.remoteJid);
+    appendOwnerCandidate(candidateSet, source.remoteJidAlt);
+  } else {
+    appendOwnerCandidate(candidateSet, source);
   }
 };
 
@@ -505,57 +534,41 @@ const dedupePacksById = (packs = []) => {
 
 const resolveOwnerCandidatesForPackCommand = async ({ senderJid, messageInfo }) => {
   const candidates = new Set();
-  const lookupByJid = new Set();
 
   const senderInfo = extractSenderInfoFromMessage(messageInfo);
-  appendOwnerCandidate(candidates, lookupByJid, senderJid);
-  appendOwnerCandidate(candidates, lookupByJid, senderInfo?.jid);
-  appendOwnerCandidate(candidates, lookupByJid, senderInfo?.participantAlt);
-  appendOwnerCandidate(candidates, lookupByJid, senderInfo?.lid);
-
-  const directResolved = await resolveUserId(extractUserIdInfo(senderJid)).catch(() => null);
-  if (directResolved) {
-    appendOwnerCandidate(candidates, lookupByJid, directResolved);
-  }
-
-  const senderResolved = await resolveUserId({
-    lid: senderInfo?.lid,
+  appendOwnerCandidatesFromSource(candidates, senderJid);
+  appendOwnerCandidatesFromSource(candidates, senderInfo);
+  appendOwnerCandidatesFromSource(candidates, messageInfo?.key);
+  appendOwnerCandidatesFromSource(candidates, {
     jid: senderInfo?.jid || senderJid || null,
+    lid: senderInfo?.lid || null,
     participantAlt: senderInfo?.participantAlt || null,
-  }).catch(() => null);
-  if (senderResolved) {
-    appendOwnerCandidate(candidates, lookupByJid, senderResolved);
-  }
-
-  const lookupValues = Array.from(lookupByJid).filter(Boolean);
-  for (let offset = 0; offset < lookupValues.length; offset += 200) {
-    const chunk = lookupValues.slice(offset, offset + 200);
-    if (!chunk.length) continue;
-    const placeholders = chunk.map(() => '?').join(', ');
-    const lookupParams = [...chunk, ...chunk];
-    const rows = await executeQuery(
-      `SELECT lid, jid
-         FROM ${TABLES.LID_MAP}
-        WHERE jid IN (${placeholders})
-           OR lid IN (${placeholders})
-        ORDER BY last_seen DESC
-        LIMIT 500`,
-      lookupParams,
-    ).catch(() => []);
-
-    for (const row of Array.isArray(rows) ? rows : []) {
-      appendOwnerCandidate(candidates, lookupByJid, row?.jid || '');
-      appendOwnerCandidate(candidates, lookupByJid, row?.lid || '');
-    }
-  }
+    remoteJid: senderInfo?.remoteJid || null,
+    remoteJidAlt: senderInfo?.remoteJidAlt || null,
+  });
 
   const lidCandidates = Array.from(candidates).filter((candidate) => LID_SERVERS.has(getJidServer(candidate)));
-  for (const lidValue of lidCandidates) {
-    const resolved = await resolveUserId(extractUserIdInfo(lidValue)).catch(() => null);
-    if (resolved) {
-      appendOwnerCandidate(candidates, lookupByJid, resolved);
-    }
+  if (lidCandidates.length) {
+    await primeLidCache(lidCandidates).catch(() => null);
   }
+
+  const currentCandidates = Array.from(candidates);
+  const resolvedCandidates = await Promise.all(
+    currentCandidates.map(async (candidate) => {
+      const info = extractUserIdInfo(candidate);
+      const resolvedCached = resolveUserIdCached(info);
+      const resolved = await resolveUserId(info).catch(() => null);
+      return [resolvedCached, resolved];
+    }),
+  );
+
+  for (const [resolvedCached, resolved] of resolvedCandidates) {
+    appendOwnerCandidate(candidates, resolvedCached);
+    appendOwnerCandidate(candidates, resolved);
+  }
+
+  const canonicalWhatsApp = resolveCanonicalWhatsAppJid(...Array.from(candidates));
+  appendOwnerCandidate(candidates, canonicalWhatsApp);
 
   return Array.from(candidates);
 };
@@ -1121,16 +1134,24 @@ export async function maybeCaptureIncomingSticker({ messageInfo, senderJid, isMe
   if (!isUserJid(senderJid)) return null;
 
   const senderInfo = extractSenderInfoFromMessage(messageInfo);
-  let ownerJid = normalizeJid(senderJid) || senderJid;
+  const senderIdentity = extractUserIdInfo({
+    lid: senderInfo?.lid || null,
+    jid: senderInfo?.jid || senderJid || null,
+    participantAlt: senderInfo?.participantAlt || null,
+    remoteJid: senderInfo?.remoteJid || null,
+    remoteJidAlt: senderInfo?.remoteJidAlt || null,
+  });
+
+  const cachedOwner = resolveUserIdCached(senderIdentity);
+  let ownerJid = normalizeJid(cachedOwner || senderIdentity.jid || senderIdentity.lid || senderJid) || senderJid;
   try {
-    const resolvedOwner = await resolveUserId({
-      lid: senderInfo?.lid,
-      jid: senderInfo?.jid || senderJid || null,
-      participantAlt: senderInfo?.participantAlt || null,
-    });
+    if (senderIdentity.lid) {
+      await primeLidCache([senderIdentity.lid]).catch(() => null);
+    }
+    const resolvedOwner = await resolveUserId(senderIdentity);
     ownerJid = normalizeJid(resolvedOwner || ownerJid) || ownerJid;
   } catch {
-    ownerJid = normalizeJid(senderJid) || senderJid;
+    ownerJid = normalizeJid(cachedOwner || senderJid) || senderJid;
   }
 
   try {

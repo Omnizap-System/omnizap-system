@@ -67,6 +67,7 @@ export const stripWebpExtension = (value) =>
     .replace(/\.webp$/i, '');
 
 const clampInt = (value, fallback, min, max) => {
+  if (value === undefined || value === null || value === '') return fallback;
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.max(min, Math.min(max, Math.floor(parsed)));
@@ -964,8 +965,6 @@ const convertUploadMediaToWebp = async ({ ownerJid, buffer, mimetype }) => {
 const PACK_TAG_MARKER_REGEX = /\[pack-tags:([^\]]+)\]/i;
 const AUTO_PACK_MARKER_REGEX = /\[(?:auto-theme|auto-tag):[^\]]+\]/gi;
 const AUTO_PACK_MARKER_TEST_REGEX = /\[(?:auto-theme|auto-tag):[^\]]+\]/i;
-const AUTO_PACK_COLLECTOR_MARKER = '[auto-pack:collector]';
-const AUTO_PACK_COLLECTOR_LEGACY_TEXT = 'coleção automática de figurinhas criadas pelo usuário.';
 const AUTO_PACK_DESCRIPTION_PREFIX_REGEX = /^curadoria automática por tema\.\s*tema:\s*[^.]+\.?\s*(?:score\s*=\s*-?\d+(?:\.\d+)?\.?\s*)?/i;
 const AUTO_PACK_SCORE_FRAGMENT_REGEX = /\bscore\s*=\s*-?\d+(?:\.\d+)?\.?/gi;
 const normalizePackTag = (value) =>
@@ -1024,29 +1023,10 @@ const parsePackDescriptionMetadata = (description) => {
   };
 };
 
-const isCollectorAutoPack = (pack) => {
-  if (!pack || typeof pack !== 'object') return false;
-  const description = String(pack.description || '').toLowerCase();
-  return description.includes(AUTO_PACK_COLLECTOR_MARKER) || description.includes(AUTO_PACK_COLLECTOR_LEGACY_TEXT);
-};
-
-const isThemeCurationAutoPack = (pack) => {
-  if (!pack || typeof pack !== 'object') return false;
-  const name = String(pack.name || '').trim();
-  if (/^\[auto\]/i.test(name)) return true;
-
-  const description = String(pack.description || '').toLowerCase();
-  if (description.includes('[auto-theme:') || description.includes('[auto-tag:')) return true;
-
-  return Boolean(String(pack.pack_theme_key || '').trim());
-};
-
 const shouldHidePackFromMyProfileDefault = (pack, { includeAutoPacks = false } = {}) => {
   if (!pack || typeof pack !== 'object') return false;
   if (includeAutoPacks) return false;
-  if (isCollectorAutoPack(pack)) return false;
-  if (isThemeCurationAutoPack(pack)) return true;
-  return pack.is_auto_pack === true || Number(pack.is_auto_pack || 0) === 1;
+  return false;
 };
 
 const buildPackDescriptionWithTags = (description, tags = []) => {
