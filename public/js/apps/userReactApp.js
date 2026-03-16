@@ -124,8 +124,14 @@ const UserApp = ({ config }) => {
 
   return html`
     <style>
-      .sidebar-transition { transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
-      .content-transition { transition: padding-left 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+      .sidebar-transition {
+        transition:
+          width 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+          transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .content-transition {
+        transition: padding-left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      }
     </style>
 
     <div className="min-h-screen bg-[#020617] text-white font-sans selection:bg-primary selection:text-primary-content overflow-x-hidden">
@@ -393,7 +399,7 @@ const UserApp = ({ config }) => {
                                 <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-lg">🪪</div>
                                 Metadados da Identidade
                               </h3>
-                              
+
                               <div className="relative grid grid-cols-1 sm:grid-cols-2 gap-10 border-b border-white/5 pb-10 mb-10">
                                 <div className="space-y-1.5">
                                   <p className="text-[10px] font-black uppercase text-white/20 tracking-widest">E-mail de Autenticação</p>
@@ -430,106 +436,114 @@ const UserApp = ({ config }) => {
                             </div>
                           </div>
                         `}
-                        
-                        ${activeTab === 'rpg' && html` <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                          <div className="p-8 rounded-[3rem] bg-gradient-to-br from-primary/10 via-transparent to-transparent border border-primary/20">
-                             <div className="flex flex-col md:flex-row items-center gap-8">
+                        ${activeTab === 'rpg' &&
+                        html`
+                          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                            <div className="p-8 rounded-[3rem] bg-gradient-to-br from-primary/10 via-transparent to-transparent border border-primary/20">
+                              <div className="flex flex-col md:flex-row items-center gap-8">
                                 <div className="relative">
-                                   <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full"></div>
-                                   <div className="relative w-32 h-32 rounded-full border-4 border-primary/20 p-2 flex items-center justify-center bg-[#020617]">
-                                      <span className="text-5xl font-black text-white">${rpgInfo.level}</span>
-                                   </div>
-                                   <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-primary text-primary-content px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl">Nível</div>
+                                  <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full"></div>
+                                  <div className="relative w-32 h-32 rounded-full border-4 border-primary/20 p-2 flex items-center justify-center bg-[#020617]">
+                                    <span className="text-5xl font-black text-white">${rpgInfo.level}</span>
+                                  </div>
+                                  <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-primary text-primary-content px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl">Nível</div>
                                 </div>
                                 <div className="flex-1 text-center md:text-left space-y-4">
-                                   <h3 className="text-2xl font-black tracking-tight">Status do Treinador</h3>
-                                   <div className="space-y-2">
-                                      <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-white/40">
-                                         <span>Experiência: ${rpgInfo.xp} XP</span>
-                                         <span>Próximo nível: ${(rpgInfo.level + 1) * 100}</span>
-                                      </div>
-                                      <div className="h-4 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
-                                         <div className="h-full bg-gradient-to-r from-primary to-emerald-400 transition-all duration-1000" style=${{ width: Math.min((rpgInfo.xp / ((rpgInfo.level + 1) * 100)) * 100, 100) + '%' }}></div>
-                                      </div>
-                                   </div>
+                                  <h3 className="text-2xl font-black tracking-tight">Status do Treinador</h3>
+                                  <div className="space-y-2">
+                                    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-white/40">
+                                      <span>Experiência: ${rpgInfo.xp} XP</span>
+                                      <span>Próximo nível: ${(rpgInfo.level + 1) * 100}</span>
+                                    </div>
+                                    <div className="h-4 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
+                                      <div className="h-full bg-gradient-to-r from-primary to-emerald-400 transition-all duration-1000" style=${{ width: Math.min((rpgInfo.xp / ((rpgInfo.level + 1) * 100)) * 100, 100) + '%' }}></div>
+                                    </div>
+                                  </div>
                                 </div>
                                 <div className="p-6 rounded-[2.5rem] bg-warning/5 border border-warning/10 text-center min-w-[160px]">
-                                   <p className="text-[9px] font-black uppercase tracking-widest text-warning/50 mb-1">Tesouro</p>
-                                   <p className="text-3xl font-black text-warning">💰 ${shortNum(rpgInfo.gold)}</p>
+                                  <p className="text-[9px] font-black uppercase tracking-widest text-warning/50 mb-1">Tesouro</p>
+                                  <p className="text-3xl font-black text-warning">💰 ${shortNum(rpgInfo.gold)}</p>
                                 </div>
-                             </div>
-                          </div>
+                              </div>
+                            </div>
 
-                          <div className="grid md:grid-cols-2 gap-6">
-                             <div className="p-8 rounded-[3rem] bg-white/[0.03] border border-white/5 space-y-6">
+                            <div className="grid md:grid-cols-2 gap-6">
+                              <div className="p-8 rounded-[3rem] bg-white/[0.03] border border-white/5 space-y-6">
                                 <h4 className="text-lg font-black flex items-center gap-3">🐉 Pokémon em Destaque</h4>
-                                ${rpgInfo.active_pokemon ? html`
-                                  <div className="p-6 rounded-3xl bg-white/5 border border-white/10 flex items-center gap-6 group hover:border-primary/40 transition-all">
-                                     <div className="relative">
-                                        <img src=${'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/' + (rpgInfo.active_pokemon.is_shiny ? 'shiny/' : '') + rpgInfo.active_pokemon.poke_id + '.png'} className="w-24 h-24 object-contain drop-shadow-2xl" />
-                                        ${rpgInfo.active_pokemon.is_shiny && html`<div className="absolute top-0 right-0 text-xl animate-pulse">✨</div>`}
-                                     </div>
-                                     <div>
-                                        <h5 className="text-xl font-black capitalize text-white group-hover:text-primary transition-colors">${rpgInfo.active_pokemon.nickname}</h5>
-                                        <p className="text-xs font-bold text-white/40 uppercase tracking-widest">Nível ${rpgInfo.active_pokemon.level}</p>
-                                     </div>
-                                  </div>
-                                ` : html`<div className="p-10 text-center border-2 border-dashed border-white/5 rounded-3xl text-white/20 font-bold">Nenhum Pokémon ativo</div>`}
-                             </div>
+                                ${rpgInfo.active_pokemon
+                                  ? html`
+                                      <div className="p-6 rounded-3xl bg-white/5 border border-white/10 flex items-center gap-6 group hover:border-primary/40 transition-all">
+                                        <div className="relative">
+                                          <img src=${'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/' + (rpgInfo.active_pokemon.is_shiny ? 'shiny/' : '') + rpgInfo.active_pokemon.poke_id + '.png'} className="w-24 h-24 object-contain drop-shadow-2xl" />
+                                          ${rpgInfo.active_pokemon.is_shiny && html`<div className="absolute top-0 right-0 text-xl animate-pulse">✨</div>`}
+                                        </div>
+                                        <div>
+                                          <h5 className="text-xl font-black capitalize text-white group-hover:text-primary transition-colors">${rpgInfo.active_pokemon.nickname}</h5>
+                                          <p className="text-xs font-bold text-white/40 uppercase tracking-widest">Nível ${rpgInfo.active_pokemon.level}</p>
+                                        </div>
+                                      </div>
+                                    `
+                                  : html`<div className="p-10 text-center border-2 border-dashed border-white/5 rounded-3xl text-white/20 font-bold">Nenhum Pokémon ativo</div>`}
+                              </div>
 
-                             <div className="p-8 rounded-[3rem] bg-white/[0.03] border border-white/5 space-y-6 text-center">
+                              <div className="p-8 rounded-[3rem] bg-white/[0.03] border border-white/5 space-y-6 text-center">
                                 <h4 className="text-lg font-black flex items-center gap-3 justify-center">🏆 Arena Competitiva</h4>
                                 <div className="grid grid-cols-2 gap-4">
-                                   <div className="bg-white/5 p-5 rounded-3xl">
-                                      <p className="text-2xl font-black text-white">${rpgInfo.pvp?.wins || 0}</p>
-                                      <p className="text-[9px] font-black uppercase text-white/30">Vitórias</p>
-                                   </div>
-                                   <div className="bg-white/5 p-5 rounded-3xl">
-                                      <p className="text-2xl font-black text-white">${rpgInfo.pvp?.losses || 0}</p>
-                                      <p className="text-[9px] font-black uppercase text-white/30">Derrotas</p>
-                                   </div>
+                                  <div className="bg-white/5 p-5 rounded-3xl">
+                                    <p className="text-2xl font-black text-white">${rpgInfo.pvp?.wins || 0}</p>
+                                    <p className="text-[9px] font-black uppercase text-white/30">Vitórias</p>
+                                  </div>
+                                  <div className="bg-white/5 p-5 rounded-3xl">
+                                    <p className="text-2xl font-black text-white">${rpgInfo.pvp?.losses || 0}</p>
+                                    <p className="text-[9px] font-black uppercase text-white/30">Derrotas</p>
+                                  </div>
                                 </div>
                                 <div className="bg-primary/10 p-4 rounded-2xl border border-primary/20">
-                                   <p className="text-sm font-black text-primary">${rpgInfo.karma?.score || 0} Karma Global</p>
+                                  <p className="text-sm font-black text-primary">${rpgInfo.karma?.score || 0} Karma Global</p>
                                 </div>
-                             </div>
+                              </div>
+                            </div>
                           </div>
-                        </div> `}
-
-                        ${activeTab === 'account' && html` <div className="max-w-xl animate-in fade-in slide-in-from-bottom-4 duration-500">
-                           <div className="space-y-10">
+                        `}
+                        ${activeTab === 'account' &&
+                        html`
+                          <div className="max-w-xl animate-in fade-in slide-in-from-bottom-4 duration-500">
+                            <div className="space-y-10">
                               <div className="flex items-center gap-6">
-                                 <div className="w-16 h-16 rounded-[2rem] bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-3xl shadow-lg">🛡️</div>
-                                 <div>
-                                    <h3 className="text-2xl font-black tracking-tight">Segurança</h3>
-                                    <p className="text-sm text-white/40 font-medium">Proteja seu acesso ao ecossistema OmniZap.</p>
-                                 </div>
+                                <div className="w-16 h-16 rounded-[2rem] bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-3xl shadow-lg">🛡️</div>
+                                <div>
+                                  <h3 className="text-2xl font-black tracking-tight">Segurança</h3>
+                                  <p className="text-sm text-white/40 font-medium">Proteja seu acesso ao ecossistema OmniZap.</p>
+                                </div>
                               </div>
                               <div className="p-8 rounded-[3rem] bg-white/[0.03] border border-white/5 space-y-8">
-                                 <div className="space-y-4">
-                                    <div className="space-y-2">
-                                       <label className="text-[10px] font-black uppercase tracking-widest text-white/30 ml-4">Alterar Senha</label>
-                                       <input type="password" placeholder="Sua nova senha forte" className="w-full h-14 bg-[#020617] border border-white/10 rounded-2xl px-6 focus:border-primary outline-none transition-all font-mono text-sm" />
-                                    </div>
-                                    <div className="space-y-2">
-                                       <label className="text-[10px] font-black uppercase tracking-widest text-white/30 ml-4">Confirmar Senha</label>
-                                       <input type="password" placeholder="Repita a nova senha" className="w-full h-14 bg-[#020617] border border-white/10 rounded-2xl px-6 focus:border-primary outline-none transition-all font-mono text-sm" />
-                                    </div>
-                                 </div>
-                                 <button className="btn btn-primary btn-block h-14 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl shadow-primary/20">Atualizar Credenciais</button>
+                                <div className="space-y-4">
+                                  <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-white/30 ml-4">Alterar Senha</label>
+                                    <input type="password" placeholder="Sua nova senha forte" className="w-full h-14 bg-[#020617] border border-white/10 rounded-2xl px-6 focus:border-primary outline-none transition-all font-mono text-sm" />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-white/30 ml-4">Confirmar Senha</label>
+                                    <input type="password" placeholder="Repita a nova senha" className="w-full h-14 bg-[#020617] border border-white/10 rounded-2xl px-6 focus:border-primary outline-none transition-all font-mono text-sm" />
+                                  </div>
+                                </div>
+                                <button className="btn btn-primary btn-block h-14 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl shadow-primary/20">Atualizar Credenciais</button>
                               </div>
-                           </div>
-                        </div> `}
-
-                        ${activeTab === 'support' && html` <div className="py-16 text-center max-w-lg mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
-                           <div className="relative inline-block mb-10">
+                            </div>
+                          </div>
+                        `}
+                        ${activeTab === 'support' &&
+                        html`
+                          <div className="py-16 text-center max-w-lg mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+                            <div className="relative inline-block mb-10">
                               <div className="absolute inset-0 bg-primary/20 blur-[60px] rounded-full animate-pulse"></div>
                               <div className="relative w-28 h-28 rounded-[3rem] bg-white/5 border border-white/10 flex items-center justify-center text-5xl shadow-2xl">🎧</div>
-                           </div>
-                           <h3 className="text-3xl font-black tracking-tighter mb-4">Central de Atendimento</h3>
-                           <p className="text-white/40 font-medium leading-relaxed mb-10 text-lg">Dúvidas sobre o sistema, planos ou bugs? Fale diretamente com nossa equipe técnica.</p>
-                           <a href="https://wa.me/559591122954" target="_blank" className="btn btn-primary btn-lg btn-block rounded-[2rem] font-black uppercase text-xs tracking-widest h-16 shadow-2xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all">Iniciar Chat Suporte</a>
-                        </div> `}
+                            </div>
+                            <h3 className="text-3xl font-black tracking-tighter mb-4">Central de Atendimento</h3>
+                            <p className="text-white/40 font-medium leading-relaxed mb-10 text-lg">Dúvidas sobre o sistema, planos ou bugs? Fale diretamente com nossa equipe técnica.</p>
+                            <a href="https://wa.me/559591122954" target="_blank" className="btn btn-primary btn-lg btn-block rounded-[2rem] font-black uppercase text-xs tracking-widest h-16 shadow-2xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all">Iniciar Chat Suporte</a>
+                          </div>
+                        `}
                       </div>
                     `}
               </div>

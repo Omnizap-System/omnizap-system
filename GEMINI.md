@@ -30,12 +30,14 @@ O **Omnizap** é um sistema profissional de automação para WhatsApp, integrand
 ## Comandos Principais
 
 ### Desenvolvimento
+
 - `npm install`: Instala as dependências.
 - `cp .env.example .env`: Configura as variáveis de ambiente necessárias.
 - `npm run db:init`: Inicializa o banco de dados MySQL e aplica o schema.
 - `npm run dev`: Inicia o sistema em modo de desenvolvimento.
 
 ### Build e Qualidade
+
 - `npm run build:frontend`: Gera os bundles de produção para o frontend (CSS + JS via Vite).
 - `npm run check`: Executa linting, testes e checagem de formatação.
 - `npm test`: Roda a suíte de testes (Node.js native test runner).
@@ -43,6 +45,7 @@ O **Omnizap** é um sistema profissional de automação para WhatsApp, integrand
 - `npm run format`: Aplica a formatação do Prettier.
 
 ### Segurança e Manutenção
+
 - `npm run security:audit`: Executa auditoria de dependências (`npm audit`).
 - `npm run security:codeql`: Roda análise estática localmente.
 - `npm run catalog:commands`: Gera o catálogo de comandos para os módulos.

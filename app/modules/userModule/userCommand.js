@@ -73,15 +73,7 @@ const hasResolvableIdentity = (value) => {
   if (typeof value === 'string') return Boolean(value.trim());
   if (typeof value !== 'object') return false;
 
-  return Boolean(
-    value?.jid ||
-      value?.lid ||
-      value?.participant ||
-      value?.participantAlt ||
-      value?.remoteJid ||
-      value?.remoteJidAlt ||
-      value?.id,
-  );
+  return Boolean(value?.jid || value?.lid || value?.participant || value?.participantAlt || value?.remoteJid || value?.remoteJidAlt || value?.id);
 };
 
 /**
