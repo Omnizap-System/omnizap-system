@@ -2,11 +2,12 @@ import crypto from 'node:crypto';
 import logger from '#logger';
 import { sendAndStore } from '../../services/messaging/messagePersistenceService.js';
 import { getAdminJid } from '../../config/index.js';
-import { getPlayText, getPlayUsageFallbackText, getPlayUsageText, getPlayWaitText } from './playConfigRuntime.js';
+import { getPlayOperationalLimits, getPlayText, getPlayUsageFallbackText, getPlayUsageText, getPlayWaitText } from './playConfigRuntime.js';
 import { DEFAULT_COMMAND_PREFIX, ERROR_CODES, KNOWN_ERROR_CODES, TYPE_CONFIG, YTDLS_ENDPOINTS } from './playCommandConstants.js';
 import { createError, withErrorMeta, normalizePlayError, truncateText, ytdlsClient, formatters, fileUtils, isYouTubeBotCheckCause, buildYouTubeBotCheckUserMessage } from './playCommandYtDlpClient.js';
 
 const adminJid = getAdminJid();
+const adminAlertDedupCache = new Map();
 
 export { DEFAULT_COMMAND_PREFIX };
 
@@ -54,13 +55,60 @@ const buildAdminFailureText = (error, context = {}) => {
   return lines.join('\n');
 };
 
+const buildAdminAlertDedupKey = (error, context = {}) => {
+  const causeKey = truncateText(error?.meta?.cause || error?.message || '', 160);
+  return [
+    context?.type || error?.meta?.type || 'n/a',
+    error?.code || 'n/a',
+    error?.meta?.endpoint || 'n/a',
+    error?.meta?.status || 'n/a',
+    error?.meta?.rawCode || 'n/a',
+    causeKey || 'n/a',
+  ].join('|');
+};
+
+const pruneAdminAlertDedupCache = (nowMs, dedupeWindowMs) => {
+  const maxAge = Math.max(60_000, dedupeWindowMs * 2);
+  for (const [key, timestamp] of adminAlertDedupCache.entries()) {
+    if (!Number.isFinite(timestamp) || nowMs - timestamp > maxAge) {
+      adminAlertDedupCache.delete(key);
+    }
+  }
+};
+
+const shouldNotifyAdminAlert = (error, context = {}) => {
+  if (!adminJid) return false;
+  if (!isTechnicalError(error)) return false;
+
+  const limits = getPlayOperationalLimits();
+  const dedupeWindowMs = Number(limits?.admin_alert_dedupe_window_ms ?? 120000);
+  if (!Number.isFinite(dedupeWindowMs) || dedupeWindowMs <= 0) {
+    return true;
+  }
+
+  const nowMs = Date.now();
+  const dedupeKey = buildAdminAlertDedupKey(error, context);
+  const lastSentAt = adminAlertDedupCache.get(dedupeKey);
+  if (Number.isFinite(lastSentAt) && nowMs - lastSentAt < dedupeWindowMs) {
+    return false;
+  }
+
+  adminAlertDedupCache.set(dedupeKey, nowMs);
+  pruneAdminAlertDedupCache(nowMs, dedupeWindowMs);
+  return true;
+};
+
+const resetAdminAlertDedupCacheForTests = () => {
+  adminAlertDedupCache.clear();
+};
+
 const notifyFailure = async (sock, remoteJid, messageInfo, expirationMessage, error, context) => {
   const errorMessage = getUserErrorMessage(error);
   const errorPrefix = getPlayText('error_prefix', '❌ Erro: ');
 
   await sendAndStore(sock, remoteJid, { text: `${errorPrefix}${errorMessage}` }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
 
-  if (adminJid) {
+  if (shouldNotifyAdminAlert(error, context)) {
     await sendAndStore(sock, adminJid, {
       text: buildAdminFailureText(error, { ...(context || {}), remoteJid }),
     });
@@ -329,4 +377,13 @@ export const handleTypedPlayCommand = async ({ sock, remoteJid, messageInfo, exp
       requestId: error?.meta?.requestId,
     });
   }
+};
+
+export const __playCommandCoreTestUtils = {
+  isTechnicalError,
+  getUserErrorMessage,
+  buildAdminFailureText,
+  shouldNotifyAdminAlert,
+  resetAdminAlertDedupCacheForTests,
+  notifyFailure,
 };

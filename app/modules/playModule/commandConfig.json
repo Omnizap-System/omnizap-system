@@ -583,13 +583,15 @@
     "search_cache_ttl_ms": 60000,
     "max_search_cache_entries": 500,
     "max_redirects": 2,
+    "max_concurrent_jobs": 2,
     "max_error_body_bytes": 65536,
     "max_meta_body_chars": 512,
     "retry_backoff_base_ms": 200,
     "search_retry_count": 1,
     "thumbnail_retry_count": 1,
     "thumbnail_timeout_ms": 15000,
-    "max_thumb_bytes": 5242880
+    "max_thumb_bytes": 5242880,
+    "admin_alert_dedupe_window_ms": 120000
   },
   "opcoes_execucao": {
     "ytdlp_base_args": ["--ignore-config", "--no-playlist", "--no-warnings", "--js-runtimes", "node", "--extractor-args", "youtube:player_client=android,web"],

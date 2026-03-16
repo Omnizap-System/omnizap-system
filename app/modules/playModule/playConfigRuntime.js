@@ -6,6 +6,7 @@ import { createModuleCommandConfigRuntime } from '../../services/ai/moduleComman
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const CONFIG_PATH = path.join(__dirname, 'commandConfig.json');
+const CONFIG_SNAPSHOT_TTL_MS = Math.max(1000, Number.parseInt(process.env.PLAY_CONFIG_SNAPSHOT_TTL_MS || '15000', 10) || 15000);
 
 const DEFAULT_TEXTS = {
   usage_header: '',
@@ -58,6 +59,7 @@ const DEFAULT_OPERATIONAL_LIMITS = {
   search_cache_ttl_ms: 60000,
   max_search_cache_entries: 500,
   max_redirects: 2,
+  max_concurrent_jobs: 2,
   max_error_body_bytes: 65536,
   max_meta_body_chars: 512,
   retry_backoff_base_ms: 200,
@@ -65,6 +67,7 @@ const DEFAULT_OPERATIONAL_LIMITS = {
   thumbnail_retry_count: 1,
   thumbnail_timeout_ms: 15000,
   max_thumb_bytes: 5 * 1024 * 1024,
+  admin_alert_dedupe_window_ms: 120000,
 };
 
 const DEFAULT_EXECUTION_OPTIONS = {
@@ -92,6 +95,10 @@ const runtime = createModuleCommandConfigRuntime({
   },
 });
 
+let cachedModuleConfig = null;
+let cachedSnapshotExpiresAt = 0;
+let cachedCommandRegistry = null;
+
 const renderUsageMethod = (method, commandPrefix) => String(method || '').replaceAll('<prefix>', String(commandPrefix || '/'));
 const renderTemplate = (value, variables = {}) => {
   let text = String(value || '');
@@ -100,6 +107,11 @@ const renderTemplate = (value, variables = {}) => {
   }
   return text;
 };
+
+const normalizeCommandToken = (value) =>
+  String(value || '')
+    .trim()
+    .toLowerCase();
 
 const toInt = (value, fallback, { min = Number.NEGATIVE_INFINITY, max = Number.POSITIVE_INFINITY } = {}) => {
   const number = Number.parseInt(String(value ?? ''), 10);
@@ -138,6 +150,50 @@ const normalizeExecutionOptions = (raw) => {
   };
 };
 
+const getPlayModuleConfigSnapshot = () => {
+  const now = Date.now();
+  if (cachedModuleConfig && now < cachedSnapshotExpiresAt) {
+    return cachedModuleConfig;
+  }
+
+  cachedModuleConfig = runtime.getModuleConfig();
+  cachedSnapshotExpiresAt = now + CONFIG_SNAPSHOT_TTL_MS;
+  cachedCommandRegistry = null;
+  return cachedModuleConfig;
+};
+
+const buildCommandRegistry = () => {
+  if (cachedCommandRegistry) return cachedCommandRegistry;
+
+  const config = getPlayModuleConfigSnapshot();
+  const entries = Array.isArray(config?.commands) ? config.commands : [];
+  const aliasToCanonical = new Map();
+  const commandEntryByCanonical = new Map();
+
+  for (const entry of entries) {
+    if (!entry || entry.enabled === false) continue;
+
+    const canonical = normalizeCommandToken(entry.name);
+    if (!canonical) continue;
+
+    commandEntryByCanonical.set(canonical, entry);
+    aliasToCanonical.set(canonical, canonical);
+
+    const aliases = Array.isArray(entry.aliases) ? entry.aliases : [];
+    for (const alias of aliases) {
+      const normalizedAlias = normalizeCommandToken(alias);
+      if (!normalizedAlias) continue;
+      aliasToCanonical.set(normalizedAlias, canonical);
+    }
+  }
+
+  cachedCommandRegistry = {
+    aliasToCanonical,
+    commandEntryByCanonical,
+  };
+  return cachedCommandRegistry;
+};
+
 const resolveUsageLines = (entry, variant) => {
   if (!entry || typeof entry !== 'object') return [];
 
@@ -158,11 +214,26 @@ const resolveUsageLines = (entry, variant) => {
   return methods.filter(Boolean).map((value) => String(value));
 };
 
-export const getPlayModuleConfig = () => runtime.getModuleConfig();
+export const getPlayModuleConfig = () => getPlayModuleConfigSnapshot();
 
-export const resolvePlayCommandName = (command) => runtime.resolveCommandName(command);
-export const getPlayCommandEntry = (command) => runtime.getCommandEntry(command);
-export const listEnabledPlayCommands = () => runtime.listEnabledCommands();
+export const resolvePlayCommandName = (command) => {
+  const normalized = normalizeCommandToken(command);
+  if (!normalized) return null;
+  const { aliasToCanonical } = buildCommandRegistry();
+  return aliasToCanonical.get(normalized) || null;
+};
+
+export const getPlayCommandEntry = (command) => {
+  const canonical = resolvePlayCommandName(command);
+  if (!canonical) return null;
+  const { commandEntryByCanonical } = buildCommandRegistry();
+  return commandEntryByCanonical.get(canonical) || null;
+};
+
+export const listEnabledPlayCommands = () => {
+  const { commandEntryByCanonical } = buildCommandRegistry();
+  return [...commandEntryByCanonical.values()];
+};
 
 export const getPlayTextConfig = () => {
   const config = getPlayModuleConfig();
@@ -181,6 +252,7 @@ export const getPlayOperationalLimits = () => {
     search_cache_ttl_ms: toInt(raw.search_cache_ttl_ms, DEFAULT_OPERATIONAL_LIMITS.search_cache_ttl_ms, { min: 1 }),
     max_search_cache_entries: toInt(raw.max_search_cache_entries, DEFAULT_OPERATIONAL_LIMITS.max_search_cache_entries, { min: 1 }),
     max_redirects: toInt(raw.max_redirects, DEFAULT_OPERATIONAL_LIMITS.max_redirects, { min: 0, max: 10 }),
+    max_concurrent_jobs: toInt(raw.max_concurrent_jobs, DEFAULT_OPERATIONAL_LIMITS.max_concurrent_jobs, { min: 1, max: 32 }),
     max_error_body_bytes: toInt(raw.max_error_body_bytes, DEFAULT_OPERATIONAL_LIMITS.max_error_body_bytes, { min: 1024 }),
     max_meta_body_chars: toInt(raw.max_meta_body_chars, DEFAULT_OPERATIONAL_LIMITS.max_meta_body_chars, { min: 64 }),
     retry_backoff_base_ms: toInt(raw.retry_backoff_base_ms, DEFAULT_OPERATIONAL_LIMITS.retry_backoff_base_ms, { min: 1 }),
@@ -188,6 +260,7 @@ export const getPlayOperationalLimits = () => {
     thumbnail_retry_count: toInt(raw.thumbnail_retry_count, DEFAULT_OPERATIONAL_LIMITS.thumbnail_retry_count, { min: 0, max: 5 }),
     thumbnail_timeout_ms: toInt(raw.thumbnail_timeout_ms, DEFAULT_OPERATIONAL_LIMITS.thumbnail_timeout_ms, { min: 1000 }),
     max_thumb_bytes: toInt(raw.max_thumb_bytes, DEFAULT_OPERATIONAL_LIMITS.max_thumb_bytes, { min: 1024 }),
+    admin_alert_dedupe_window_ms: toInt(raw.admin_alert_dedupe_window_ms, DEFAULT_OPERATIONAL_LIMITS.admin_alert_dedupe_window_ms, { min: 0 }),
   };
 };
 

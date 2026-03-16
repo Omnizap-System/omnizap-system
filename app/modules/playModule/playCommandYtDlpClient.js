@@ -74,6 +74,56 @@ const getLimits = () => getPlayOperationalLimits();
 
 const getExecutionOptions = () => getPlayExecutionOptions();
 
+const createPlayProcessLimiter = () => {
+  let active = 0;
+  const queue = [];
+
+  const resolveLimit = () => Math.max(1, Number(getLimits().max_concurrent_jobs ?? 2));
+
+  const pump = () => {
+    const limit = resolveLimit();
+    while (active < limit && queue.length) {
+      const next = queue.shift();
+      if (!next) continue;
+      active += 1;
+      Promise.resolve()
+        .then(next.task)
+        .then(next.resolve, next.reject)
+        .finally(() => {
+          active = Math.max(0, active - 1);
+          pump();
+        });
+    }
+  };
+
+  const run = (task) =>
+    new Promise((resolve, reject) => {
+      queue.push({ task, resolve, reject });
+      pump();
+    });
+
+  const stats = () => ({ active, queued: queue.length, limit: resolveLimit() });
+
+  return { run, stats };
+};
+
+const playProcessLimiter = createPlayProcessLimiter();
+
+const runWithPlayProcessSlot = async (task, meta = {}) => {
+  const before = playProcessLimiter.stats();
+  if (before.active >= before.limit) {
+    logger.warn('Play process: aguardando slot de execução.', {
+      endpoint: meta?.endpoint || YTDLS_ENDPOINTS.download,
+      command: meta?.command || null,
+      activeJobs: before.active,
+      queuedJobs: before.queued,
+      maxConcurrentJobs: before.limit,
+    });
+  }
+
+  return playProcessLimiter.run(task);
+};
+
 const truncateText = (value, maxChars = getLimits().max_meta_body_chars || MAX_META_BODY_CHARS) => {
   if (typeof value !== 'string') return '';
   if (value.length <= maxChars) return value;
@@ -350,7 +400,10 @@ const normalizeBinaryError = (error, { timeoutMessage, fallbackMessage, endpoint
 
 const probeVideoStreams = async (filePath, requestId, endpoint) => {
   try {
-    const result = await runBinaryCommand(FFPROBE_BIN, ['-v', 'error', '-print_format', 'json', '-show_streams', filePath]);
+    const result = await runWithPlayProcessSlot(
+      () => runBinaryCommand(FFPROBE_BIN, ['-v', 'error', '-print_format', 'json', '-show_streams', filePath]),
+      { endpoint, command: FFPROBE_BIN },
+    );
     const parsed = JSON.parse(result.stdout || '{}');
     const streams = Array.isArray(parsed?.streams) ? parsed.streams : [];
     const videoStream = streams.find((stream) => stream?.codec_type === 'video') || null;
@@ -380,7 +433,13 @@ const transcodeVideoForWhatsapp = async (filePath, requestId, endpoint) => {
   try {
     await safeUnlink(outputPath);
 
-    await runBinaryCommand(FFMPEG_BIN, ['-y', '-i', filePath, '-map', '0:v:0', '-map', '0:a:0?', '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-c:a', 'aac', '-b:a', '128k', '-ar', '44100', '-ac', '2', outputPath], { timeoutMs: VIDEO_PROCESS_TIMEOUT_MS });
+    await runWithPlayProcessSlot(
+      () =>
+        runBinaryCommand(FFMPEG_BIN, ['-y', '-i', filePath, '-map', '0:v:0', '-map', '0:a:0?', '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-c:a', 'aac', '-b:a', '128k', '-ar', '44100', '-ac', '2', outputPath], {
+          timeoutMs: VIDEO_PROCESS_TIMEOUT_MS,
+        }),
+      { endpoint, command: FFMPEG_BIN },
+    );
 
     const stats = await fs.promises.stat(outputPath);
     const transcodedBytes = Number(stats?.size || 0);
@@ -948,7 +1007,10 @@ const runYtDlp = async ({ args, endpoint, requestId, input, timeoutMs = DEFAULT_
   const binaryPath = await ensureYtDlpReady();
 
   try {
-    return await runBinaryCommand(binaryPath, args, { timeoutMs });
+    return await runWithPlayProcessSlot(() => runBinaryCommand(binaryPath, args, { timeoutMs }), {
+      endpoint,
+      command: path.basename(binaryPath),
+    });
   } catch (error) {
     throw normalizeYtDlpError(error, {
       endpoint,
@@ -1055,21 +1117,7 @@ const resolveYoutubeLink = async (query) => {
   return searchResult.resultado.url;
 };
 
-const resolveYoutubeCandidates = async (query) => {
-  const normalized = query ? query.trim() : '';
-
-  if (!normalized) {
-    throw createError(ERROR_CODES.INVALID_INPUT, playText('search_invalid_input', 'Você precisa informar um link do YouTube ou termo de busca.'), {
-      endpoint: YTDLS_ENDPOINTS.search,
-      technical: false,
-    });
-  }
-
-  if (/^https?:\/\//i.test(normalized)) {
-    return [normalized];
-  }
-
-  const searchResult = await fetchSearchResult(normalized);
+const extractCandidateUrlsFromSearchResult = (searchResult) => {
   const urls = [];
   const seen = new Set();
 
@@ -1090,6 +1138,26 @@ const resolveYoutubeCandidates = async (query) => {
       pushUrl(item?.url);
     }
   }
+
+  return urls;
+};
+
+const resolveYoutubeCandidates = async (query) => {
+  const normalized = query ? query.trim() : '';
+
+  if (!normalized) {
+    throw createError(ERROR_CODES.INVALID_INPUT, playText('search_invalid_input', 'Você precisa informar um link do YouTube ou termo de busca.'), {
+      endpoint: YTDLS_ENDPOINTS.search,
+      technical: false,
+    });
+  }
+
+  if (/^https?:\/\//i.test(normalized)) {
+    return [normalized];
+  }
+
+  const searchResult = await fetchSearchResult(normalized);
+  const urls = extractCandidateUrlsFromSearchResult(searchResult);
 
   if (!urls.length) {
     throw createError(ERROR_CODES.NOT_FOUND, playText('search_not_found', 'Nenhum resultado encontrado para a busca.'), {
@@ -1455,6 +1523,14 @@ const formatters = {
 const fileUtils = {
   buildTempFilePath,
   safeUnlink,
+};
+
+export const __playYtDlpClientTestUtils = {
+  extractCandidateUrlsFromSearchResult,
+  buildDownloadAttemptArgsList,
+  isYouTubeBotCheckCause,
+  buildYouTubeBotCheckUserMessage,
+  getProcessLimiterStats: () => playProcessLimiter.stats(),
 };
 
 export { createError, withErrorMeta, normalizePlayError, truncateText, ytdlsClient, formatters, fileUtils, isYouTubeBotCheckCause, buildYouTubeBotCheckUserMessage };
