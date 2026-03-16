@@ -1,6 +1,6 @@
 {
   "schema_version": "3.0.0",
-  "generated_at": "2026-03-13T17:33:22.183Z",
+  "generated_at": "2026-03-16T04:11:51.489Z",
   "totals": {
     "modules": 14,
     "categories": 10,
@@ -3313,8 +3313,8 @@
             "erro_permissao": "Permissão insuficiente para executar este comando."
           },
           "technical": {
-            "collected_data": ["chat_identifier", "sender_identifier", "command_content", "identificador do chat (remoteJid)", "identificador do remetente (senderJid)", "texto do comando e argumentos", "contexto da mensagem (citacao e mencoes, quando existir)", "link ou termo de busca enviado no comando", "metadados de fila/download retornados pelo servico de midia", "informacoes de tamanho do arquivo para validacao de limite"],
-            "dependencies": ["serviço YTDLS/Downloader", "ffmpeg", "ffprobe"],
+            "collected_data": ["chat_identifier", "sender_identifier", "command_content", "identificador do chat (remoteJid)", "identificador do remetente (senderJid)", "texto do comando e argumentos", "contexto da mensagem (citacao e mencoes, quando existir)", "link ou termo de busca enviado no comando", "metadados de busca/download retornados pelo yt-dlp local", "informacoes de tamanho do arquivo para validacao de limite"],
+            "dependencies": ["yt-dlp local (binario gerenciado pelo modulo)", "ffmpeg", "ffprobe"],
             "side_effects": ["baixa mídia temporária", "envia áudio no chat"],
             "behavior": {
               "type": "argument_driven",
@@ -3391,8 +3391,8 @@
             "erro_permissao": "Permissão insuficiente para executar este comando."
           },
           "technical": {
-            "collected_data": ["chat_identifier", "sender_identifier", "command_content", "identificador do chat (remoteJid)", "identificador do remetente (senderJid)", "texto do comando e argumentos", "contexto da mensagem (citacao e mencoes, quando existir)", "link ou termo de busca enviado no comando", "metadados de fila/download retornados pelo servico de midia", "informacoes de tamanho e formato de video para validacao"],
-            "dependencies": ["serviço YTDLS/Downloader", "ffmpeg", "ffprobe"],
+            "collected_data": ["chat_identifier", "sender_identifier", "command_content", "identificador do chat (remoteJid)", "identificador do remetente (senderJid)", "texto do comando e argumentos", "contexto da mensagem (citacao e mencoes, quando existir)", "link ou termo de busca enviado no comando", "metadados de busca/download retornados pelo yt-dlp local", "informacoes de tamanho e formato de video para validacao"],
+            "dependencies": ["yt-dlp local (binario gerenciado pelo modulo)", "ffmpeg", "ffprobe"],
             "side_effects": ["baixa mídia temporária", "envia vídeo no chat"],
             "behavior": {
               "type": "argument_driven",
