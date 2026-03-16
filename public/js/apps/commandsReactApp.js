@@ -55,25 +55,26 @@ const CommandDetailsPage = ({ command, onClose, devMode }) => {
 
       <div className="sticky top-0 z-50 bg-[#020617]/60 backdrop-blur-xl border-b border-white/5">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <button onClick=${onClose} className="btn btn-ghost group pl-0 hover:bg-transparent">
-            <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-primary group-hover:text-primary-content group-hover:border-primary transition-all duration-300">
+          <button onClick=${onClose} className="btn btn-ghost group pl-0 hover:bg-transparent min-h-0 h-auto py-2">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-primary group-hover:text-primary-content group-hover:border-primary transition-all duration-300">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15 19l-7-7 7-7" /></svg>
             </div>
             <span className="hidden sm:inline text-xs font-black uppercase tracking-widest ml-3 opacity-50 group-hover:opacity-100 transition-opacity">Voltar ao Catálogo</span>
+            <span className="sm:hidden text-[10px] font-black uppercase tracking-widest ml-2 opacity-50">Voltar</span>
           </button>
 
           <div className="flex items-center gap-3">
             <div className="text-right">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">${command.category_label}</p>
+              <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] text-primary">${command.category_label}</p>
               <p className="text-[8px] font-bold opacity-30 uppercase tracking-widest hidden sm:block">Ref. Doc V3.5</p>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-xl border border-primary/20 shadow-[0_0_20px_rgba(34,197,94,0.1)]">${command.category_icon || '🧩'}</div>
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-primary/10 flex items-center justify-center text-lg sm:text-xl border border-primary/20 shadow-[0_0_20px_rgba(34,197,94,0.1)]">${command.category_icon || '🧩'}</div>
           </div>
         </div>
       </div>
 
       <main className="container mx-auto max-w-4xl px-4 py-8 lg:py-16 relative z-10">
-        <div className="space-y-12">
+        <div className="space-y-12 sm:space-y-16">
           <header className="space-y-6 text-center sm:text-left">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-[10px] font-black uppercase tracking-widest">
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
@@ -82,10 +83,10 @@ const CommandDetailsPage = ({ command, onClose, devMode }) => {
 
             <div className="space-y-4">
               <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4">
-                <h1 className="text-5xl sm:text-6xl lg:text-8xl font-black tracking-tighter text-white">/<span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-emerald-400">${command.name}</span></h1>
-                ${command.premium && html` <div className="badge badge-warning h-10 px-6 font-black text-[10px] uppercase tracking-[0.2em] shadow-[0_0_30px_rgba(251,191,36,0.2)] border-none">Premium</div> `}
+                <h1 className="text-4xl sm:text-7xl lg:text-8xl font-black tracking-tighter text-white break-words">/<span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-emerald-400">${command.name}</span></h1>
+                ${command.premium && html` <div className="badge badge-warning h-8 sm:h-10 px-4 sm:px-6 font-black text-[9px] sm:text-[10px] uppercase tracking-[0.2em] shadow-[0_0_30px_rgba(251,191,36,0.2)] border-none">Premium</div> `}
               </div>
-              <p className="text-lg sm:text-xl lg:text-2xl text-white/60 leading-relaxed font-medium max-w-3xl mx-auto sm:mx-0">${command.descricao}</p>
+              <p className="text-lg sm:text-xl lg:text-2xl text-white/60 leading-relaxed font-medium max-w-3xl mx-auto sm:mx-0 break-words">${command.descricao}</p>
             </div>
 
             <div className="flex flex-wrap justify-center sm:justify-start gap-2 pt-2">
@@ -108,10 +109,10 @@ const CommandDetailsPage = ({ command, onClose, devMode }) => {
               ${(command.metodos_de_uso || []).map(
                 (usage, idx) => html`
                   <div key=${idx} className="group relative">
-                    <div className="absolute inset-0 bg-primary/5 blur-xl opacity-0 group-hover:opacity-100 transition-opacity rounded-[2.5rem]"></div>
-                    <div className="relative flex flex-col sm:flex-row items-stretch sm:items-center gap-4 p-1 rounded-[2rem] bg-white/[0.03] border border-white/5 group-hover:border-primary/30 transition-all duration-300">
-                      <code className="flex-1 px-6 py-5 sm:py-6 font-mono text-sm sm:text-base text-primary/80 break-all"> ${usage} </code>
-                      <button onClick=${() => handleCopy(usage, `usage-${idx}`)} className=${`px-8 py-4 sm:py-6 rounded-2xl sm:rounded-r-[1.8rem] sm:rounded-l-none font-black text-[10px] uppercase tracking-widest transition-all ${copyStatus[`usage-${idx}`] ? 'bg-success text-white' : 'bg-white/5 hover:bg-primary hover:text-primary-content'}`}>${copyStatus[`usage-${idx}`] ? 'Copiado!' : 'Copiar'}</button>
+                    <div className="absolute inset-0 bg-primary/5 blur-xl opacity-0 group-hover:opacity-100 transition-opacity rounded-[1.5rem] sm:rounded-[2.5rem]"></div>
+                    <div className="relative flex flex-col sm:flex-row items-stretch sm:items-center gap-0 sm:gap-4 p-1 rounded-[1.5rem] sm:rounded-[2rem] bg-white/[0.03] border border-white/5 group-hover:border-primary/30 transition-all duration-300">
+                      <code className="flex-1 px-5 py-4 sm:px-6 sm:py-6 font-mono text-sm sm:text-base text-primary/80 break-all leading-relaxed"> ${usage} </code>
+                      <button onClick=${() => handleCopy(usage, `usage-${idx}`)} className=${`px-8 py-3.5 sm:py-6 rounded-2xl sm:rounded-r-[1.8rem] sm:rounded-l-none font-black text-[10px] uppercase tracking-widest transition-all ${copyStatus[`usage-${idx}`] ? 'bg-success text-white' : 'bg-white/5 hover:bg-primary hover:text-primary-content'}`}>${copyStatus[`usage-${idx}`] ? 'Copiado!' : 'Copiar'}</button>
                     </div>
                   </div>
                 `,
@@ -129,15 +130,15 @@ const CommandDetailsPage = ({ command, onClose, devMode }) => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 ${command.arguments.map(
                   (arg) => html`
-                    <div key=${arg.name} className="group p-6 rounded-[2rem] bg-white/[0.02] border border-white/5 hover:border-primary/20 transition-all duration-300">
+                    <div key=${arg.name} className="group p-5 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] bg-white/[0.02] border border-white/5 hover:border-primary/20 transition-all duration-300">
                       <div className="flex items-start justify-between mb-4">
                         <div className="space-y-1">
-                          <h4 className="text-lg font-black text-white group-hover:text-primary transition-colors">${arg.name}</h4>
+                          <h4 className="text-base sm:text-lg font-black text-white group-hover:text-primary transition-colors">${arg.name}</h4>
                           <span className="inline-block text-[9px] font-bold text-white/30 font-mono uppercase tracking-widest bg-white/5 px-2 py-0.5 rounded"> Type: ${arg.type} </span>
                         </div>
-                        <span className=${`text-[8px] font-black uppercase px-3 py-1 rounded-full border ${arg.required ? 'bg-error/10 text-error border-error/20' : 'bg-white/5 text-white/30 border-white/10'}`}> ${arg.required ? 'Obrigatório' : 'Opcional'} </span>
+                        <span className=${`text-[8px] font-black uppercase px-2.5 py-1 rounded-full border ${arg.required ? 'bg-error/10 text-error border-error/20' : 'bg-white/5 text-white/30 border-white/10'}`}> ${arg.required ? 'Obrigatório' : 'Opcional'} </span>
                       </div>
-                      <p className="text-sm text-white/50 font-medium leading-relaxed">${arg.description}</p>
+                      <p className="text-xs sm:text-sm text-white/50 font-medium leading-relaxed">${arg.description}</p>
                     </div>
                   `,
                 )}
@@ -146,32 +147,32 @@ const CommandDetailsPage = ({ command, onClose, devMode }) => {
           `}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-6">
-            <section className="p-8 rounded-[2.5rem] bg-white/[0.02] border border-white/5 space-y-6 relative overflow-hidden group">
+            <section className="p-6 sm:p-8 rounded-[1.5rem] sm:rounded-[2.5rem] bg-white/[0.02] border border-white/5 space-y-6 relative overflow-hidden group">
               <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-primary/5 blur-2xl rounded-full group-hover:bg-primary/10 transition-colors"></div>
               <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/30 relative z-10">Specs Técnicas</h3>
-              <div className="grid grid-cols-2 gap-y-8 relative z-10">
+              <div className="grid grid-cols-2 gap-y-6 sm:gap-y-8 relative z-10">
                 <div>
                   <p className="text-[9px] font-bold uppercase text-white/20 mb-1 tracking-widest">Versão</p>
-                  <p className="text-base font-black text-white">${command.technical?.version || '1.0.0'}</p>
+                  <p className="text-sm sm:text-base font-black text-white">${command.technical?.version || '1.0.0'}</p>
                 </div>
                 <div>
                   <p className="text-[9px] font-bold uppercase text-white/20 mb-1 tracking-widest">Estabilidade</p>
-                  <p className="text-base font-black text-emerald-400">${command.technical?.stability || 'Stable'}</p>
+                  <p className="text-sm sm:text-base font-black text-emerald-400">${command.technical?.stability || 'Stable'}</p>
                 </div>
                 <div>
                   <p className="text-[9px] font-bold uppercase text-white/20 mb-1 tracking-widest">Risco</p>
-                  <p className="text-base font-black ${command.technical?.risk_level !== 'low' ? 'text-rose-500' : 'text-emerald-400'}">${command.technical?.risk_level?.toUpperCase() || 'LOW'}</p>
+                  <p className="text-sm sm:text-base font-black ${command.technical?.risk_level !== 'low' ? 'text-rose-500' : 'text-emerald-400'}">${command.technical?.risk_level?.toUpperCase() || 'LOW'}</p>
                 </div>
                 <div>
                   <p className="text-[9px] font-bold uppercase text-white/20 mb-1 tracking-widest">ID Sistema</p>
-                  <p className="text-[10px] font-mono font-bold text-white/40 truncate">${command.id}</p>
+                  <p className="text-[10px] font-mono font-bold text-white/40 truncate" title=${command.id}>${command.id}</p>
                 </div>
               </div>
             </section>
 
             ${command.technical?.collected_data?.length > 0 &&
             html`
-              <section className="p-8 rounded-[2.5rem] bg-white/[0.02] border border-white/5 space-y-6 relative overflow-hidden group">
+              <section className="p-6 sm:p-8 rounded-[1.5rem] sm:rounded-[2.5rem] bg-white/[0.02] border border-white/5 space-y-6 relative overflow-hidden group">
                 <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-emerald-500/5 blur-2xl rounded-full group-hover:bg-emerald-500/10 transition-colors"></div>
                 <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/30 relative z-10">Privacidade e Dados</h3>
                 <div className="flex flex-wrap gap-2 relative z-10">${command.technical.collected_data.map((data) => html` <span key=${data} className="text-[10px] font-bold bg-white/5 px-4 py-2 rounded-xl border border-white/10 text-white/60">${data}</span> `)}</div>
@@ -189,12 +190,12 @@ const CommandDetailsPage = ({ command, onClose, devMode }) => {
               </div>
               <div className="relative group">
                 <div className="absolute inset-0 bg-warning/5 blur-3xl opacity-20"></div>
-                <div className="relative bg-[#020617] border border-warning/10 rounded-[2.5rem] overflow-hidden">
-                  <div className="bg-warning/5 px-8 py-3 border-b border-warning/10 flex items-center justify-between">
+                <div className="relative bg-[#020617] border border-warning/10 rounded-[1.5rem] sm:rounded-[2.5rem] overflow-hidden">
+                  <div className="bg-warning/5 px-6 sm:px-8 py-3 border-b border-warning/10 flex items-center justify-between">
                     <span className="text-[9px] font-black uppercase tracking-widest text-warning/60 font-mono">command_schema.json</span>
                     <button onClick=${() => handleCopy(JSON.stringify(command, null, 2), 'raw-json')} className=${`text-[9px] font-black uppercase tracking-widest transition-colors ${copyStatus['raw-json'] ? 'text-success' : 'text-warning/40 hover:text-warning'}`}>${copyStatus['raw-json'] ? 'Copiado!' : 'Copiar JSON'}</button>
                   </div>
-                  <pre className="p-8 font-mono text-[10px] sm:text-[11px] text-warning/70 overflow-x-auto max-h-[400px] scrollbar-thin scrollbar-thumb-warning/20">
+                  <pre className="p-6 sm:p-8 font-mono text-[9px] sm:text-[11px] text-warning/70 overflow-x-auto max-h-[400px] scrollbar-thin scrollbar-thumb-warning/20">
                     ${JSON.stringify(command, null, 2)}
                   </pre
                   >
@@ -203,10 +204,10 @@ const CommandDetailsPage = ({ command, onClose, devMode }) => {
             </section>
           `}
 
-          <div className="pt-12 pb-20 text-center">
-            <button onClick=${onClose} className="group relative inline-flex items-center justify-center">
+          <div className="pt-8 sm:pt-12 pb-20 text-center">
+            <button onClick=${onClose} className="group relative inline-flex items-center justify-center w-full sm:w-auto">
               <div className="absolute inset-0 bg-primary/20 blur-2xl group-hover:bg-primary/40 transition-colors rounded-2xl"></div>
-              <div className="relative bg-primary text-primary-content px-12 py-5 rounded-2xl font-black text-xs uppercase tracking-[0.3em] shadow-2xl hover:scale-105 active:scale-95 transition-all">Voltar ao Catálogo</div>
+              <div className="relative bg-primary text-primary-content px-12 py-5 rounded-2xl font-black text-xs uppercase tracking-[0.3em] shadow-2xl hover:scale-105 active:scale-95 transition-all w-full sm:w-auto text-center">Voltar ao Catálogo</div>
             </button>
           </div>
         </div>
