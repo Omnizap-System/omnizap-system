@@ -427,6 +427,29 @@ const App = () => {
         background-size: 200% 200%;
         animation: gradient-x 15s ease infinite;
       }
+      @keyframes shine {
+        0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+        100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+      }
+      .hover-shine {
+        position: relative;
+        overflow: hidden;
+      }
+      .hover-shine::after {
+        content: "";
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: linear-gradient(rgba(255,255,255,0) 0%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0) 100%);
+        transform: translateX(-100%) translateY(-100%) rotate(45deg);
+        transition: transform 0.6s;
+        pointer-events: none;
+      }
+      .hover-shine:hover::after {
+        transform: translateX(100%) translateY(100%) rotate(45deg);
+      }
       .no-scrollbar::-webkit-scrollbar {
         display: none;
       }
@@ -459,23 +482,27 @@ const App = () => {
             <!-- Desktop Nav Items (Middle) -->
             <nav className="hidden lg:flex items-center gap-1 mx-4">${NAV_ITEMS.map((item) => html` <a href=${item.href} className="btn btn-ghost btn-sm rounded-lg font-medium text-white/50 hover:text-primary hover:bg-white/5 transition-all uppercase text-[10px] tracking-widest"> ${item.label} </a> `)}</nav>
 
-            <div className="flex items-center gap-2 sm:gap-4">
+            <div className="flex items-center">
               ${session?.user
                 ? html`
-                    <a href="/user/" className="group relative flex items-center h-10 gap-3 px-1.5 sm:pr-4 rounded-2xl bg-white/5 border border-white/10 hover:border-primary/40 transition-all duration-300">
+                    <a href="/user/" className="group relative flex items-center h-11 gap-3 pl-1.5 pr-1.5 sm:pr-5 rounded-2xl bg-white/5 border border-white/10 hover:border-primary/40 hover:bg-primary/5 transition-all duration-500 hover:shadow-[0_0_20px_rgba(34,197,94,0.15)]">
                       <div className="relative flex-shrink-0">
-                        <img src=${authInfo.image} className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl object-cover border border-white/10 group-hover:border-primary/50 transition-colors" />
-                        <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-success border-2 border-[#020617] rounded-full"></div>
+                        <img src=${authInfo.image} className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl object-cover border border-white/10 group-hover:border-primary/50 transition-all duration-500 group-hover:scale-105" />
+                        <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-success border-2 border-[#020617] rounded-full shadow-[0_0_8px_rgba(34,197,94,0.8)] group-hover:animate-pulse"></div>
                       </div>
-                      <div className="hidden sm:flex flex-col items-start gap-0">
+                      <div className="hidden sm:flex flex-col items-start gap-0.5">
                         <span className="text-[10px] font-black uppercase tracking-widest text-white/40 group-hover:text-primary transition-colors leading-tight">${authInfo.label}</span>
-                        <span className="text-[8px] font-bold text-white/20 uppercase tracking-tighter leading-tight">Painel de Controle</span>
+                        <span className="text-[8px] font-bold text-white/20 uppercase tracking-tighter leading-tight group-hover:text-white/40 transition-colors">Painel de Controle</span>
                       </div>
+                      <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-primary/0 via-primary/5 to-primary/0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"></div>
                     </a>
                   `
-                : html` <a href="/login/" className="btn btn-ghost btn-sm h-10 rounded-xl border border-white/10 hover:bg-white/5 px-4 font-bold text-[10px] uppercase tracking-widest text-white/70"> Entrar </a> `}
-
-              <a href=${botMenuUrl} className="btn btn-primary btn-sm h-10 rounded-xl shadow-lg shadow-primary/20 text-[10px] font-black uppercase tracking-widest px-5"> <span className="hidden xs:inline text-[9px]">Adicionar</span> Bot </a>
+                : html`
+                    <a href="/login/" className="group relative overflow-hidden btn btn-primary btn-sm h-11 min-h-0 rounded-2xl px-8 font-black text-[10px] uppercase tracking-[0.2em] shadow-lg shadow-primary/20 hover:shadow-primary/40 hover:scale-105 active:scale-95 transition-all border-none">
+                      <span className="relative z-10">Entrar</span>
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                    </a>
+                  `}
             </div>
           </div>
 
@@ -619,10 +646,10 @@ const App = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               ${STEPS.map(
                 (s) => html`
-                  <div key=${s.step} data-reveal="fade-up" className="relative group p-8 rounded-[2.5rem] bg-white/[0.02] border border-white/5 hover:border-primary/20 transition-all duration-500">
-                    <div className="absolute top-8 right-8 text-4xl font-black text-primary/10 group-hover:text-primary/20 transition-colors">${s.step}</div>
-                    <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-black mb-6 border border-primary/20">${s.step}</div>
-                    <h3 className="text-xl font-bold mb-3">${s.title}</h3>
+                  <div key=${s.step} data-reveal="fade-up" className="relative group p-8 rounded-[2.5rem] bg-white/[0.02] border border-white/5 hover:border-primary/30 hover:-translate-y-2 hover:shadow-2xl hover:shadow-primary/10 transition-all duration-500 overflow-hidden">
+                    <div className="absolute top-8 right-8 text-4xl font-black text-primary/10 group-hover:text-primary/30 group-hover:scale-150 group-hover:-rotate-12 transition-all duration-700">${s.step}</div>
+                    <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-black mb-6 border border-primary/20 group-hover:bg-primary group-hover:text-primary-content group-hover:scale-110 transition-all duration-500">${s.step}</div>
+                    <h3 className="text-xl font-bold mb-3 group-hover:text-primary transition-colors">${s.title}</h3>
                     <p className="text-white/40 leading-relaxed text-sm font-medium">${s.desc}</p>
                   </div>
                 `,
@@ -646,10 +673,11 @@ const App = () => {
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
               ${FEATURES.map(
                 (f) => html`
-                  <div data-reveal="fade-up" className="group p-8 rounded-[2.5rem] bg-[#020617] border border-white/5 hover:border-primary/30 transition-all hover:shadow-2xl hover:shadow-primary/5">
-                    <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center text-3xl mb-6 group-hover:scale-110 group-hover:bg-primary/10 transition-all border border-white/5">${f.icon}</div>
-                    <h3 className="text-xl font-bold mb-3">${f.title}</h3>
-                    <p className="text-white/40 leading-relaxed text-sm font-medium">${f.desc}</p>
+                  <div data-reveal="fade-up" className="group p-8 rounded-[2.5rem] bg-[#020617] border border-white/5 hover:border-primary/40 hover:-translate-y-2 transition-all duration-500 hover:shadow-2xl hover:shadow-primary/10 relative overflow-hidden">
+                    <div className="absolute -right-10 -bottom-10 w-32 h-32 bg-primary/5 blur-3xl group-hover:bg-primary/10 transition-colors duration-700 rounded-full"></div>
+                    <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center text-3xl mb-6 group-hover:scale-110 group-hover:rotate-6 group-hover:bg-primary/10 transition-all border border-white/5 group-hover:border-primary/20">${f.icon}</div>
+                    <h3 className="text-xl font-bold mb-3 group-hover:text-primary transition-colors">${f.title}</h3>
+                    <p className="text-white/40 leading-relaxed text-sm font-medium group-hover:text-white/60 transition-colors">${f.desc}</p>
                   </div>
                 `,
               )}
@@ -685,19 +713,19 @@ const App = () => {
               <div className="w-full lg:w-2/3 grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 ${filteredCommandBlocks.map(
                   (block) => html`
-                    <div data-reveal="fade-up" className="bg-white/[0.02] border border-white/5 rounded-3xl overflow-hidden group hover:border-primary/20 transition-all">
+                    <div data-reveal="fade-up" className="bg-white/[0.02] border border-white/5 rounded-3xl overflow-hidden group hover:border-primary/30 transition-all hover:bg-white/[0.04] hover:scale-[1.02] duration-500 hover-shine">
                       <div className="p-5 sm:p-8">
-                        <h3 className="text-xs sm:text-sm font-black uppercase tracking-[0.2em] text-primary/60 mb-5 sm:mb-6 flex items-center gap-2">
-                          <span className="w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_rgba(34,197,94,0.5)]"></span>
+                        <h3 className="text-xs sm:text-sm font-black uppercase tracking-[0.2em] text-primary/60 mb-5 sm:mb-6 flex items-center gap-2 group-hover:text-primary transition-colors">
+                          <span className="w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_rgba(34,197,94,0.5)] group-hover:animate-ping"></span>
                           ${block.title}
                         </h3>
                         <div className="grid gap-4 sm:gap-5">
                           ${block.items.map(
                             ([cmd, label]) => html`
-                              <div className="flex items-start gap-3 group">
+                              <div className="flex items-start gap-3 group/item">
                                 <div className="flex-1">
-                                  <div className="font-mono text-sm font-bold text-white/90 group-hover:text-primary transition-colors">${cmd}</div>
-                                  <div className="text-[11px] sm:text-xs text-white/30 font-medium leading-tight">${label}</div>
+                                  <div className="font-mono text-sm font-bold text-white/90 group-hover/item:text-primary transition-colors transform group-hover/item:translate-x-1 duration-300">${cmd}</div>
+                                  <div className="text-[11px] sm:text-xs text-white/30 font-medium leading-tight group-hover/item:text-white/50 transition-colors">${label}</div>
                                 </div>
                               </div>
                             `,
@@ -710,7 +738,7 @@ const App = () => {
 
                 <!-- Mobile Only CTA -->
                 <div className="lg:hidden mt-2">
-                  <a href="/comandos/" className="btn btn-block btn-outline border-white/10 rounded-2xl h-14 font-black text-[10px] uppercase tracking-widest"> Ver Todos os Comandos </a>
+                  <a href="/comandos/" className="btn btn-block btn-outline border-white/10 rounded-2xl h-14 font-black text-[10px] uppercase tracking-widest active:bg-primary active:text-primary-content active:border-primary"> Ver Todos os Comandos </a>
                 </div>
               </div>
             </div>
@@ -728,9 +756,9 @@ const App = () => {
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
               ${GUIDES.map(
                 (guide) => html`
-                  <a href=${guide.href} data-reveal="fade-up" className="p-6 rounded-3xl bg-white/[0.02] border border-white/5 hover:border-primary/40 transition-all group">
+                  <a href=${guide.href} data-reveal="fade-up" className="p-6 rounded-3xl bg-white/[0.02] border border-white/5 hover:border-primary/40 hover:-translate-y-1 transition-all duration-500 group hover:bg-white/[0.04] hover-shine">
                     <h3 className="font-black mb-2 group-hover:text-primary transition-colors text-white/80">${guide.title}</h3>
-                    <p className="text-xs text-white/30 leading-relaxed font-medium">${guide.desc}</p>
+                    <p className="text-xs text-white/30 leading-relaxed font-medium group-hover:text-white/50 transition-colors">${guide.desc}</p>
                   </a>
                 `,
               )}
@@ -747,43 +775,43 @@ const App = () => {
             </div>
 
             <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-              <div data-reveal="fade-up" className="p-8 rounded-[2.5rem] bg-white/[0.02] border border-white/5 flex flex-col hover:border-white/10 transition-all">
+              <div data-reveal="fade-up" className="p-8 rounded-[2.5rem] bg-white/[0.02] border border-white/5 flex flex-col hover:border-white/20 transition-all duration-500 hover:bg-white/[0.04] group/free hover-shine">
                 <div className="mb-8">
-                  <h3 className="text-xl font-bold mb-2">Plano Gratuito</h3>
-                  <div className="text-4xl font-black mb-4">R$ 0<span className="text-sm text-white/20 font-medium italic">/sempre</span></div>
+                  <h3 className="text-xl font-bold mb-2 group-hover/free:text-white transition-colors">Plano Gratuito</h3>
+                  <div className="text-4xl font-black mb-4 group-hover/free:scale-105 origin-left transition-transform duration-500">R$ 0<span className="text-sm text-white/20 font-medium italic">/sempre</span></div>
                   <p className="text-sm text-white/40">Ideal para grupos pequenos e iniciantes.</p>
                 </div>
                 <ul className="space-y-4 mb-10 flex-1">
                   ${['Moderação básica', 'Figurinhas ilimitadas', 'Comandos de utilidades', 'Uso compartilhado de IA'].map(
                     (item) => html`
-                      <li className="flex items-center gap-3 text-sm font-medium text-white/60">
-                        <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
+                      <li className="flex items-center gap-3 text-sm font-medium text-white/60 group-hover/free:text-white/80 transition-colors">
+                        <svg className="w-5 h-5 text-emerald-500 group-hover/free:scale-125 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
                         ${item}
                       </li>
                     `,
                   )}
                 </ul>
-                <a href=${botMenuUrl} className="btn btn-outline border-white/10 rounded-xl font-black">Adicionar Grátis</a>
+                <a href=${botMenuUrl} className="btn btn-outline border-white/10 rounded-xl font-black hover:bg-white hover:text-[#020617] hover:border-white transition-all">Adicionar Grátis</a>
               </div>
 
-              <div data-reveal="fade-up" className="p-8 rounded-[2.5rem] bg-primary/5 border border-primary/20 flex flex-col relative overflow-hidden group hover:border-primary/40 transition-all">
-                <div className="absolute top-6 right-6 px-3 py-1 rounded-full bg-primary text-[#020617] text-[10px] font-black uppercase tracking-widest">Recomendado</div>
+              <div data-reveal="fade-up" className="p-8 rounded-[2.5rem] bg-primary/5 border border-primary/20 flex flex-col relative overflow-hidden group hover:border-primary/60 transition-all duration-500 hover:scale-[1.03] hover:shadow-2xl hover:shadow-primary/20 hover-shine">
+                <div className="absolute top-6 right-6 px-3 py-1 rounded-full bg-primary text-[#020617] text-[10px] font-black uppercase tracking-widest group-hover:scale-110 transition-transform">Recomendado</div>
                 <div className="mb-8">
                   <h3 className="text-xl font-bold mb-2 text-primary">Plano Premium</h3>
-                  <div className="text-4xl font-black mb-4 text-white">R$ 14,90<span className="text-sm text-white/20 font-medium italic">/mês</span></div>
+                  <div className="text-4xl font-black mb-4 text-white group-hover:scale-105 origin-left transition-transform duration-500">R$ 14,90<span className="text-sm text-white/20 font-medium italic">/mês</span></div>
                   <p className="text-sm text-white/40">Potência máxima para administradores profissionais.</p>
                 </div>
                 <ul className="space-y-4 mb-10 flex-1">
                   ${['IA sem limites (GPT-4o)', 'Webhooks & API Docs', 'Backup de mensagens', 'Rankings customizados', 'Suporte prioritário'].map(
                     (item) => html`
-                      <li className="flex items-center gap-3 text-sm font-medium text-white/90">
-                        <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
+                      <li className="flex items-center gap-3 text-sm font-medium text-white/90 group-hover:translate-x-1 transition-transform duration-300">
+                        <svg className="w-5 h-5 text-primary group-hover:scale-125 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
                         ${item}
                       </li>
                     `,
                   )}
                 </ul>
-                <a href=${botMenuUrl} className="btn btn-primary rounded-xl font-black shadow-lg shadow-primary/20">Quero ser Premium</a>
+                <a href=${botMenuUrl} className="btn btn-primary rounded-xl font-black shadow-lg shadow-primary/20 group-hover:shadow-primary/40 transition-all hover:scale-105">Quero ser Premium</a>
               </div>
             </div>
           </div>
@@ -844,53 +872,96 @@ const App = () => {
       </main>
 
       <!-- Footer -->
-      <footer className="bg-[#020617] border-t border-white/5 py-16">
+      <footer className="bg-[#020617] border-t border-white/5 pt-20 pb-10 relative overflow-hidden">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent"></div>
+
         <div className="container mx-auto px-4">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-12 mb-12 text-center lg:text-left">
-            <div className="col-span-2 lg:col-span-1 space-y-4">
-              <div className="flex items-center justify-center lg:justify-start gap-2">
-                <img src="/apple-touch-icon.png" className="w-8 h-8 rounded-lg" />
-                <span className="text-xl font-black tracking-tighter">OmniZap<span className="text-primary">.</span></span>
+          <div className="grid grid-cols-2 lg:grid-cols-12 gap-12 mb-20">
+            <!-- Brand Column -->
+            <div className="col-span-2 lg:col-span-4 space-y-6">
+              <div className="flex items-center gap-3 justify-center lg:justify-start">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20 shadow-[0_0_20px_rgba(34,197,94,0.1)]">
+                  <img src="/apple-touch-icon.png" className="w-7 h-7 rounded-lg" />
+                </div>
+                <span className="text-2xl font-black tracking-tighter">OmniZap<span className="text-primary">.</span></span>
               </div>
-              <p className="text-xs text-white/30 leading-relaxed font-medium">
-                Plataforma Open Source de automação WhatsApp. <br />
-                Feito para a comunidade brasileira.
+              <p className="text-sm text-white/30 leading-relaxed font-medium text-center lg:text-left max-w-sm mx-auto lg:mx-0">
+                A próxima geração de automação para WhatsApp. Unindo IA Generativa, segurança LGPD e alta performance para escalar sua comunidade.
               </p>
+              <div className="flex items-center gap-4 justify-center lg:justify-start pt-2">
+                <a href="https://github.com/Omnizap-System/omnizap" target="_blank" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-primary/10 hover:text-primary transition-all border border-white/5 hover:border-primary/30 group">
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.02-1.04-.032-2.037-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+                </a>
+                <a href=${botMenuUrl} target="_blank" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-primary/10 hover:text-primary transition-all border border-white/5 hover:border-primary/30 group">
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.397-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.506-.173-.007-.371-.007-.57-.007-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.131.57-.074 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-2.578l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.72 1.017 3.691 1.553 5.7 1.553h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+                </a>
+              </div>
             </div>
 
-            <div>
-              <h4 className="font-bold text-xs uppercase tracking-widest text-white/20 mb-6">Explorar</h4>
-              <ul className="space-y-3 text-sm font-black text-white/50">
-                <li><a href="/comandos/" className="hover:text-primary transition-colors">Biblioteca de Comandos</a></li>
-                <li><a href="/api-docs/" className="hover:text-primary transition-colors">Documentação API</a></li>
-                <li><a href="/login/" className="hover:text-primary transition-colors">Painel de Usuário</a></li>
-              </ul>
-            </div>
+            <!-- Links Sections -->
+            <div className="col-span-2 lg:col-span-8 grid grid-cols-2 md:grid-cols-4 gap-8">
+              <div className="space-y-6">
+                <h4 className="font-bold text-xs uppercase tracking-widest text-primary/60 cursor-default">Plataforma</h4>
+                <ul className="space-y-3">
+                  <li><a href="/login/" className="text-sm font-medium text-white/40 hover:text-white transition-colors flex items-center gap-2 group"><span className="w-1.5 h-1.5 rounded-full bg-white/10 group-hover:bg-primary transition-colors"></span> Painel Web</a></li>
+                  <li><a href="/comandos/" className="text-sm font-medium text-white/40 hover:text-white transition-colors flex items-center gap-2 group"><span className="w-1.5 h-1.5 rounded-full bg-white/10 group-hover:bg-primary transition-colors"></span> Comandos</a></li>
+                  <li><a href="/stickers/" className="text-sm font-medium text-white/40 hover:text-white transition-colors flex items-center gap-2 group"><span className="w-1.5 h-1.5 rounded-full bg-white/10 group-hover:bg-primary transition-colors"></span> Catálogo</a></li>
+                  <li><a href="/api-docs/" className="text-sm font-medium text-white/40 hover:text-white transition-colors flex items-center gap-2 group"><span className="w-1.5 h-1.5 rounded-full bg-white/10 group-hover:bg-primary transition-colors"></span> API Docs</a></li>
+                </ul>
+              </div>
 
-            <div>
-              <h4 className="font-bold text-xs uppercase tracking-widest text-white/20 mb-6">Legal</h4>
-              <ul className="space-y-3 text-sm font-medium text-white/40">
-                <li><a href="/termos-de-uso/" className="hover:text-primary transition-colors">Termos</a></li>
-                <li><a href="/politica-de-privacidade/" className="hover:text-primary transition-colors">Privacidade</a></li>
-                <li><a href="/licenca/" className="hover:text-primary transition-colors">Licença</a></li>
-              </ul>
-            </div>
+              <div className="space-y-6">
+                <h4 className="font-bold text-xs uppercase tracking-widest text-primary/60 cursor-default">Recursos</h4>
+                <ul className="space-y-3">
+                  <li><a href="#recursos" className="text-sm font-medium text-white/40 hover:text-white transition-colors">IA Generativa</a></li>
+                  <li><a href="#recursos" className="text-sm font-medium text-white/40 hover:text-white transition-colors">Moderação</a></li>
+                  <li><a href="#recursos" className="text-sm font-medium text-white/40 hover:text-white transition-colors">Downloads</a></li>
+                  <li><a href="#guias" className="text-sm font-medium text-white/40 hover:text-white transition-colors">Guias SEO</a></li>
+                </ul>
+              </div>
 
-            <div>
-              <h4 className="font-bold text-xs uppercase tracking-widest text-white/20 mb-6">Social</h4>
-              <ul className="space-y-3 text-sm font-medium text-white/40">
-                <li><a href="https://github.com/Omnizap-System/omnizap" target="_blank" className="hover:text-primary transition-colors">GitHub</a></li>
-                <li><a href=${botMenuUrl} className="hover:text-primary transition-colors">WhatsApp</a></li>
-              </ul>
+              <div className="space-y-6">
+                <h4 className="font-bold text-xs uppercase tracking-widest text-primary/60 cursor-default">Suporte</h4>
+                <ul className="space-y-3">
+                  <li><a href="#faq" className="text-sm font-medium text-white/40 hover:text-white transition-colors">FAQ</a></li>
+                  <li><a href=${botMenuUrl} className="text-sm font-medium text-white/40 hover:text-white transition-colors">Central de Ajuda</a></li>
+                  <li><a href="https://github.com/Omnizap-System/omnizap/issues" target="_blank" className="text-sm font-medium text-white/40 hover:text-white transition-colors">Reportar Bug</a></li>
+                  <li><a href="/suboperadores/" className="text-sm font-medium text-white/40 hover:text-white transition-colors">Transparência</a></li>
+                </ul>
+              </div>
+
+              <div className="space-y-6">
+                <h4 className="font-bold text-xs uppercase tracking-widest text-primary/60 cursor-default">Legal</h4>
+                <ul className="space-y-3">
+                  <li><a href="/termos-de-uso/" className="text-sm font-medium text-white/40 hover:text-white transition-colors">Termos</a></li>
+                  <li><a href="/politica-de-privacidade/" className="text-sm font-medium text-white/40 hover:text-white transition-colors">Privacidade</a></li>
+                  <li><a href="/aup/" className="text-sm font-medium text-white/40 hover:text-white transition-colors">Uso Aceitável</a></li>
+                  <li><a href="/licenca/" className="text-sm font-medium text-white/40 hover:text-white transition-colors">Licença MIT</a></li>
+                </ul>
+              </div>
             </div>
           </div>
 
-          <div className="border-t border-white/5 pt-8 flex flex-col sm:flex-row justify-between items-center gap-4 text-[10px] font-bold uppercase tracking-[0.2em] text-white/20">
-            <span>© 2026 OMNIZAP</span>
-            <div className="flex items-center gap-4">
-              <span>STATUS: <span className="text-success">${metrics.status}</span></span>
-              <span className="text-white/10">•</span>
-              <span>VERSION: 2.5.8</span>
+          <!-- Bottom Bar -->
+          <div className="border-t border-white/5 pt-8 flex flex-col sm:flex-row justify-between items-center gap-6">
+            <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-8 text-[10px] font-bold uppercase tracking-[0.2em] text-white/20">
+              <span>© 2026 OMNIZAP · ALL RIGHTS RESERVED</span>
+              <div className="hidden sm:block w-px h-3 bg-white/10"></div>
+              <div className="flex items-center gap-4">
+                <span>STATUS: <span className="text-success">${metrics.status}</span></span>
+                <span className="text-white/10">•</span>
+                <span>LATENCY: <span className="text-primary">${metrics.latency}</span></span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/5">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
+                <span className="text-[9px] font-black uppercase tracking-widest text-white/40">v2.6.0 Stable</span>
+              </div>
+              <a href="#top" className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center hover:bg-primary hover:text-primary-content transition-all border border-white/5 active:scale-90">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 15l7-7 7 7"/></svg>
+              </a>
             </div>
           </div>
         </div>
