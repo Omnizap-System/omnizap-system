@@ -34,3 +34,5 @@ public/assets/js/*.bundle.js
 public/assets/js/chunks/
 backups/
 .tmp_tools/
+app/modules/playModule/local/bin/
+app/modules/playModule/local/downloads/
