@@ -86,7 +86,7 @@
   "dependencies": {
     "@hapi/boom": "^10.0.1",
     "@kaikybrofc/logger-module": "^1.0.4",
-    "@whiskeysockets/baileys": "github:jlucaso1/Baileys#be89465e07afa871cf3f0e19cabfec9780db6be7",
+    "@whiskeysockets/baileys": "github:jlucaso1/Baileys#feat-add-stickerpack-support",
     "argon2": "^0.44.0",
     "axios": "^1.13.5",
     "canvas": "^3.2.1",
@@ -113,6 +113,7 @@
     "qrcode-terminal": "^0.12.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "sharp": "^0.34.3",
     "stream-json": "^1.9.1",
     "uuid": "^13.0.0",
     "webp-conv": "github:kaikybrofc/webp-conv",
