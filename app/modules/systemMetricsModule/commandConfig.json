@@ -335,6 +335,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "statusbot",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Exibe latência e estado de saúde do servidor com um comando simples. Não requer Premium.",
+        "quando_usar": ["Antes de iniciar tarefas importantes, para confirmar se o servidor está respondendo.", "Após perceber lentidão ou instabilidade, para checar o status rapidamente.", "Durante monitoramento rápido para verificar se tudo está estável ao longo do dia."],
+        "exemplos_reais": [
+          {
+            "situacao": "Checagem rápida antes de iniciar uma tarefa.",
+            "comando": "<prefix>statusbot",
+            "resposta_esperada": "Latência atual: 42 ms | Status: OK.",
+            "variacao": "ou <prefix>ping."
+          },
+          {
+            "situacao": "Lentidão percebida durante pico de tráfego.",
+            "comando": "<prefix>statusbot",
+            "resposta_esperada": "Latência atual: 320 ms | Status: Atenção - possíveis lentidões. Verifique sua rede.",
+            "variacao": "Se o problema persistir, tente novamente em alguns minutos."
+          },
+          {
+            "situacao": "Verificando disponibilidade após manutenção.",
+            "comando": "<prefix>statusbot",
+            "resposta_esperada": "Latência atual: 15 ms | Status: OK.",
+            "variacao": "Se retornar erro, espere e tente novamente."
+          }
+        ],
+        "resposta_esperada": ["Latência atual: <valor> ms | Status: OK.", "Latência atual: <valor> ms | Status: Atenção - verifique rede.", "Latência atual: <valor> ms | Status: ERRO - serviço indisponível."],
+        "erros_comuns_usuario": ["Esquecer de incluir o prefixo <prefix> ao digitar o comando.", "Executar sem estar conectado à internet ou com a rede instável.", "Esperar uma resposta com muitos detalhes além da latência e do status simples.", "Não estar logado com Google quando a autenticação for necessária.", "Tentar usar o comando em horários de manutenção sem observar a latência."],
+        "passos_se_der_erro": ["Verifique a sua conexão com a internet e tente novamente.", "Aguarde alguns segundos e execute novamente o comando: <prefix>statusbot.", "Confira se há mensagens de erro específicas (ex.: permissionError) e corrija as permissões se necessário.", "Se o problema persistir, tente em outro momento ou contate o suporte, descrevendo o que aconteceu."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     }
   ],

@@ -357,6 +357,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "figurinha",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Converte imagem ou vídeo enviado em figurinha para o WhatsApp. Requer login Google e mídia. Disponível para planos comum e premium.",
+        "quando_usar": ["Quando você quer transformar uma foto ou vídeo enviada em uma figurinha para compartilhar no chat.", "Quando desejar adicionar texto opcional à figurinha com o texto após o comando.", "Quando usar o atalho <prefix>s para criar rapidamente a figurinha a partir da mídia recebida."],
+        "exemplos_reais": [
+          {
+            "situacao": "Transformar imagem recebida em figurinha (sem texto).",
+            "comando": "<prefix>figurinha",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "com imagem anexada."
+          },
+          {
+            "situacao": "Criar figurinha com texto personalizado.",
+            "comando": "<prefix>figurinha Olá amigos",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "texto_extra fornecido."
+          },
+          {
+            "situacao": "Usar atalho para vídeo e gerar figurinha.",
+            "comando": "<prefix>s",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "vídeo anexado."
+          }
+        ],
+        "resposta_esperada": ["Comando executado com sucesso.", "Formato de uso inválido. Consulte metodos_de_uso.", "Permissão insuficiente para executar este comando."],
+        "erros_comuns_usuario": ["Não há mídia anexada para transformar em figurinha.", "Formato de uso inválido. Use <prefix>figurinha ou <prefix>s.", "Não é possível converter conteúdo NSFW ou não aprovado.", "Você não está logado no Google ou a autenticação falhou."],
+        "passos_se_der_erro": ["Verifique se você enviou uma imagem ou vídeo junto ao comando.", "Tente novamente com <prefix>figurinha ou <prefix>s.", "Certifique-se de estar conectado com sua conta Google e que o login esteja ativo."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -553,6 +582,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "paraimagem",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Converte figurinha (sticker) para imagem ou vídeo, para você salvar/usar fora do WhatsApp. Disponível para planos comum e premium.",
+        "quando_usar": ["Quando você recebeu uma figurinha e quer salvá-la como imagem.", "Quando precisa de um vídeo a partir de uma figurinha (quando suportado).", "Quando quer reutilizar a figurinha em outros lugares ou projetos."],
+        "exemplos_reais": [
+          {
+            "situacao": "Você recebeu uma figurinha e quer salvar como imagem.",
+            "comando": "<prefix>paraimagem",
+            "resposta_esperada": "A imagem da figurinha é gerada e enviada de volta para você.",
+            "variacao": "paraimagem."
+          },
+          {
+            "situacao": "Precisa de um vídeo da figurinha (quando suportado).",
+            "comando": "<prefix>tovideo",
+            "resposta_esperada": "Vídeo da figurinha gerado e enviado.",
+            "variacao": "tovideo."
+          },
+          {
+            "situacao": "Erro ao enviar comando com formato errado.",
+            "comando": "<prefix>paraimagem extra",
+            "resposta_esperada": "Formato de uso inválido. Consulte metodos_de_uso.",
+            "variacao": "erro de formatação."
+          }
+        ],
+        "resposta_esperada": ["Imagem ou vídeo gerado a partir da figurinha enviada (quando disponível).", "Mensagens claras de erro se houver problemas de formato, permissão ou conteúdo."],
+        "erros_comuns_usuario": ["Formato de comando inválido ou sem figurinha na mensagem.", "Não há figurinha na mensagem para converter.", "Falha de login ou permissão inadequada (Google Login necessário).", "Tentativa de usar o comando sem indicar uma figurinha compatível."],
+        "passos_se_der_erro": ["Confirme que você está logado com Google.", "Envie uma figurinha válida e tente novamente com <prefix>paraimagem, <prefix>tovideo ou <prefix>tovid.", "Verifique se o prefixo do bot está correto.", "Se o problema persistir, peça suporte com print da tela e da mensagem recebida."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -771,6 +829,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "figurinhatexto",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Gera figurinha com texto em tema escuro. Digite o texto (até 80 caracteres, até 4 linhas) e a figurinha é criada.",
+        "quando_usar": ["Quando quiser transformar uma frase curta em uma figurinha para compartilhar no chat.", "Para destacar mensagens com estilo visual sem sair do chat."],
+        "exemplos_reais": [
+          {
+            "situacao": "Criar uma figurinha com uma frase curta para cumprimentar.",
+            "comando": "<prefix>figurinhatexto Olá, tudo bem?",
+            "resposta_esperada": "Figura gerada com o texto: 'Olá, tudo bem?'.",
+            "variacao": "<prefix>st Olá, tudo bem?"
+          },
+          {
+            "situacao": "Texto com várias linhas (até 4 linhas).",
+            "comando": "<prefix>figurinhatexto Linha 1\\nLinha 2\\nLinha 3\\nLinha 4",
+            "resposta_esperada": "Figura criada com o texto: 'Linha 1\\nLinha 2\\nLinha 3\\nLinha 4'.",
+            "variacao": "<prefix>st Linha 1\\nLinha 2\\nLinha 3\\nLinha 4."
+          },
+          {
+            "situacao": "Uso rápido com alias.",
+            "comando": "<prefix>st Bom dia a todos",
+            "resposta_esperada": "Figura gerada com o texto: 'Bom dia a todos'.",
+            "variacao": "<prefix>figurinhatexto Bom dia a todos."
+          }
+        ],
+        "resposta_esperada": ["Figura criada com sucesso e pronta para enviar no chat.", "Texto da figurinha incorporado ao sticker.", "Comando executado com sucesso."],
+        "erros_comuns_usuario": ["Texto com mais de 80 caracteres.", "Não informar o texto após <prefix>figurinhatexto ou <prefix>st.", "Formato de uso inválido (faltou o texto ou usou caractere não suportado).", "Usar mais de 4 linhas."],
+        "passos_se_der_erro": ["Verifique o texto informado: até 80 caracteres e até 4 linhas.", "Repita o comando correto, por exemplo: <prefix>figurinhatexto Seu texto aqui.", "Certifique-se de estar conectado com a conta Google, se necessário.", "Se o problema persistir, aguarde alguns minutos e tente novamente ou procure suporte."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -989,6 +1076,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "figurinhatextobranco",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Crie figurinha com texto em branco em tema claro usando <prefix>figurinhatextobranco ou <prefix>stw.",
+        "quando_usar": ["Quer compartilhar uma mensagem rápida como imagem no chat.", "Precisa de até 80 caracteres, em até 4 linhas.", "Não precisa de opções adicionais ou ajustes de estilo.", "Prefere um atalho curto com <prefix>stw."],
+        "exemplos_reais": [
+          {
+            "situacao": "Frase motivacional.",
+            "comando": "<prefix>figurinhatextobranco Acredite em si mesmo!",
+            "resposta_esperada": "Figurinha criada com o texto 'Acredite em si mesmo!' em tema claro.",
+            "variacao": "<prefix>stw Acredite em si mesmo!"
+          },
+          {
+            "situacao": "Bom dia.",
+            "comando": "<prefix>figurinhatextobranco Bom dia, equipe!",
+            "resposta_esperada": "Figurinha criada com o texto 'Bom dia, equipe!' em tema claro.",
+            "variacao": "<prefix>stw Bom dia, equipe!"
+          },
+          {
+            "situacao": "Quatro linhas.",
+            "comando": "<prefix>figurinhatextobranco Linha 1 Linha 2 Linha 3 Linha 4",
+            "resposta_esperada": "Figurinha criada com o texto em quatro linhas.",
+            "variacao": "<prefix>stw Linha 1 Linha 2 Linha 3 Linha 4."
+          }
+        ],
+        "resposta_esperada": ["Comando executado com sucesso."],
+        "erros_comuns_usuario": ["Texto não informado após o comando.", "Texto excede 80 caracteres ou ultrapassa 4 linhas.", "Formato de uso incorreto ou sem o prefixo correto.", "Tentar usar caracteres não suportados."],
+        "passos_se_der_erro": ["Certifique-se de incluir o texto após o comando, ex.: <prefix>figurinhatextobranco Seu texto.", "Verifique o tamanho: até 80 caracteres e até 4 linhas.", "Use o formato correto: <prefix>figurinhatextobranco ou <prefix>stw.", "Tente novamente. Se o erro persistir, copie o comando usado e peça ajuda."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -1207,6 +1323,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "figurinhatextopisca",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Gera figurinha animada de texto piscante com até 80 caracteres (máx. 4 linhas), usando <prefix>figurinhatextopisca ou <prefix>stb.",
+        "quando_usar": ["Destacar mensagens com texto piscante em chats", "Promover ofertas rápidas ou lembretes", "Saudar ou chamar atenção com uma frase curta", "Transformar seu texto pronto em figurinha para envio rápido"],
+        "exemplos_reais": [
+          {
+            "situacao": "Promoção rápida com destaque.",
+            "comando": "<prefix>figurinhatextopisca Promoção de 50% hoje!",
+            "resposta_esperada": "Figura criada com sucesso.",
+            "variacao": "<prefix>stb Promoção de 50% hoje!"
+          },
+          {
+            "situacao": "Saudação breve.",
+            "comando": "<prefix>figurinhatextopisca Olá, bom dia!",
+            "resposta_esperada": "Figura criada com sucesso.",
+            "variacao": "<prefix>stb Olá, bom dia!"
+          },
+          {
+            "situacao": "Lembrete com até 4 linhas.",
+            "comando": "<prefix>figurinhatextopisca Lembrete: entrega hoje Confira novidades",
+            "resposta_esperada": "Figura criada com sucesso.",
+            "variacao": "<prefix>stb Lembrete: entrega hoje Confira novidades."
+          }
+        ],
+        "resposta_esperada": ["Comando executado com sucesso.", "Formato de uso inválido. Consulte metodos_de_uso.", "Permissão insuficiente para executar este comando."],
+        "erros_comuns_usuario": ["Texto excede 80 caracteres", "Mais de 4 linhas", "Não usar nenhum <prefix> no comando", "Texto vazio", "Texto com caracteres especiais não suportados"],
+        "passos_se_der_erro": ["Verifique o tamanho do texto (≤ 80 caracteres) e o número de linhas (≤ 4).", "Tente novamente usando um dos comandos válidos com o mesmo texto.", "Confirme que você está logado via Google, conforme necessário.", "Se o erro continuar, tente novamente mais tarde ou procure suporte."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     }
   ],

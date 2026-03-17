@@ -377,6 +377,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "pokemon",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Comando principal do RPG Pokemon, usado para explorar, batalhar, comprar itens e socializar dentro do jogo pelo chat.",
+        "quando_usar": ["Iniciar a aventura: <prefix>pokemon start.", "Explorar o mapa: <prefix>pokemon explorar.", "Batalhar contra inimigos: <prefix>pokemon atacar <id>.", "Obter ajuda ou ver os métodos de uso: <prefix>pokemon help."],
+        "exemplos_reais": [
+          {
+            "situacao": "Novo jogador quer começar a aventura.",
+            "comando": "<prefix>pokemon start",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "Prefixo pode variar (ex.: ! ou /)."
+          },
+          {
+            "situacao": "Explorar o mapa atual.",
+            "comando": "<prefix>pokemon explorar",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "Se houver área bloqueada, o jogo mostrará informações da área atual."
+          },
+          {
+            "situacao": "Iniciar batalha contra o oponente 1.",
+            "comando": "<prefix>pokemon atacar 1",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "O número pode variar conforme os oponentes disponíveis."
+          }
+        ],
+        "resposta_esperada": ["Comando executado com sucesso.", "Formato de uso inválido. Consulte metodos_de_uso.", "Permissão insuficiente para executar este comando."],
+        "erros_comuns_usuario": ["Esquecer de informar o subcomando obrigatório (ação).", "Usar um subcomando que não existe ou está incorreto.", "Não estar logado com Google antes de usar o comando.", "Formato incorreto ao enviar parâmetros (ex.: <prefix>pokemon atacar sem o id).", "Tentar usar comandos antes de iniciar o jogo com <prefix>pokemon start."],
+        "passos_se_der_erro": ["Leia a mensagem de erro e verifique se o uso está correto consultando <prefix>pokemon help.", "Confira se o subcomando digitado é válido e se o <prefix> está correto.", "Tente novamente com o formato correto, por exemplo <prefix>pokemon start.", "Certifique-se de estar logado com Google, já que é exigido.", "Se o problema continuar, reporte o contexto do erro para o suporte."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     }
   ],

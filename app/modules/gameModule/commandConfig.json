@@ -357,6 +357,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "dado",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Rola um dado com número de lados opcional. Se não informar, usa 6. Use <prefix>dado, <prefix>dado <lados> ou <prefix>dice <lados> para obter um resultado entre 1 e o número de lados (até 1000).",
+        "quando_usar": ["Precisa de um número aleatório para jogos de tabuleiro, RPG ou simulações.", "Quero um dado específico de lados para um desafio ou teste.", "Vou jogar com dados com mais de 6 lados (até 1000)."],
+        "exemplos_reais": [
+          {
+            "situacao": "Rolar dado padrão (6 lados).",
+            "comando": "<prefix>dado",
+            "resposta_esperada": "Você rolou um dado de 6 lados: 4.",
+            "variacao": "Pode também usar <prefix>dado para o mesmo resultado."
+          },
+          {
+            "situacao": "Rolar dado de 20 lados.",
+            "comando": "<prefix)dado 20",
+            "resposta_esperada": "Você rolou um dado de 20 lados: 13.",
+            "variacao": "ou <prefix>dice 20."
+          },
+          {
+            "situacao": "Rolar dado de 100 lados.",
+            "comando": "<prefix>dice 100",
+            "resposta_esperada": "Você rolou um dado de 100 lados: 87.",
+            "variacao": "ou <prefix>dado 100."
+          }
+        ],
+        "resposta_esperada": ["Resultado do dado: <valor>", "Você rolou um dado de <lados> lados: <valor>"],
+        "erros_comuns_usuario": ["Formato de uso inválido. Use um dos formatos: <prefix>dado, <prefix>dado <lados> ou <prefix>dice <lados>.", "O número de lados precisa estar entre 2 e 1000.", "Informar um valor não numérico ou caracteres.", "Esquecer de incluir o <prefix> ao digitar o comando."],
+        "passos_se_der_erro": ["Leia a mensagem de erro com atenção e ajuste o comando para um formato válido.", "Verifique se o valor de lados está entre 2 e 1000 quando informado.", "Use exatamente um dos formatos: <prefix>dado, <prefix>dado <lados> ou <prefix>dice <lados>.", "Se o problema persistir, confirme que você está logado com Google e tente novamente.", "Se ainda assim não funcionar, peça ajuda ao suporte."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     }
   ],

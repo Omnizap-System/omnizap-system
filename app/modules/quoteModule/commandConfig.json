@@ -357,6 +357,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "citar",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Converta texto em uma figurinha no estilo quote para compartilhar citações.",
+        "quando_usar": ["Quando quiser transformar um texto ou mensagem citada em uma figurinha com o estilo 'quote' para compartilhar na conversa.", "Para criar citações rápidas sem digitar outros detalhes, basta digitar o comando com o texto desejado."],
+        "exemplos_reais": [
+          {
+            "situacao": "Criar uma quote simples a partir de um texto próprio.",
+            "comando": "<prefix>citar seu texto",
+            "resposta_esperada": "Figura citada criada com sucesso.",
+            "variacao": "Aparece a figurinha com o seu texto formatado como quote."
+          },
+          {
+            "situacao": "Citar uma frase de outro usuário mencionando-o.",
+            "comando": "<prefix>qc @usuário a frase citada",
+            "resposta_esperada": "Figura citada criada com sucesso.",
+            "variacao": "A citação é gerada a partir da mensagem citada."
+          },
+          {
+            "situacao": "Erro de formato ao não informar o texto.",
+            "comando": "<prefix>citar",
+            "resposta_esperada": "Formato de uso inválido. Consulte metodos_de_uso.",
+            "variacao": "O sistema pede para incluir o texto após o comando."
+          }
+        ],
+        "resposta_esperada": ["Figura citada criada com sucesso.", "Formato de uso inválido. Consulte metodos_de_uso.", "Permissão insuficiente para executar este comando."],
+        "erros_comuns_usuario": ["Esquecer de informar o texto após o comando <prefix>citar.", "Usar o comando <prefix>qc sem a estrutura correta (falta @usuario ou texto).", "Texto muito longo ou com caracteres não suportados pela figurinha.", "Não estar logado quando o sistema exigir login Google."],
+        "passos_se_der_erro": ["Verifique se você incluiu o texto após o comando.", "Se usar <prefix>qc, confirme a menção @usuário e o conteúdo a citar.", "Garanta que você está conectado com o Google (login requerido) e tente novamente.", "Se o problema persistir, tente novamente após atualizar a página ou contate o suporte."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     }
   ],

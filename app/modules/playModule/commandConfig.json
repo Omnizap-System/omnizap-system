@@ -357,6 +357,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "tocar",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Tocar reproduz/gera áudio a partir de um link do YouTube ou de um termo de busca. Disponível para todos (não requer premium).",
+        "quando_usar": ["Quando quiser ouvir o áudio de um vídeo do YouTube sem abrir o navegador.", "Quando você tem um link do YouTube e quer ouvir rapidamente no chat.", "Quando prefere buscar por um termo e ouvir o áudio resultante."],
+        "exemplos_reais": [
+          {
+            "situacao": "Usuário tem o link de um vídeo e quer ouvir o áudio.",
+            "comando": "<prefix>tocar https://youtube.com/watch?v=EXEMPLO",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "<prefix>tocar https://youtu.be/EXEMPLO."
+          },
+          {
+            "situacao": "Usuário quer ouvir áudio a partir de um termo de busca.",
+            "comando": "<prefix>tocar melhor trilha sonora de cinema",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "<prefix>tocar <termo de busca>."
+          },
+          {
+            "situacao": "Usuário envia o comando sem argumento ou com formato incorreto.",
+            "comando": "<prefix>tocar",
+            "resposta_esperada": "Formato de uso inválido. Consulte metodos_de_uso.",
+            "variacao": "<prefix>tocar <link>."
+          }
+        ],
+        "resposta_esperada": ["Comando executado com sucesso.", "Formato de uso inválido. Consulte metodos_de_uso.", "Permissão insuficiente para executar este comando."],
+        "erros_comuns_usuario": ["Não fornecer argumento (link ou termo de busca).", "Link não é de vídeo YouTube válido.", "Formato do comando não segue <prefix>tocar <link> ou <prefix>tocar <termo>.", "Não estar logado com a conta Google quando solicitado.", "Conectividade ruim ou serviço temporariamente indisponível."],
+        "passos_se_der_erro": ["Verifique se o comando usa <prefix>tocar <link> ou <prefix>tocar <termo>.", "Copie o link direto do YouTube ou revise o termo de busca.", "Tente novamente em instantes.", "Caso persista, confirme que a conta Google está disponível e tente novamente.", "Se ainda falhar, informe o contexto (link ou termo usado) para suporte."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -575,6 +604,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "tocarvideo",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Baixe ou reproduza vídeos do YouTube a partir de um link ou de termos de busca. Requer login Google e assinatura Premium. O conteúdo fica disponível no chat.",
+        "quando_usar": ["Quando você tem um link do YouTube que quer baixar para assistir no chat.", "Quando prefere buscar um vídeo pelo título/termo de busca em vez de colar o link.", "Antes de usar, confirme que você tem acesso à assinatura Premium."],
+        "exemplos_reais": [
+          {
+            "situacao": "Baixar vídeo a partir de um link do YouTube.",
+            "comando": "<prefix>tocarvideo https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "uso com link direto (alias: playvid)."
+          },
+          {
+            "situacao": "Buscar vídeo pelo termo de busca.",
+            "comando": "<prefix>tocarvideo melhor tutorial de edição de fotos",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "uso com termo de busca."
+          },
+          {
+            "situacao": "Tentar usar sem Premium.",
+            "comando": "<prefix>tocarvideo https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            "resposta_esperada": "Permissão insuficiente para executar este comando.",
+            "variacao": "sem assinatura Premium."
+          }
+        ],
+        "resposta_esperada": ["Comando executado com sucesso.", "Formato de uso inválido. Consulte metodos_de_uso.", "Permissão insuficiente para executar este comando."],
+        "erros_comuns_usuario": ["Esquecer de incluir o link ou termo de busca.", "Enviar link que não é do YouTube.", "Não estar logado com uma conta Google.", "Tentar usar o recurso sem a assinatura Premium."],
+        "passos_se_der_erro": ["Verifique se você está usando o formato correto: <prefix>tocarvideo <link_do_youtube> ou <prefix>tocarvideo <termo>.", "Certifique-se de estar logado com uma conta Google válida.", "Confirme que você possui assinatura Premium ativa para este comando.", "Se o erro persistir, tente novamente após confirmar as informações ou entre em contato com o suporte com a captura de tela do erro."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     }
   ],

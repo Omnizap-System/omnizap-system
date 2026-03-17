@@ -357,6 +357,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "baixartiktok",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Baixe vídeos do TikTok sem marca d'água a partir de URLs, direto no chat.",
+        "quando_usar": ["Quero salvar vídeos do TikTok sem a marca d’água para assistir offline.", "Preciso baixar até 5 vídeos de uma vez.", "Uso rápido: baixar rapidamente sem complicações."],
+        "exemplos_reais": [
+          {
+            "situacao": "Baixar um único vídeo.",
+            "comando": "<prefix>baixartiktok https://www.tiktok.com/@usuario/video/12345",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "<prefix>tt https://tiktok.com/@usuario/video/12345."
+          },
+          {
+            "situacao": "Baixar até 5 vídeos de uma vez.",
+            "comando": "<prefix>tt https://www.tiktok.com/@a/video/1 https://www.tiktok.com/@b/video/2",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "<prefix>baixartiktok https://tiktok.com/@a/video/1 https://tiktok.com/@b/video/2."
+          },
+          {
+            "situacao": "Formato de uso inválido.",
+            "comando": "<prefix>baixartiktok",
+            "resposta_esperada": "Formato de uso inválido. Consulte metodos_de_uso.",
+            "variacao": "<prefix>tt <url> <url> extra."
+          }
+        ],
+        "resposta_esperada": ["Comando executado com sucesso.", "Formato de uso inválido. Consulte metodos_de_uso.", "Permissão insuficiente para executar este comando."],
+        "erros_comuns_usuario": ["Não incluir URL(s) ou incluir mais de 5 URLs.", "Usar URLs que não são do TikTok.", "Esquecer de colocar o prefixo correto do comando.", "Tentar usar sem conexão estável."],
+        "passos_se_der_erro": ["Confira se inseriu entre 1 e 5 URLs válidas do TikTok.", "Use o formato correto: <prefix>baixartiktok <url> ou <prefix>tt <url1> <url2> ...", "Verifique a sua conexão com a internet.", "Se o erro persistir, tente novamente mais tarde ou contate o suporte."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     }
   ],

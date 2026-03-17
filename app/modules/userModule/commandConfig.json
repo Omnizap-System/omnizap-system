@@ -377,6 +377,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "perfil",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Consulta o perfil e estatísticas de um usuário. Exibe dados básicos como nome, bio, foto e métricas rápidas.",
+        "quando_usar": ["Precisa ver informações de alguém no chat.", "Quer confirmar dados de um usuário pelo id, telefone ou menção.", "Antes de agir com base no perfil, verifique as informações obtidas."],
+        "exemplos_reais": [
+          {
+            "situacao": "Ver o próprio perfil.",
+            "comando": "<prefix>perfil perfil",
+            "resposta_esperada": "Perfil exibido com dados básicos do seu usuário.",
+            "variacao": "perfil."
+          },
+          {
+            "situacao": "Consultar perfil por ID.",
+            "comando": "<prefix>perfil perfil 12345",
+            "resposta_esperada": "Perfil do usuário 12345 exibido.",
+            "variacao": "<prefix>perfil perfil 12345."
+          },
+          {
+            "situacao": "Consultar perfil por @contato.",
+            "comando": "<prefix>usuario perfil @joana",
+            "resposta_esperada": "Perfil do contato exibido.",
+            "variacao": "<prefix>usuario perfil @joana."
+          }
+        ],
+        "resposta_esperada": ["Perfil exibido com sucesso com informações básicas e estatísticas.", "Erro: usuário não encontrado ou alvo inválido."],
+        "erros_comuns_usuario": ["Formato de uso inválido. Use <prefix>perfil perfil [alvo].", "Alvo ausente ou inválido (id, telefone ou menção).", "Não autorizado: verifique se está logado com sua conta Google."],
+        "passos_se_der_erro": ["Conferir formato do comando: <prefix>perfil perfil [alvo].", "Verificar o alvo informado (id, telefone ou menção).", "Garantir login com conta Google.", "Se o erro persistir, tente novamente mais tarde ou contate o suporte com o comando utilizado."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     }
   ],

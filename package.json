@@ -73,6 +73,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "validate:command-configs": "node ./scripts/validate-command-configs.mjs",
+    "command-config:ux:openai": "node ./scripts/enrich-command-config-ux-openai.mjs",
     "command-config:schema:generate": "node ./scripts/generate-command-config-schema.mjs",
     "command-config:schema:validate": "node ./scripts/validate-command-config-schema.mjs",
     "format": "node ./scripts/run-prettier-all.mjs --write",

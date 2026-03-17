@@ -2,20 +2,7 @@ import logger from '#logger';
 import { findById, upsert } from '../../../database/index.js';
 import { extractUserIdInfo, resolveUserIdCached, isLidUserId, isWhatsAppUserId } from '../../config/index.js';
 
-const GROUP_METADATA_FIELDS = [
-  'id',
-  'subject',
-  'description',
-  'owner_jid',
-  'creation',
-  'participants',
-  'linked_parent_jid',
-  'is_community',
-  'is_community_announce',
-  'member_add_mode',
-  'join_approval_mode',
-  'addressing_mode',
-];
+const GROUP_METADATA_FIELDS = ['id', 'subject', 'description', 'owner_jid', 'creation', 'participants', 'linked_parent_jid', 'is_community', 'is_community_announce', 'member_add_mode', 'join_approval_mode', 'addressing_mode'];
 
 const PARTICIPANT_ACTIONS = new Set(['add', 'remove', 'promote', 'demote', 'modify']);
 

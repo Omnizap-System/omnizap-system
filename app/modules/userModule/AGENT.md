@@ -7,7 +7,7 @@ Este arquivo e destinado a agentes de IA para gerar respostas no contexto dos co
 - arquivo_base: `app/modules/userModule/commandConfig.json`
 - schema_version: `2.0.0`
 - module_enabled: `true`
-- generated_at: `2026-03-11T02:35:17.177Z`
+- generated_at: `2026-03-17T04:04:14.195Z`
 
 ## Escopo do Modulo
 

@@ -60,6 +60,143 @@ const resolveCategoryMeta = (key) => {
   return { label, icon: '🧩' };
 };
 
+const pickFirstText = (...values) => {
+  for (const value of values) {
+    const text = String(value || '').trim();
+    if (text) return text;
+  }
+  return '';
+};
+
+const ensureSentence = (value) => {
+  const text = String(value || '')
+    .trim()
+    .replace(/\s+/g, ' ');
+  if (!text) return '';
+  if (/[.!?]$/.test(text)) return text;
+  return `${text}.`;
+};
+
+const parseOptionalBoolean = (value) => {
+  if (value === true) return true;
+  if (value === false) return false;
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase();
+  if (!normalized) return null;
+  if (['1', 'true', 'yes', 'sim'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'nao', 'não'].includes(normalized)) return false;
+  return null;
+};
+
+const normalizeUserList = (value) => unique(ensureArray(value).map((item) => String(item || '').trim()));
+
+const normalizeExampleCommand = (value, fallback = '') => {
+  const raw = String(value || '').trim();
+  if (!raw) return String(fallback || '').trim();
+  return raw.replaceAll('<prefix>', '/');
+};
+
+const normalizeUserExample = (value, { fallbackSituation = '', fallbackCommand = '', fallbackExpected = '', fallbackVariation = '' } = {}) => {
+  if (!value) return null;
+
+  if (typeof value === 'string') {
+    const commandText = normalizeExampleCommand(value, fallbackCommand);
+    if (!commandText) return null;
+    return {
+      situacao: ensureSentence(fallbackSituation || 'Exemplo real de uso do comando'),
+      comando: commandText,
+      resposta_esperada: ensureSentence(fallbackExpected || 'O bot confirma a execução'),
+      variacao: ensureSentence(fallbackVariation || ''),
+    };
+  }
+
+  if (typeof value === 'object' && !Array.isArray(value)) {
+    const situacao = pickFirstText(value.situacao, value.cenario, value.contexto, fallbackSituation);
+    const comando = normalizeExampleCommand(pickFirstText(value.comando, value.command, value.uso), fallbackCommand);
+    const respostaEsperada = pickFirstText(value.resposta_esperada, value.expected_response, value.resposta, fallbackExpected);
+    const variacao = pickFirstText(value.variacao, value.outcome_variation, fallbackVariation);
+
+    if (!comando) return null;
+
+    return {
+      situacao: ensureSentence(situacao || 'Exemplo real de uso do comando'),
+      comando,
+      resposta_esperada: ensureSentence(respostaEsperada || 'O bot confirma a execução'),
+      variacao: ensureSentence(variacao || ''),
+    };
+  }
+
+  return null;
+};
+
+const buildUserExperienceContract = ({ commandName = '', description = '', docsSummary = '', usageMethods = [], responses = {}, requirements = {}, premium = false, rawUserExperience = {} } = {}) => {
+  const explicitSummary = pickFirstText(rawUserExperience.resumo_usuario, rawUserExperience.summary, rawUserExperience.resumo_ia);
+  const explicitSummaryOrigin = pickFirstText(rawUserExperience.resumo_usuario_origem, rawUserExperience.summary_origin);
+  const normalizedSummaryOrigin = explicitSummaryOrigin === 'manual' || explicitSummaryOrigin === 'auto_ia_assistida' ? explicitSummaryOrigin : '';
+  const summaryBase = pickFirstText(explicitSummary, docsSummary, description, `Use /${commandName} para executar esta ação no bot`);
+  const resumoUsuario = ensureSentence(summaryBase);
+  const summaryOrigin = normalizedSummaryOrigin || (explicitSummary ? 'manual' : 'auto_ia_assistida');
+  const explicitReviewPending = parseOptionalBoolean(rawUserExperience.resumo_usuario_revisao_pendente);
+
+  const explicitWhenToUse = normalizeUserList(rawUserExperience.quando_usar || rawUserExperience.when_to_use);
+  const descriptionNoPunctuation = String(description || '')
+    .trim()
+    .replace(/[.!?]+$/, '');
+  const descriptionSentence = ensureSentence(descriptionNoPunctuation);
+  const derivedWhenToUse = unique([descriptionSentence ? `Use quando você precisa desta ação: ${descriptionSentence}` : '', requirements.group ? 'Funciona dentro de grupos.' : 'Pode ser usado no privado e em grupo.', requirements.admin ? 'Você precisa ser admin para executar.' : '', requirements.owner ? 'Esse comando é restrito ao admin principal do sistema.' : '', requirements.google_login ? 'É necessário estar logado no sistema para usar.' : '', premium ? 'Disponível para usuários Premium.' : ''].filter(Boolean));
+  const quandoUsar = explicitWhenToUse.length ? explicitWhenToUse : derivedWhenToUse.slice(0, 5);
+
+  const successResponse = ensureSentence(pickFirstText(rawUserExperience.resposta_sucesso, responses.success, responses.sucesso, 'O bot confirma que executou o comando'));
+  const usageErrorResponse = ensureSentence(pickFirstText(rawUserExperience.resposta_uso_incorreto, responses.usage_error, responses.erro_uso, 'Se o formato estiver incorreto, o bot mostra como usar corretamente'));
+  const permissionResponse = ensureSentence(pickFirstText(rawUserExperience.resposta_sem_permissao, responses.permission_error, responses.erro_permissao, premium ? 'Sem plano Premium ativo, o bot informa a restrição de acesso' : 'Sem permissão suficiente, o bot informa o motivo'));
+
+  const explicitExpectedResponses = normalizeUserList(rawUserExperience.resposta_esperada || rawUserExperience.expected_response);
+  const respostaEsperada = explicitExpectedResponses.length ? explicitExpectedResponses : unique([`Sucesso: ${successResponse}`, `Uso incorreto: ${usageErrorResponse}`, `Permissão: ${permissionResponse}`]);
+
+  const explicitExamples = ensureArray(rawUserExperience.exemplos_reais || rawUserExperience.real_examples);
+  const defaultSituation = descriptionSentence ? `Cenário comum: ${descriptionSentence}` : `Cenário comum: você quer usar /${commandName} no dia a dia.`;
+  const fallbackUsageMethods = usageMethods.length ? usageMethods : [`/${commandName}`];
+  let exemplosReais = explicitExamples
+    .map((example) =>
+      normalizeUserExample(example, {
+        fallbackSituation: defaultSituation,
+        fallbackCommand: fallbackUsageMethods[0] || `/${commandName}`,
+        fallbackExpected: successResponse,
+        fallbackVariation: usageErrorResponse,
+      }),
+    )
+    .filter(Boolean);
+
+  if (!exemplosReais.length) {
+    exemplosReais = fallbackUsageMethods.slice(0, 3).map((usageMethod, index) => ({
+      situacao: ensureSentence(index === 0 ? defaultSituation : `Variação ${index + 1} de uso do comando no mesmo contexto`),
+      comando: normalizeExampleCommand(usageMethod, `/${commandName}`),
+      resposta_esperada: successResponse,
+      variacao: usageErrorResponse,
+    }));
+  }
+
+  const explicitCommonErrors = normalizeUserList(rawUserExperience.erros_comuns_usuario || rawUserExperience.common_user_errors);
+  const derivedCommonErrors = unique(['Digitar o comando fora do formato esperado.', requirements.group ? 'Tentar executar fora de um grupo.' : '', requirements.admin ? 'Tentar executar sem ser admin.' : '', requirements.owner ? 'Tentar executar sem ser admin principal do sistema.' : '', requirements.google_login ? 'Tentar usar sem estar logado no sistema.' : '', premium ? 'Tentar usar sem acesso Premium ativo.' : ''].filter(Boolean));
+  const errosComunsUsuario = explicitCommonErrors.length ? explicitCommonErrors : derivedCommonErrors.slice(0, 5);
+
+  const explicitErrorSteps = normalizeUserList(rawUserExperience.passos_se_der_erro || rawUserExperience.error_steps);
+  const fallbackErrorSteps = ['Copie e teste um exemplo pronto desta página.', 'Confira se você está no local certo (grupo/privado) e com a permissão necessária.', premium ? 'Verifique se seu acesso Premium está ativo.' : '', 'Se ainda falhar, fale com o admin do sistema no privado.'].filter(Boolean);
+  const passosSeDerErro = explicitErrorSteps.length ? explicitErrorSteps : fallbackErrorSteps;
+
+  return {
+    resumo_usuario: resumoUsuario,
+    quando_usar: quandoUsar,
+    exemplos_reais: exemplosReais,
+    resposta_esperada: respostaEsperada,
+    erros_comuns_usuario: errosComunsUsuario,
+    passos_se_der_erro: passosSeDerErro,
+    resumo_usuario_origem: summaryOrigin,
+    resumo_usuario_revisao_pendente: explicitReviewPending ?? summaryOrigin !== 'manual',
+  };
+};
+
 const deepMerge = (target, source) => {
   if (!source) return target;
   const output = { ...target };
@@ -162,6 +299,23 @@ const sanitizeCommand = ({ command: rawCommand, moduleDefaults, moduleDirName, m
   const sideEffects = unique([...ensureArray(command?.efeitos_colaterais), ...ensureArray(command?.side_effects)]);
 
   const responses = deepMerge(moduleDefaults?.responses || moduleDefaults?.respostas_padrao || {}, command?.responses || command?.respostas_padrao || {});
+  const userExperienceSeed = deepMerge(moduleDefaults?.user_experience || moduleDefaults?.experiencia_usuario || {}, command?.user_experience || command?.experiencia_usuario || {});
+  if (command?.resumo_usuario !== undefined) userExperienceSeed.resumo_usuario = command.resumo_usuario;
+  if (command?.quando_usar !== undefined) userExperienceSeed.quando_usar = command.quando_usar;
+  if (command?.exemplos_reais !== undefined) userExperienceSeed.exemplos_reais = command.exemplos_reais;
+  if (command?.resposta_esperada !== undefined) userExperienceSeed.resposta_esperada = command.resposta_esperada;
+  if (command?.erros_comuns_usuario !== undefined) userExperienceSeed.erros_comuns_usuario = command.erros_comuns_usuario;
+  if (command?.passos_se_der_erro !== undefined) userExperienceSeed.passos_se_der_erro = command.passos_se_der_erro;
+  const userExperience = buildUserExperienceContract({
+    commandName,
+    description: String(command?.description || command?.descricao || '').trim(),
+    docsSummary: String(command?.docs?.summary || '').trim(),
+    usageMethods,
+    responses,
+    requirements,
+    premium,
+    rawUserExperience: userExperienceSeed,
+  });
 
   const observability = deepMerge(moduleDefaults?.observability || {}, command?.observability || {});
   const privacy = deepMerge(moduleDefaults?.privacy || {}, command?.privacy || {});
@@ -185,6 +339,7 @@ const sanitizeCommand = ({ command: rawCommand, moduleDefaults, moduleDirName, m
     subcomandos: unique(ensureArray(command?.subcomandos).map((item) => String(item).trim())),
     metodos_de_uso: usageMethods,
     mensagens_uso: normalizedUsageVariants,
+    ...userExperience,
     arguments: args,
     responses,
     technical: {

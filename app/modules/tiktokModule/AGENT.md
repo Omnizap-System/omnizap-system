@@ -7,7 +7,7 @@ Este arquivo e destinado a agentes de IA para gerar respostas no contexto dos co
 - arquivo_base: `app/modules/tiktokModule/commandConfig.json`
 - schema_version: `2.0.0`
 - module_enabled: `true`
-- generated_at: `2026-03-11T02:35:17.177Z`
+- generated_at: `2026-03-17T04:04:14.195Z`
 
 ## Escopo do Modulo
 
@@ -168,7 +168,7 @@ Este arquivo e destinado a agentes de IA para gerar respostas no contexto dos co
 - docs:
 - summary: Baixa midia do TikTok sem marca d'agua.
 - usage_examples: <prefix>baixartiktok <url>, <prefix>tt <url1> <url2>
-- usage*variants.default: 🎬 \_Baixartiktok Downloader*, , Uso: _<prefix>baixartiktok <link1> [link2 ...]_, , Exemplo: _<prefix>baixartiktok https://www.baixartiktok.com/@usuario/video/123_
+- usage_variants.default: 🎬 _Baixartiktok Downloader_, , Uso: _<prefix>baixartiktok <link1> [link2 ...]_, , Exemplo: _<prefix>baixartiktok https://www.baixartiktok.com/@usuario/video/123_
 - behavior:
 - type: argument_driven
 - allowed_actions: (nenhum)

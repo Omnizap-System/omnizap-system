@@ -30,11 +30,76 @@ const CommandDetailsPage = ({ command, onClose, devMode }) => {
   if (!command) return null;
   const [copyStatus, setCopyStatus] = useState({});
 
+  const toList = (value) => {
+    if (!Array.isArray(value)) return [];
+    return value.map((item) => String(item || '').trim()).filter(Boolean);
+  };
+
+  const metodosDeUso = toList(command.metodos_de_uso);
+  const resumoUsuario = String(command.resumo_usuario || command.descricao || `Use /${command.name} para executar esta ação.`).trim();
+  const resumoOrigem = String(command.resumo_usuario_origem || '').trim();
+  const resumoPendente = Boolean(command.resumo_usuario_revisao_pendente);
+
+  const quandoUsar = toList(command.quando_usar);
+  const respostaEsperada = toList(command.resposta_esperada);
+  const errosComuns = toList(command.erros_comuns_usuario);
+  const passosErro = toList(command.passos_se_der_erro);
+
+  const fallbackUso = metodosDeUso[0] || `/${command.name}`;
+  const exemplosReais = (Array.isArray(command.exemplos_reais) ? command.exemplos_reais : [])
+    .map((example, index) => {
+      if (typeof example === 'string') {
+        const comando = String(example || '').trim();
+        if (!comando) return null;
+        return {
+          situacao: `Exemplo real ${index + 1} para usar o comando.`,
+          comando,
+          resposta_esperada: respostaEsperada[0] || 'O bot confirma a execução com uma resposta clara.',
+          variacao: '',
+        };
+      }
+
+      if (!example || typeof example !== 'object' || Array.isArray(example)) return null;
+
+      const situacao = String(example.situacao || example.cenario || example.contexto || '').trim();
+      const comando = String(example.comando || example.command || example.uso || '').trim();
+      const resposta = String(example.resposta_esperada || example.expected_response || example.resposta || '').trim();
+      const variacao = String(example.variacao || example.outcome_variation || '').trim();
+
+      if (!comando) return null;
+      return {
+        situacao: situacao || `Exemplo real ${index + 1} para usar o comando.`,
+        comando,
+        resposta_esperada: resposta || respostaEsperada[0] || 'O bot responde confirmando o resultado.',
+        variacao,
+      };
+    })
+    .filter(Boolean);
+
+  if (!exemplosReais.length) {
+    exemplosReais.push({
+      situacao: `Você quer usar /${command.name} no dia a dia.`,
+      comando: fallbackUso,
+      resposta_esperada: respostaEsperada[0] || 'O bot responde confirmando o resultado.',
+      variacao: respostaEsperada[1] || '',
+    });
+  }
+
+  const quandoUsarComFallback = quandoUsar.length ? quandoUsar : [`Quando você precisa executar ${command.descricao || `a ação do comando /${command.name}`}.`, command.requirements?.group ? 'Use dentro de grupos.' : 'Pode ser usado em grupo ou no privado.', command.premium ? 'Disponível para usuários Premium.' : ''].filter(Boolean);
+
+  const respostaEsperadaComFallback = respostaEsperada.length ? respostaEsperada : ['Sucesso: o bot confirma a execução.', 'Formato incorreto: o bot mostra como usar corretamente.', 'Permissão: o bot informa quando faltar acesso.'];
+
+  const errosComunsComFallback = errosComuns.length ? errosComuns : ['Digitar o comando fora do formato esperado.', command.requirements?.group ? 'Tentar usar fora de grupo.' : '', command.requirements?.admin ? 'Tentar usar sem ser admin.' : '', command.premium ? 'Tentar usar sem plano Premium ativo.' : ''].filter(Boolean);
+
+  const passosErroComFallback = passosErro.length ? passosErro : ['Copie um exemplo desta página e teste sem alterar.', 'Confira se você está no local correto (grupo ou privado).', 'Se continuar com erro, fale com o admin no privado.'];
+
   const handleCopy = (text, id) => {
-    navigator.clipboard.writeText(text);
-    setCopyStatus({ ...copyStatus, [id]: true });
+    const copyText = String(text || '').trim();
+    if (!copyText) return;
+    navigator.clipboard?.writeText(copyText).catch(() => {});
+    setCopyStatus((prev) => ({ ...prev, [id]: true }));
     setTimeout(() => {
-      setCopyStatus({ ...copyStatus, [id]: false });
+      setCopyStatus((prev) => ({ ...prev, [id]: false }));
     }, 2000);
   };
 
@@ -102,107 +167,222 @@ const CommandDetailsPage = ({ command, onClose, devMode }) => {
 
           <section className="space-y-6">
             <div className="flex items-center gap-4">
-              <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-white/20">Como usar agora</h3>
+              <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-white/20">Resumo rápido</h3>
               <div className="flex-1 h-px bg-white/5"></div>
             </div>
-            <div className="grid gap-4">
-              ${(command.metodos_de_uso || []).map(
-                (usage, idx) => html`
-                  <div key=${idx} className="group relative">
-                    <div className="absolute inset-0 bg-primary/5 blur-xl opacity-0 group-hover:opacity-100 transition-opacity rounded-[1.5rem] sm:rounded-[2.5rem]"></div>
-                    <div className="relative flex flex-col sm:flex-row items-stretch sm:items-center gap-0 sm:gap-4 p-1 rounded-[1.5rem] sm:rounded-[2rem] bg-white/[0.03] border border-white/5 group-hover:border-primary/30 transition-all duration-300">
-                      <code className="flex-1 px-5 py-4 sm:px-6 sm:py-6 font-mono text-sm sm:text-base text-primary/80 break-all leading-relaxed"> ${usage} </code>
-                      <button onClick=${() => handleCopy(usage, `usage-${idx}`)} className=${`px-8 py-3.5 sm:py-6 rounded-2xl sm:rounded-r-[1.8rem] sm:rounded-l-none font-black text-[10px] uppercase tracking-widest transition-all ${copyStatus[`usage-${idx}`] ? 'bg-success text-white' : 'bg-white/5 hover:bg-primary hover:text-primary-content'}`}>${copyStatus[`usage-${idx}`] ? 'Copiado!' : 'Copiar'}</button>
-                    </div>
+            <div className="relative p-6 sm:p-8 rounded-[1.5rem] sm:rounded-[2rem] bg-white/[0.03] border border-white/10 space-y-4 overflow-hidden">
+              <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full bg-primary/10 blur-3xl"></div>
+              <div className="relative flex flex-wrap items-center gap-2">${resumoPendente && html` <span className="badge badge-info badge-sm h-7 px-3 font-bold uppercase tracking-wider">Resumo por IA · Revisão pendente</span> `} ${!resumoPendente && resumoOrigem === 'manual' && html` <span className="badge badge-success badge-sm h-7 px-3 font-bold uppercase tracking-wider">Resumo revisado</span> `}</div>
+              <p className="relative text-base sm:text-lg text-white/80 leading-relaxed">${resumoUsuario}</p>
+            </div>
+          </section>
+
+          <section className="space-y-6">
+            <div className="flex items-center gap-4">
+              <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-white/20">Quando usar</h3>
+              <div className="flex-1 h-px bg-white/5"></div>
+            </div>
+            <div className="grid gap-3">
+              ${quandoUsarComFallback.map(
+                (item, idx) => html`
+                  <div key=${`when-${idx}`} className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 flex items-start gap-3">
+                    <span className="mt-0.5 text-primary">•</span>
+                    <p className="text-sm sm:text-base text-white/75 leading-relaxed">${item}</p>
                   </div>
                 `,
               )}
             </div>
           </section>
 
-          ${command.arguments?.length > 0 &&
-          html`
-            <section className="space-y-6">
-              <div className="flex items-center gap-4">
-                <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-white/20">Configurações e Argumentos</h3>
-                <div className="flex-1 h-px bg-white/5"></div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                ${command.arguments.map(
-                  (arg) => html`
-                    <div key=${arg.name} className="group p-5 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] bg-white/[0.02] border border-white/5 hover:border-primary/20 transition-all duration-300">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="space-y-1">
-                          <h4 className="text-base sm:text-lg font-black text-white group-hover:text-primary transition-colors">${arg.name}</h4>
-                          <span className="inline-block text-[9px] font-bold text-white/30 font-mono uppercase tracking-widest bg-white/5 px-2 py-0.5 rounded"> Type: ${arg.type} </span>
-                        </div>
-                        <span className=${`text-[8px] font-black uppercase px-2.5 py-1 rounded-full border ${arg.required ? 'bg-error/10 text-error border-error/20' : 'bg-white/5 text-white/30 border-white/10'}`}> ${arg.required ? 'Obrigatório' : 'Opcional'} </span>
-                      </div>
-                      <p className="text-xs sm:text-sm text-white/50 font-medium leading-relaxed">${arg.description}</p>
+          <section className="space-y-6">
+            <div className="flex items-center gap-4">
+              <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-white/20">Exemplos reais</h3>
+              <div className="flex-1 h-px bg-white/5"></div>
+            </div>
+            <div className="grid gap-5">
+              ${exemplosReais.map(
+                (example, idx) => html`
+                  <article key=${`example-${idx}`} className="p-5 sm:p-6 rounded-[1.5rem] bg-white/[0.03] border border-white/10 space-y-5">
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-black uppercase tracking-[0.2em] text-primary/70">Situação real</p>
+                      <p className="text-sm sm:text-base text-white/80 leading-relaxed">${example.situacao}</p>
                     </div>
-                  `,
-                )}
-              </div>
-            </section>
-          `}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-6">
-            <section className="p-6 sm:p-8 rounded-[1.5rem] sm:rounded-[2.5rem] bg-white/[0.02] border border-white/5 space-y-6 relative overflow-hidden group">
-              <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-primary/5 blur-2xl rounded-full group-hover:bg-primary/10 transition-colors"></div>
-              <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/30 relative z-10">Specs Técnicas</h3>
-              <div className="grid grid-cols-2 gap-y-6 sm:gap-y-8 relative z-10">
-                <div>
-                  <p className="text-[9px] font-bold uppercase text-white/20 mb-1 tracking-widest">Versão</p>
-                  <p className="text-sm sm:text-base font-black text-white">${command.technical?.version || '1.0.0'}</p>
-                </div>
-                <div>
-                  <p className="text-[9px] font-bold uppercase text-white/20 mb-1 tracking-widest">Estabilidade</p>
-                  <p className="text-sm sm:text-base font-black text-emerald-400">${command.technical?.stability || 'Stable'}</p>
-                </div>
-                <div>
-                  <p className="text-[9px] font-bold uppercase text-white/20 mb-1 tracking-widest">Risco</p>
-                  <p className="text-sm sm:text-base font-black ${command.technical?.risk_level !== 'low' ? 'text-rose-500' : 'text-emerald-400'}">${command.technical?.risk_level?.toUpperCase() || 'LOW'}</p>
-                </div>
-                <div>
-                  <p className="text-[9px] font-bold uppercase text-white/20 mb-1 tracking-widest">ID Sistema</p>
-                  <p className="text-[10px] font-mono font-bold text-white/40 truncate" title=${command.id}>${command.id}</p>
-                </div>
-              </div>
-            </section>
+                    <div className="space-y-2">
+                      <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/40">Comando pronto</p>
+                      <div className="relative flex flex-col sm:flex-row items-stretch sm:items-center gap-0 sm:gap-4 p-1 rounded-2xl bg-[#0b1124] border border-white/10">
+                        <code className="flex-1 px-5 py-4 sm:px-6 sm:py-4 font-mono text-sm text-primary/80 break-all leading-relaxed">${example.comando}</code>
+                        <button onClick=${() => handleCopy(example.comando, `example-cmd-${idx}`)} className=${`px-8 py-3.5 rounded-2xl sm:rounded-r-[1.2rem] sm:rounded-l-none font-black text-[10px] uppercase tracking-widest transition-all ${copyStatus[`example-cmd-${idx}`] ? 'bg-success text-white' : 'bg-white/5 hover:bg-primary hover:text-primary-content'}`}>${copyStatus[`example-cmd-${idx}`] ? 'Copiado!' : 'Copiar'}</button>
+                      </div>
+                    </div>
 
-            ${command.technical?.collected_data?.length > 0 &&
-            html`
-              <section className="p-6 sm:p-8 rounded-[1.5rem] sm:rounded-[2.5rem] bg-white/[0.02] border border-white/5 space-y-6 relative overflow-hidden group">
-                <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-emerald-500/5 blur-2xl rounded-full group-hover:bg-emerald-500/10 transition-colors"></div>
-                <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/30 relative z-10">Privacidade e Dados</h3>
-                <div className="flex flex-wrap gap-2 relative z-10">${command.technical.collected_data.map((data) => html` <span key=${data} className="text-[10px] font-bold bg-white/5 px-4 py-2 rounded-xl border border-white/10 text-white/60">${data}</span> `)}</div>
-                <p className="text-[9px] text-white/20 font-medium leading-relaxed italic relative z-10">* Estes dados são processados apenas para execução do comando.</p>
-              </section>
-            `}
-          </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
+                        <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/40 mb-2">Resposta esperada</p>
+                        <p className="text-sm text-white/75 leading-relaxed">${example.resposta_esperada}</p>
+                      </div>
+                      <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
+                        <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/40 mb-2">Variação possível</p>
+                        <p className="text-sm text-white/75 leading-relaxed">${example.variacao || 'Se faltar parâmetro ou permissão, o bot explica o próximo passo para corrigir.'}</p>
+                      </div>
+                    </div>
+                  </article>
+                `,
+              )}
+            </div>
+          </section>
 
-          ${devMode &&
-          html`
-            <section className="space-y-6 animate-in slide-in-from-bottom-8 duration-1000">
-              <div className="flex items-center gap-4">
-                <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-warning/30">Developer Metadata</h3>
-                <div className="flex-1 h-px bg-warning/10"></div>
-              </div>
-              <div className="relative group">
-                <div className="absolute inset-0 bg-warning/5 blur-3xl opacity-20"></div>
-                <div className="relative bg-[#020617] border border-warning/10 rounded-[1.5rem] sm:rounded-[2.5rem] overflow-hidden">
-                  <div className="bg-warning/5 px-6 sm:px-8 py-3 border-b border-warning/10 flex items-center justify-between">
-                    <span className="text-[9px] font-black uppercase tracking-widest text-warning/60 font-mono">command_schema.json</span>
-                    <button onClick=${() => handleCopy(JSON.stringify(command, null, 2), 'raw-json')} className=${`text-[9px] font-black uppercase tracking-widest transition-colors ${copyStatus['raw-json'] ? 'text-success' : 'text-warning/40 hover:text-warning'}`}>${copyStatus['raw-json'] ? 'Copiado!' : 'Copiar JSON'}</button>
+          <section className="space-y-6">
+            <div className="flex items-center gap-4">
+              <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-white/20">O que esperar de resposta</h3>
+              <div className="flex-1 h-px bg-white/5"></div>
+            </div>
+            <div className="grid gap-3">
+              ${respostaEsperadaComFallback.map(
+                (item, idx) => html`
+                  <div key=${`expected-${idx}`} className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 flex items-start gap-3">
+                    <span className="mt-0.5 text-emerald-400">✓</span>
+                    <p className="text-sm sm:text-base text-white/75 leading-relaxed">${item}</p>
                   </div>
-                  <pre className="p-6 sm:p-8 font-mono text-[9px] sm:text-[11px] text-warning/70 overflow-x-auto max-h-[400px] scrollbar-thin scrollbar-thumb-warning/20">
-                    ${JSON.stringify(command, null, 2)}
-                  </pre
-                  >
+                `,
+              )}
+            </div>
+          </section>
+
+          <section className="space-y-6">
+            <div className="flex items-center gap-4">
+              <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-white/20">Se der erro</h3>
+              <div className="flex-1 h-px bg-white/5"></div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <div className="p-5 rounded-[1.3rem] bg-white/[0.03] border border-white/10 space-y-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-300">Erros comuns</p>
+                <div className="space-y-2">
+                  ${errosComunsComFallback.map(
+                    (item, idx) => html`
+                      <div key=${`common-error-${idx}`} className="text-sm text-white/75 leading-relaxed flex items-start gap-2">
+                        <span className="text-amber-300">•</span>
+                        <span>${item}</span>
+                      </div>
+                    `,
+                  )}
                 </div>
               </div>
-            </section>
-          `}
+
+              <div className="p-5 rounded-[1.3rem] bg-white/[0.03] border border-white/10 space-y-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">O que fazer agora</p>
+                <div className="space-y-2">
+                  ${passosErroComFallback.map(
+                    (item, idx) => html`
+                      <div key=${`error-step-${idx}`} className="text-sm text-white/75 leading-relaxed flex items-start gap-2">
+                        <span className="text-primary font-black">${idx + 1}.</span>
+                        <span>${item}</span>
+                      </div>
+                    `,
+                  )}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <details className="group rounded-[1.5rem] border border-white/10 bg-white/[0.02] open:bg-white/[0.03] transition-colors">
+            <summary className="list-none cursor-pointer px-6 py-5 flex items-center justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">Área técnica</p>
+                <p className="text-xs text-white/50 mt-1">Especificações avançadas e metadados do comando.</p>
+              </div>
+              <span className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center group-open:rotate-180 transition-transform">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" /></svg>
+              </span>
+            </summary>
+
+            <div className="px-6 pb-6 space-y-6">
+              ${metodosDeUso.length > 0 &&
+              html`
+                <section className="space-y-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Como usar agora</p>
+                  <div className="grid gap-3">
+                    ${metodosDeUso.map(
+                      (usage, idx) => html`
+                        <div key=${idx} className="relative flex flex-col sm:flex-row items-stretch sm:items-center gap-0 sm:gap-4 p-1 rounded-2xl bg-[#0b1124] border border-white/10">
+                          <code className="flex-1 px-5 py-4 sm:px-6 sm:py-4 font-mono text-sm text-primary/80 break-all leading-relaxed">${usage}</code>
+                          <button onClick=${() => handleCopy(usage, `usage-${idx}`)} className=${`px-8 py-3.5 rounded-2xl sm:rounded-r-[1.2rem] sm:rounded-l-none font-black text-[10px] uppercase tracking-widest transition-all ${copyStatus[`usage-${idx}`] ? 'bg-success text-white' : 'bg-white/5 hover:bg-primary hover:text-primary-content'}`}>${copyStatus[`usage-${idx}`] ? 'Copiado!' : 'Copiar'}</button>
+                        </div>
+                      `,
+                    )}
+                  </div>
+                </section>
+              `}
+              ${command.arguments?.length > 0 &&
+              html`
+                <section className="space-y-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Argumentos</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    ${command.arguments.map(
+                      (arg) => html`
+                        <div key=${arg.name} className="p-4 rounded-2xl bg-white/[0.02] border border-white/10">
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <h4 className="text-sm font-black text-white">${arg.name}</h4>
+                            <span className=${`text-[8px] font-black uppercase px-2 py-1 rounded-full border ${arg.required ? 'bg-error/10 text-error border-error/20' : 'bg-white/5 text-white/40 border-white/10'}`}>${arg.required ? 'Obrigatório' : 'Opcional'}</span>
+                          </div>
+                          <p className="text-[10px] font-mono text-white/40 uppercase tracking-wider mb-2">Tipo: ${arg.type}</p>
+                          <p className="text-sm text-white/65 leading-relaxed">${arg.description}</p>
+                        </div>
+                      `,
+                    )}
+                  </div>
+                </section>
+              `}
+
+              <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/10 space-y-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Specs técnicas</p>
+                  <div className="grid grid-cols-2 gap-y-4">
+                    <div>
+                      <p className="text-[9px] font-bold uppercase text-white/20 mb-1 tracking-widest">Versão</p>
+                      <p className="text-sm font-black text-white">${command.technical?.version || '1.0.0'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-bold uppercase text-white/20 mb-1 tracking-widest">Estabilidade</p>
+                      <p className="text-sm font-black text-emerald-400">${command.technical?.stability || 'stable'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-bold uppercase text-white/20 mb-1 tracking-widest">Risco</p>
+                      <p className="text-sm font-black ${command.technical?.risk_level !== 'low' ? 'text-rose-500' : 'text-emerald-400'}">${command.technical?.risk_level?.toUpperCase() || 'LOW'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-bold uppercase text-white/20 mb-1 tracking-widest">ID Sistema</p>
+                      <p className="text-[10px] font-mono font-bold text-white/40 break-all">${command.id}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-white/[0.02] border border-white/10 space-y-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Privacidade e dados</p>
+                  ${(command.technical?.collected_data || []).length > 0
+                    ? html`
+                        <div className="flex flex-wrap gap-2">${command.technical.collected_data.map((data) => html` <span key=${data} className="text-[10px] font-bold bg-white/5 px-3 py-1.5 rounded-lg border border-white/10 text-white/60">${data}</span> `)}</div>
+                        <p className="text-[10px] text-white/40 leading-relaxed">Dados processados apenas para executar a funcionalidade solicitada.</p>
+                      `
+                    : html`<p className="text-sm text-white/60 leading-relaxed">Este comando não expõe dados técnicos adicionais de coleta.</p>`}
+                </div>
+              </section>
+
+              ${devMode &&
+              html`
+                <section className="space-y-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-warning/50">Developer Metadata</p>
+                  <div className="relative bg-[#020617] border border-warning/10 rounded-2xl overflow-hidden">
+                    <div className="bg-warning/5 px-4 py-3 border-b border-warning/10 flex items-center justify-between gap-4">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-warning/60 font-mono">command_schema.json</span>
+                      <button onClick=${() => handleCopy(JSON.stringify(command, null, 2), 'raw-json')} className=${`text-[9px] font-black uppercase tracking-widest transition-colors ${copyStatus['raw-json'] ? 'text-success' : 'text-warning/40 hover:text-warning'}`}>${copyStatus['raw-json'] ? 'Copiado!' : 'Copiar JSON'}</button>
+                    </div>
+                    <pre className="p-4 sm:p-6 font-mono text-[9px] sm:text-[11px] text-warning/70 overflow-x-auto max-h-[380px] scrollbar-thin scrollbar-thumb-warning/20">${JSON.stringify(command, null, 2)}</pre>
+                  </div>
+                </section>
+              `}
+            </div>
+          </details>
 
           <div className="pt-8 sm:pt-12 pb-20 text-center">
             <button onClick=${onClose} className="group relative inline-flex items-center justify-center w-full sm:w-auto">

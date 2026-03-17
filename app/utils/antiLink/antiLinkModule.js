@@ -671,7 +671,7 @@ const isMissingCanonicalSenderColumnError = (error) => {
   const errno = Number(error?.errno || 0);
   if (errno === 1054) return true;
   const message = String(error?.message || '').toLowerCase();
-  return message.includes('canonical_sender_id') && (message.includes('unknown column') || message.includes('doesn\'t exist'));
+  return message.includes('canonical_sender_id') && (message.includes('unknown column') || message.includes("doesn't exist"));
 };
 
 const isSenderInCandidates = (senderJid, senderCandidates = []) => {

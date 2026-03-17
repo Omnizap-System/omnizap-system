@@ -7,7 +7,7 @@ Este arquivo e destinado a agentes de IA para gerar respostas no contexto dos co
 - arquivo_base: `app/modules/waifuPicsModule/commandConfig.json`
 - schema_version: `2.0.0`
 - module_enabled: `true`
-- generated_at: `2026-03-11T02:35:17.177Z`
+- generated_at: `2026-03-17T04:04:14.195Z`
 
 ## Escopo do Modulo
 
@@ -90,9 +90,9 @@ Este arquivo e destinado a agentes de IA para gerar respostas no contexto dos co
 - <prefix>wp neko
 - mensagens_uso (variantes):
 - default:
-- 💡 _Uso:_ <prefix>waifu <categoria>
-  Exemplo: <prefix>waifu neko
-- Dica: Use <prefix>waifuajuda para ver todas as categorias! 🎨
+- 🖼️ _Como usar:_ <prefix>waifu <categoria>
+- Exemplos rápidos: <prefix>waifu neko | <prefix>wp hug
+- Quer ver todas as categorias disponíveis? Use <prefix>waifuajuda.
 - subcomandos:
 - (nenhum)
 - argumentos:
@@ -125,12 +125,22 @@ Este arquivo e destinado a agentes de IA para gerar respostas no contexto dos co
 - consulta API externa
 - envia imagem no chat
 - respostas_padrao:
-- success: Prontinho! Aqui está sua imagem. ✨
-- usage_error: Ops! Parece que você esqueceu a categoria. Use <prefix>waifuajuda para ver as opções disponíveis. 🧐
-- permission_error: Eita! Você não tem permissão para usar este comando. Entre em contato com um administrador. 🔐
-- sucesso: Comando executado com sucesso.
-- erro_uso: Formato de uso inválido. Consulte metodos_de_uso.
-- erro_permissao: Permissão insuficiente para executar este comando.
+- success: ✅ Pedido recebido! Aqui vai sua imagem.
+  Dica: você pode pedir outra categoria no próximo comando (ex.: <prefix>waifu neko).
+- usage_error: ❗ Não entendi o formato do comando.
+  Exemplos:
+  • <prefix>waifu neko
+  • <prefix>waifunsfw waifu
+  Para ver todas as categorias: <prefix>waifuajuda
+- permission_error: 🔒 Este comando não está liberado para você neste contexto.
+  Se for NSFW em grupo, peça para um admin usar <prefix>nsfw on.
+- sucesso: ✅ Imagem enviada com sucesso!
+  Exemplo de próximo pedido: <prefix>waifu hug
+- erro_uso: ❗ Categoria inválida ou ausente.
+  Exemplos: <prefix>waifu neko | <prefix>wp waifu
+  Veja a lista completa em <prefix>waifuajuda.
+- erro_permissao: 🔒 Não consegui liberar este pedido para seu perfil.
+  Se achar que é engano, verifique seu plano e tente novamente.
 - mensagens_sistema:
 - (nao informado)
 - limites_operacionais:
@@ -211,9 +221,9 @@ Este arquivo e destinado a agentes de IA para gerar respostas no contexto dos co
 - <prefix>wpnsfw waifu
 - mensagens_uso (variantes):
 - default:
-- 🔞 _Uso:_ <prefix>waifunsfw <categoria>
-  Exemplo: <prefix>wpnsfw blowjob
-- Atenção: O grupo deve estar com NSFW ligado!
+- 🔞 _Como usar:_ <prefix>waifunsfw <categoria>
+- Exemplos rápidos: <prefix>waifunsfw waifu | <prefix>wpnsfw neko
+- Pré-requisitos: plano Premium; em grupo, NSFW ativo com <prefix>nsfw on.
 - subcomandos:
 - (nenhum)
 - argumentos:
@@ -247,12 +257,22 @@ Este arquivo e destinado a agentes de IA para gerar respostas no contexto dos co
 - consulta API externa
 - envia imagem NSFW no chat
 - respostas_padrao:
-- success: Prontinho! Aqui está sua imagem. ✨
-- usage_error: Ops! Parece que você esqueceu a categoria. Use <prefix>waifuajuda para ver as opções disponíveis. 🧐
-- permission_error: Eita! Você não tem permissão para usar este comando. Entre em contato com um administrador. 🔐
-- sucesso: Comando executado com sucesso.
-- erro_uso: Formato de uso inválido. Consulte metodos_de_uso.
-- erro_permissao: Permissão insuficiente para executar este comando.
+- success: ✅ Pedido recebido! Aqui vai sua imagem.
+  Dica: você pode pedir outra categoria no próximo comando (ex.: <prefix>waifu neko).
+- usage_error: ❗ Não entendi o formato do comando.
+  Exemplos:
+  • <prefix>waifu neko
+  • <prefix>waifunsfw waifu
+  Para ver todas as categorias: <prefix>waifuajuda
+- permission_error: 🔒 Este comando não está liberado para você neste contexto.
+  Se for NSFW em grupo, peça para um admin usar <prefix>nsfw on.
+- sucesso: 🔞 Imagem NSFW enviada.
+  Exemplo de próximo pedido: <prefix>waifunsfw neko
+- erro_uso: ❗ Categoria NSFW inválida ou ausente.
+  Exemplos: <prefix>waifunsfw waifu | <prefix>wpnsfw neko
+  Veja opções em <prefix>waifuajuda.
+- erro_permissao: 🔒 Este comando NSFW exige acesso Premium.
+  Em grupos, também é preciso NSFW ativo com <prefix>nsfw on.
 - mensagens_sistema:
 - (nao informado)
 - limites_operacionais:
@@ -332,8 +352,9 @@ Este arquivo e destinado a agentes de IA para gerar respostas no contexto dos co
 - <prefix>waifuajuda
 - mensagens_uso (variantes):
 - default:
-- 📖 _Guia Rápido:_ Digite <prefix>waifuajuda para ver as categorias SFW e NSFW disponíveis.
-- Use <prefix>waifu <categoria> para receber uma imagem!
+- 📖 _Como usar:_ <prefix>waifuajuda
+- Depois do guia, teste: <prefix>waifu neko
+- Para NSFW: <prefix>waifunsfw waifu (Premium; em grupo exige <prefix>nsfw on).
 - subcomandos:
 - (nenhum)
 - argumentos:
@@ -364,12 +385,21 @@ Este arquivo e destinado a agentes de IA para gerar respostas no contexto dos co
 - efeitos_colaterais:
 - envia mensagem de ajuda
 - respostas_padrao:
-- success: Prontinho! Aqui está sua imagem. ✨
-- usage_error: Ops! Parece que você esqueceu a categoria. Use <prefix>waifuajuda para ver as opções disponíveis. 🧐
-- permission_error: Eita! Você não tem permissão para usar este comando. Entre em contato com um administrador. 🔐
-- sucesso: Comando executado com sucesso.
-- erro_uso: Formato de uso inválido. Consulte metodos_de_uso.
-- erro_permissao: Permissão insuficiente para executar este comando.
+- success: ✅ Pedido recebido! Aqui vai sua imagem.
+  Dica: você pode pedir outra categoria no próximo comando (ex.: <prefix>waifu neko).
+- usage_error: ❗ Não entendi o formato do comando.
+  Exemplos:
+  • <prefix>waifu neko
+  • <prefix>waifunsfw waifu
+  Para ver todas as categorias: <prefix>waifuajuda
+- permission_error: 🔒 Este comando não está liberado para você neste contexto.
+  Se for NSFW em grupo, peça para um admin usar <prefix>nsfw on.
+- sucesso: 📚 Guia enviado com sucesso.
+  Agora experimente: <prefix>waifu neko
+- erro_uso: ℹ️ Este comando não precisa de argumentos.
+  Use apenas: <prefix>waifuajuda
+- erro_permissao: 🔒 Não consegui mostrar o guia neste contexto.
+  Tente novamente no privado ou em um grupo permitido.
 - mensagens_sistema:
 - (nao informado)
 - limites_operacionais:

@@ -7,13 +7,18 @@ Este arquivo e destinado a agentes de IA para gerar respostas no contexto dos co
 - arquivo_base: `app/modules/playModule/commandConfig.json`
 - schema_version: `2.0.0`
 - module_enabled: `true`
-- generated_at: `2026-03-11T02:35:17.177Z`
+- generated_at: `2026-03-17T04:04:14.195Z`
 
 ## Escopo do Modulo
 
 - module: `playModule`
 - source_files:
 - playCommand.js
+- playCommandHandlers.js
+- playCommandCore.js
+- playCommandYtDlpClient.js
+- playCommandConstants.js
+- playConfigRuntime.js
 - total_commands: `2`
 - total_enabled_commands: `2`
 
@@ -119,10 +124,10 @@ Este arquivo e destinado a agentes de IA para gerar respostas no contexto dos co
 - texto do comando e argumentos
 - contexto da mensagem (citacao e mencoes, quando existir)
 - link ou termo de busca enviado no comando
-- metadados de fila/download retornados pelo servico de midia
+- metadados de busca/download retornados pelo yt-dlp local
 - informacoes de tamanho do arquivo para validacao de limite
 - dependencias_externas:
-- serviço YTDLS/Downloader
+- yt-dlp local (binario gerenciado pelo modulo)
 - ffmpeg
 - ffprobe
 - efeitos_colaterais:
@@ -244,10 +249,10 @@ Este arquivo e destinado a agentes de IA para gerar respostas no contexto dos co
 - texto do comando e argumentos
 - contexto da mensagem (citacao e mencoes, quando existir)
 - link ou termo de busca enviado no comando
-- metadados de fila/download retornados pelo servico de midia
+- metadados de busca/download retornados pelo yt-dlp local
 - informacoes de tamanho e formato de video para validacao
 - dependencias_externas:
-- serviço YTDLS/Downloader
+- yt-dlp local (binario gerenciado pelo modulo)
 - ffmpeg
 - ffprobe
 - efeitos_colaterais:

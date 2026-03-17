@@ -36,15 +36,18 @@ const NEWS_API_CONTEXT_TTL_MS = Math.max(30_000, Number(process.env.NEWS_API_CON
 const NEWS_API_DETAILS_CACHE_TTL_MS = Math.max(60_000, Number(process.env.NEWS_API_DETAILS_CACHE_TTL_MS) || NEWS_API_CONTEXT_TTL_MS * 2);
 const NEWS_API_CONTEXT_TOP = Math.max(5, Math.min(200, Number(process.env.NEWS_API_CONTEXT_TOP) || 40));
 const NEWS_SMART_SELECTION_WINDOW = Math.max(5, Math.min(200, Number(process.env.NEWS_SMART_SELECTION_WINDOW) || 80));
-const NEWS_SMART_SELECTION_ENABLED = String(process.env.NEWS_SMART_SELECTION_ENABLED || 'true')
-  .trim()
-  .toLowerCase() !== 'false';
-const NEWS_CAPTION_CONTEXT_ENABLED = String(process.env.NEWS_CAPTION_CONTEXT_ENABLED || 'true')
-  .trim()
-  .toLowerCase() !== 'false';
-const NEWS_API_LEGACY_FALLBACK = String(process.env.NEWS_API_LEGACY_FALLBACK || 'true')
-  .trim()
-  .toLowerCase() !== 'false';
+const NEWS_SMART_SELECTION_ENABLED =
+  String(process.env.NEWS_SMART_SELECTION_ENABLED || 'true')
+    .trim()
+    .toLowerCase() !== 'false';
+const NEWS_CAPTION_CONTEXT_ENABLED =
+  String(process.env.NEWS_CAPTION_CONTEXT_ENABLED || 'true')
+    .trim()
+    .toLowerCase() !== 'false';
+const NEWS_API_LEGACY_FALLBACK =
+  String(process.env.NEWS_API_LEGACY_FALLBACK || 'true')
+    .trim()
+    .toLowerCase() !== 'false';
 const MIN_DELAY_MS = 60 * 1000;
 const MAX_DELAY_MS = 120 * 1000;
 const MAX_SENT_IDS = Number(process.env.NEWS_SENT_IDS_LIMIT || 500);
@@ -91,7 +94,9 @@ const parseConfigValue = (value) => {
 };
 
 const resolveNewsApiRequestUrl = (baseUrl, pathValue = '') => {
-  const normalizedBase = String(baseUrl || '').trim().replace(/\/+$/, '');
+  const normalizedBase = String(baseUrl || '')
+    .trim()
+    .replace(/\/+$/, '');
   const normalizedPath = String(pathValue || '').trim();
 
   if (!normalizedPath) return normalizedBase;
@@ -327,12 +332,7 @@ const getNewsContext = async () => {
   const staleContext = newsContextState.data || buildEmptyNewsContext();
 
   newsContextState.inFlight = (async () => {
-    const [trendsResponse, franchisesResponse, sourcesResponse, seoResponse] = await Promise.all([
-      requestNewsApiOptional({ path: NEWS_API_TRENDS_PATH, timeoutMs: NEWS_API_TIMEOUT_MS, params: { top: NEWS_API_CONTEXT_TOP }, label: 'trends' }),
-      requestNewsApiOptional({ path: NEWS_API_FRANCHISES_PATH, timeoutMs: NEWS_API_TIMEOUT_MS, params: { top: NEWS_API_CONTEXT_TOP, limit: NEWS_API_CONTEXT_TOP }, label: 'franchises' }),
-      requestNewsApiOptional({ path: NEWS_API_SOURCES_PATH, timeoutMs: NEWS_API_TIMEOUT_MS, params: { top: NEWS_API_CONTEXT_TOP }, label: 'sources' }),
-      requestNewsApiOptional({ path: NEWS_API_SEO_ENTITIES_PATH, timeoutMs: NEWS_API_TIMEOUT_MS, params: { top: NEWS_API_CONTEXT_TOP }, label: 'seo_entities' }),
-    ]);
+    const [trendsResponse, franchisesResponse, sourcesResponse, seoResponse] = await Promise.all([requestNewsApiOptional({ path: NEWS_API_TRENDS_PATH, timeoutMs: NEWS_API_TIMEOUT_MS, params: { top: NEWS_API_CONTEXT_TOP }, label: 'trends' }), requestNewsApiOptional({ path: NEWS_API_FRANCHISES_PATH, timeoutMs: NEWS_API_TIMEOUT_MS, params: { top: NEWS_API_CONTEXT_TOP, limit: NEWS_API_CONTEXT_TOP }, label: 'franchises' }), requestNewsApiOptional({ path: NEWS_API_SOURCES_PATH, timeoutMs: NEWS_API_TIMEOUT_MS, params: { top: NEWS_API_CONTEXT_TOP }, label: 'sources' }), requestNewsApiOptional({ path: NEWS_API_SEO_ENTITIES_PATH, timeoutMs: NEWS_API_TIMEOUT_MS, params: { top: NEWS_API_CONTEXT_TOP }, label: 'seo_entities' })]);
 
     const context = buildNewsContextFromPayloads({
       trendsPayload: trendsResponse?.data,
@@ -385,10 +385,7 @@ const normalizeNewsItems = (data) => {
   return toArrayItems(data)
     .filter((item) => item && typeof item === 'object')
     .map((item) => {
-      const refined =
-        item.refined && typeof item.refined === 'object'
-          ? { ...item.refined }
-          : {};
+      const refined = item.refined && typeof item.refined === 'object' ? { ...item.refined } : {};
 
       const resolvedUrl = String(refined.url || item.url || '').trim();
       const resolvedCanonicalUrl = String(refined.canonicalUrl || item.canonicalUrl || '').trim();
@@ -424,11 +421,7 @@ const normalizeNewsItems = (data) => {
           franchiseSlug: normalizedFranchiseSlug || '',
           franchiseName: String(item.franchiseName || refined.franchiseName || '').trim() || '',
           categories: Array.isArray(refined.categories) ? refined.categories : Array.isArray(item.categories) ? item.categories : [],
-          categoriesNormalized: Array.isArray(refined.categoriesNormalized)
-            ? refined.categoriesNormalized.map((entry) => normalizeToken(entry)).filter(Boolean)
-            : Array.isArray(item.categoriesNormalized)
-              ? item.categoriesNormalized.map((entry) => normalizeToken(entry)).filter(Boolean)
-              : [],
+          categoriesNormalized: Array.isArray(refined.categoriesNormalized) ? refined.categoriesNormalized.map((entry) => normalizeToken(entry)).filter(Boolean) : Array.isArray(item.categoriesNormalized) ? item.categoriesNormalized.map((entry) => normalizeToken(entry)).filter(Boolean) : [],
         },
       };
     })
@@ -526,11 +519,7 @@ const mergeNewsItem = (primaryItem, fallbackItem) => {
       sourceName: String(base?.refined?.sourceName || fallback?.refined?.sourceName || '').trim(),
       franchiseSlug: extractItemFranchiseSlug(base) || extractItemFranchiseSlug(fallback) || '',
       franchiseName: String(base?.refined?.franchiseName || fallback?.refined?.franchiseName || '').trim(),
-      categoriesNormalized: Array.isArray(base?.refined?.categoriesNormalized) && base.refined.categoriesNormalized.length
-        ? base.refined.categoriesNormalized
-        : Array.isArray(fallback?.refined?.categoriesNormalized)
-          ? fallback.refined.categoriesNormalized
-          : [],
+      categoriesNormalized: Array.isArray(base?.refined?.categoriesNormalized) && base.refined.categoriesNormalized.length ? base.refined.categoriesNormalized : Array.isArray(fallback?.refined?.categoriesNormalized) ? fallback.refined.categoriesNormalized : [],
     },
   };
 
@@ -617,10 +606,7 @@ const enrichNewsItemIfNeeded = async (newsItem) => {
     return newsItem;
   }
 
-  const [byId, bySlug] = await Promise.all([
-    fetchArticleById(newsItem.id),
-    fetchArticleBySlug(extractItemNewsSlug(newsItem)),
-  ]);
+  const [byId, bySlug] = await Promise.all([fetchArticleById(newsItem.id), fetchArticleBySlug(extractItemNewsSlug(newsItem))]);
 
   return mergeNewsItem(mergeNewsItem(newsItem, byId), bySlug);
 };
@@ -762,58 +748,12 @@ const normalizeNewsFilters = (config = {}) => {
   const nested = config?.newsFilters && typeof config.newsFilters === 'object' ? config.newsFilters : {};
 
   return {
-    includeSourceIds: new Set(
-      [
-        ...normalizeStringList(config.newsSources),
-        ...normalizeStringList(config.newsSourceIds),
-        ...normalizeStringList(nested.sources),
-        ...normalizeStringList(nested.sourceIds),
-      ].filter(Boolean),
-    ),
-    excludeSourceIds: new Set(
-      [
-        ...normalizeStringList(config.newsBlockedSources),
-        ...normalizeStringList(config.newsExcludeSources),
-        ...normalizeStringList(nested.excludeSources),
-        ...normalizeStringList(nested.blockedSources),
-      ].filter(Boolean),
-    ),
-    includeFranchiseSlugs: new Set(
-      [
-        ...normalizeStringList(config.newsFranchises),
-        ...normalizeStringList(config.newsFranchiseSlugs),
-        ...normalizeStringList(nested.franchises),
-        ...normalizeStringList(nested.franchiseSlugs),
-      ].filter(Boolean),
-    ),
-    excludeFranchiseSlugs: new Set(
-      [
-        ...normalizeStringList(config.newsBlockedFranchises),
-        ...normalizeStringList(config.newsExcludeFranchises),
-        ...normalizeStringList(nested.excludeFranchises),
-        ...normalizeStringList(nested.blockedFranchises),
-      ].filter(Boolean),
-    ),
-    includeEntitySlugs: new Set(
-      [
-        ...normalizeStringList(config.newsEntities),
-        ...normalizeStringList(config.newsEntitySlugs),
-        ...normalizeStringList(config.newsTags),
-        ...normalizeStringList(nested.entities),
-        ...normalizeStringList(nested.entitySlugs),
-        ...normalizeStringList(nested.tags),
-      ].filter(Boolean),
-    ),
-    excludeEntitySlugs: new Set(
-      [
-        ...normalizeStringList(config.newsBlockedEntities),
-        ...normalizeStringList(config.newsExcludeEntities),
-        ...normalizeStringList(config.newsBlockedTags),
-        ...normalizeStringList(nested.excludeEntities),
-        ...normalizeStringList(nested.blockedEntities),
-        ...normalizeStringList(nested.excludeTags),
-      ].filter(Boolean),
-    ),
+    includeSourceIds: new Set([...normalizeStringList(config.newsSources), ...normalizeStringList(config.newsSourceIds), ...normalizeStringList(nested.sources), ...normalizeStringList(nested.sourceIds)].filter(Boolean)),
+    excludeSourceIds: new Set([...normalizeStringList(config.newsBlockedSources), ...normalizeStringList(config.newsExcludeSources), ...normalizeStringList(nested.excludeSources), ...normalizeStringList(nested.blockedSources)].filter(Boolean)),
+    includeFranchiseSlugs: new Set([...normalizeStringList(config.newsFranchises), ...normalizeStringList(config.newsFranchiseSlugs), ...normalizeStringList(nested.franchises), ...normalizeStringList(nested.franchiseSlugs)].filter(Boolean)),
+    excludeFranchiseSlugs: new Set([...normalizeStringList(config.newsBlockedFranchises), ...normalizeStringList(config.newsExcludeFranchises), ...normalizeStringList(nested.excludeFranchises), ...normalizeStringList(nested.blockedFranchises)].filter(Boolean)),
+    includeEntitySlugs: new Set([...normalizeStringList(config.newsEntities), ...normalizeStringList(config.newsEntitySlugs), ...normalizeStringList(config.newsTags), ...normalizeStringList(nested.entities), ...normalizeStringList(nested.entitySlugs), ...normalizeStringList(nested.tags)].filter(Boolean)),
+    excludeEntitySlugs: new Set([...normalizeStringList(config.newsBlockedEntities), ...normalizeStringList(config.newsExcludeEntities), ...normalizeStringList(config.newsBlockedTags), ...normalizeStringList(nested.excludeEntities), ...normalizeStringList(nested.blockedEntities), ...normalizeStringList(nested.excludeTags)].filter(Boolean)),
     onlyTrending: Boolean(config.newsOnlyTrending || nested.onlyTrending),
   };
 };
@@ -940,12 +880,7 @@ const buildNewsCaption = async (newsItem, context = null) => {
   const needsSourceDetail = sourceId && !String(newsItem?.sourceName || newsItem?.refined?.sourceName || sourceFromContext?.name || '').trim();
   const needsFranchiseDetail = franchiseSlug && !String(newsItem?.franchiseName || newsItem?.refined?.franchiseName || franchiseFromContext?.name || '').trim();
 
-  const [sourceDetails, franchiseDetails, seoByFranchise, seoByTag] = await Promise.all([
-    needsSourceDetail ? fetchSourceDetails(sourceId) : null,
-    needsFranchiseDetail ? fetchFranchiseDetails(franchiseSlug) : null,
-    franchiseSlug ? fetchSeoEntityDetails({ type: 'anime', slug: franchiseSlug }) : null,
-    !franchiseSlug && fallbackTagSlug ? fetchSeoEntityDetails({ type: 'tag', slug: fallbackTagSlug }) : null,
-  ]);
+  const [sourceDetails, franchiseDetails, seoByFranchise, seoByTag] = await Promise.all([needsSourceDetail ? fetchSourceDetails(sourceId) : null, needsFranchiseDetail ? fetchFranchiseDetails(franchiseSlug) : null, franchiseSlug ? fetchSeoEntityDetails({ type: 'anime', slug: franchiseSlug }) : null, !franchiseSlug && fallbackTagSlug ? fetchSeoEntityDetails({ type: 'tag', slug: fallbackTagSlug }) : null]);
 
   const lines = [`📰 *${title}*`];
   if (NEWS_CAPTION_CONTEXT_ENABLED) {

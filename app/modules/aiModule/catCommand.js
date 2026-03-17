@@ -395,17 +395,7 @@ const shouldSendAdminAlert = ({ commandName = '', stage = '', remoteJid = '', se
   return true;
 };
 
-const notifyAdminAiError = async (
-  sock,
-  {
-    commandName = 'cat',
-    stage = 'unknown',
-    remoteJid = '',
-    senderJid = '',
-    messageInfo = null,
-    error = null,
-  } = {},
-) => {
+const notifyAdminAiError = async (sock, { commandName = 'cat', stage = 'unknown', remoteJid = '', senderJid = '', messageInfo = null, error = null } = {}) => {
   try {
     const adminJid = normalizeJid((await resolveAdminJid().catch(() => null)) || OWNER_JID || '');
     if (!adminJid) return;

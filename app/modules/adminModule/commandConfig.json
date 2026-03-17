@@ -331,6 +331,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "menuadm",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Exibe o menu administrativo do bot para o grupo, mostrando opções disponíveis para gerenciar a conversa. Não requer premium; disponível para planos comum e premium.",
+        "quando_usar": ["Quero ver quais comandos de administração o bot oferece no grupo.", "Preciso confirmar privilégios e opções de administração sem lembrar de cada comando.", "Estou em um grupo e quero navegar rapidamente pelas opções de admin."],
+        "exemplos_reais": [
+          {
+            "situacao": "Você está em um grupo e quer ver todas as opções administrativas disponíveis.",
+            "comando": "<prefix>menuadmin",
+            "resposta_esperada": "O menu administrativo é exibido com opções como gerenciar membros, avisos, regras do grupo e outras ações de moderação.",
+            "variacao": "<prefix>adm | <prefix>menuadm."
+          },
+          {
+            "situacao": "Você quer ajuda para entender um comando específico do menu admin.",
+            "comando": "<prefix>menuadmin ajuda banir",
+            "resposta_esperada": "Instruções de como banir usuários ou usar um comando relacionado.",
+            "variacao": "<prefix>menuadmin ajuda banir / <prefix>menuadmin perguntar banir."
+          },
+          {
+            "situacao": "Você quer ver perguntas frequentes sobre o menu admin.",
+            "comando": "<prefix>menuadmin faq",
+            "resposta_esperada": "Lista de perguntas frequentes e respostas sobre o menu administrativo.",
+            "variacao": "<prefix>menuadmin FAQ."
+          }
+        ],
+        "resposta_esperada": ["Menu administrativo exibido com as opções disponíveis para admin no grupo."],
+        "erros_comuns_usuario": ["Não ter privilégios de admin no grupo.", "Tentar usar o comando fora de grupo (em privado).", "Esquecer de colocar o prefix correto ao digitar o comando.", "Solicitar opções sem estar logado ou autorizado (googleLogin) se aplicável."],
+        "passos_se_der_erro": ["Se houver erro de permissão, confirme que você é admin do grupo e tente novamente.", "Se o formato estiver incorreto, utilize um dos modos de uso: <prefix>menuadmin, <prefix>menuadmin ajuda <comando>, <prefix>menuadmin faq, <prefix>menuadmin perguntar <pergunta>.", "Se ocorrer erro genérico, aguarde alguns segundos e tente novamente."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -572,6 +601,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "premium",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Gerencia usuários premium: listar, adicionar ou remover privilégios. Acesso disponível apenas ao proprietário do bot. Não depende do plano do usuário que recebe o privilégio.",
+        "quando_usar": ["Ver quem tem premium no sistema.", "Conceder premium a novos usuários.", "Remover o privilégio de alguém.", "Confirmar configuração antes de mudanças (somente o proprietário)."],
+        "exemplos_reais": [
+          {
+            "situacao": "Listar usuários premium atuais.",
+            "comando": "<prefix>premium list",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "Pode usar <prefix>vip list como sinônimo."
+          },
+          {
+            "situacao": "Adicionar usuário ao premium.",
+            "comando": "<prefix>premium add @usuario",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "Ex.: <prefix>premium add @joao."
+          },
+          {
+            "situacao": "Remover usuário do premium.",
+            "comando": "<prefix>premium remove @usuario",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "Ex.: <prefix>premium remove @joao."
+          }
+        ],
+        "resposta_esperada": ["Comando executado com sucesso.", "Formato de uso inválido. Consulte metodos_de_uso.", "Permissão insuficiente para executar este comando."],
+        "erros_comuns_usuario": ["O acao (add|remove|list) não foi especificado.", "Nenhum usuário foi mencionado ao adicionar/remover.", "Tentar adicionar um usuário que já é premium.", "Tentar remover um usuário que não é premium.", "Tentar executar sem ser o proprietário."],
+        "passos_se_der_erro": ["Verifique se você é o proprietário do bot.", "Confirme o formato: <prefix>premium [add|remove|list] [@usuario].", "Para add/remove, tenha pelo menos uma menção/JID válida.", "Se o erro persistir, tente novamente após verificar permissões e formato.", "Se necessário, contate o suporte técnico do sistema."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -786,6 +844,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "nsfw",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Ativa, desativa ou verifica o status do NSFW no grupo. Recurso Premium; funciona apenas para admins em grupos.",
+        "quando_usar": ["Você é admin do grupo e quer controlar NSFW.", "Para ativar NSFW: use <prefix>nsfw on.", "Para desativar NSFW: use <prefix>nsfw off.", "Para ver o status atual: use <prefix>nsfw status.", "Lembre-se: é recurso Premium e exige plano ativo."],
+        "exemplos_reais": [
+          {
+            "situacao": "Administrador quer ativar NSFW em um grupo Premium.",
+            "comando": "<prefix>nsfw on",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "ativacao."
+          },
+          {
+            "situacao": "Administrador verifica o status do NSFW.",
+            "comando": "<prefix>nsfw status",
+            "resposta_esperada": "NSFW está ativo no grupo.",
+            "variacao": "status_ativo."
+          },
+          {
+            "situacao": "Usuário sem permissão tenta ativar NSFW.",
+            "comando": "<prefix>nsfw on",
+            "resposta_esperada": "Permissão insuficiente para executar este comando.",
+            "variacao": "sem_permissao."
+          }
+        ],
+        "resposta_esperada": ["Comando executado com sucesso.", "Formato de uso inválido. Consulte metodos_de_uso.", "Permissão insuficiente para executar este comando."],
+        "erros_comuns_usuario": ["Não é admin do grupo", "Tentar usar o comando sem ter o plano Premium ativo", "Usar o comando fora de um grupo", "Esquecer de fornecer o parâmetro da ação (on|off|status)"],
+        "passos_se_der_erro": ["Verifique se você é admin do grupo", "Confirme que o grupo tem assinatura Premium ativa", "Garanta o uso correto: <prefix>nsfw on|off|status", "Tente novamente", "Se o problema persistir, peça suporte"],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -1000,6 +1087,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "autosticker",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Ativa ou desativa a geração automática de figurinhas no grupo, facilitando a criação de figurinhas a partir das mensagens. Funcionalidade disponível para planos comuns e premium.",
+        "quando_usar": ["Você é admin do grupo e quer ativar a geração automática de figurinhas.", "Você precisa desativar a geração automática para evitar figurinhas indesejadas.", "Quer verificar rapidamente se a função está ligada ou desligada no grupo."],
+        "exemplos_reais": [
+          {
+            "situacao": "Você é admin e quer ativar a função no grupo.",
+            "comando": "<prefix>autofigurinha on",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "Também pode usar <prefix>autosticker on."
+          },
+          {
+            "situacao": "Você quer desativar a função.",
+            "comando": "<prefix>autofigurinha off",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "ou <prefix>autosticker off."
+          },
+          {
+            "situacao": "Checar o status atual da função.",
+            "comando": "<prefix>autofigurinha status",
+            "resposta_esperada": "Status atual: ligado.",
+            "variacao": "ou <prefix>autosticker status."
+          }
+        ],
+        "resposta_esperada": ["Comando executado com sucesso."],
+        "erros_comuns_usuario": ["Esqueceu de informar o argumento on/off/status.", "O usuário não é admin ou o bot não tem permissão no grupo.", "Formato do comando está incorreto. Use <prefix>autofigurinha on|off|status.", "Tente usar em um grupo onde a função é permitida.", "Esqueceu de considerar o alias <prefix>autosticker na hora do uso."],
+        "passos_se_der_erro": ["1) Confirme que você está em um grupo e tem permissão de admin.", "2) Verifique o formato do comando: <prefix>autofigurinha on|off|status.", "3) Tente novamente após alguns segundos.", "4) Se o erro persistir, verifique se o bot está ativo no grupo e tente novamente ou procure suporte."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -1214,6 +1330,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "stickermode",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Controle o foco de figurinhas no grupo: ative, desative ou verifique o status. Requer que o usuário seja admin do grupo.",
+        "quando_usar": ["Quando quiser ativar o foco em figurinhas para reduzir ruído no grupo.", "Quando já não for mais necessário o foco e desejar voltar ao envio normal de figurinhas.", "Para checar rapidamente o status atual do modo figurinha."],
+        "exemplos_reais": [
+          {
+            "situacao": "Você é admin e quer ativar o foco em figurinhas no grupo.",
+            "comando": "<prefix>modofigurinha on",
+            "resposta_esperada": "Modo figurinha ativado. Status atual: ativo.",
+            "variacao": "<prefix>modofigurinha on."
+          },
+          {
+            "situacao": "Você quer desativar o modo e permitir figurinhas novamente.",
+            "comando": "<prefix>modofigurinha off",
+            "resposta_esperada": "Modo figurinha desativado. Status atual: desativado.",
+            "variacao": "<prefix>modofigurinha off."
+          },
+          {
+            "situacao": "Você quer confirmar o estado atual do modo.",
+            "comando": "<prefix>modofigurinha status",
+            "resposta_esperada": "Status atual: ativo/desativado (conforme o grupo).",
+            "variacao": "<prefix>modofigurinha status."
+          }
+        ],
+        "resposta_esperada": ["Comando executado com sucesso.", "Status informado com precisão (ativo ou desativado) conforme a consulta."],
+        "erros_comuns_usuario": ["Não é admin do grupo ao tentar ativar/desativar.", "Esquecer de usar o prefixo correto ao digitar o comando.", "Tentar usar em chats privados (não é permitido).", "Tentar ativar com parâmetros ausentes ou inválidos."],
+        "passos_se_der_erro": ["Verifique se você é admin do grupo.", "Confirme o prefixo correto e o formato do comando (on, off, status).", "Tente novamente com <prefix>modofigurinha on/off/status.", "Se o problema persistir, peça ajuda ao administrador do grupo ou entre em contato com o suporte."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -1448,6 +1593,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "chatwindow",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Abre/fecha uma janela temporária de chat para enviar stickers, sem sair da tela. Requer ser admin em grupo e login Google. Não é exclusivo de premium; disponível para planos comum e premium.",
+        "quando_usar": ["Quando você precisa de um chat rápido em modo sticker sem sair da conversa atual.", "Para fechar a janela temporária quando terminar.", "Para verificar se a janela está ativa e, se houver, por quanto tempo resta."],
+        "exemplos_reais": [
+          {
+            "situacao": "Abrir a janela para uso rápido de stickers em um grupo.",
+            "comando": "<prefix>janelachat on",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "Pode abrir também com minutos: <prefix>janelachat on 15."
+          },
+          {
+            "situacao": "Fechar a janela de chat temporária.",
+            "comando": "<prefix>janelachat off",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "Se já estiver fechada, a mensagem pode indicar que já está fechada."
+          },
+          {
+            "situacao": "Ver status da janela.",
+            "comando": "<prefix>janelachat status",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "O status pode indicar: ativo, inativo, tempo restante."
+          }
+        ],
+        "resposta_esperada": ["Comando executado com sucesso.", "Formato de uso inválido. Consulte metodos_de_uso.", "Permissão insuficiente para executar este comando."],
+        "erros_comuns_usuario": ["Não ter permissões de administrador no grupo.", "Esquecer de incluir o <prefix> ao digitar o comando.", "Usar o subcomando errado (ex.: janelachat onsem números).", "Usar on sem definir minutos quando é necessário (minutos obrigatórios em alguns casos).", "Tentar usar fora de um grupo ou sem login Google."],
+        "passos_se_der_erro": ["Verifique se você é admin do grupo e se o login Google está ativo.", "Confirme o prefixo correto (<prefix>) e o formato: <prefix>janelachat on|off|status [minutos].", "Tente o comando novamente após 5 segundos.", "Caso o erro persista, peça a outro admin para tentar ou acionar suporte.", "Se o erro for de formato, leia o aviso de uso: formato inválido."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -1662,6 +1836,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "stickermsglimit",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Define e gerencia o limite de mensagens por usuário no modo sticker. Você pode definir o tempo em minutos entre envios, consultar o status atual ou resetar. Requer ser admin em grupo. Não é necessário premium.",
+        "quando_usar": ["Reduzir spam de figurinhas por usuário.", "Ajustar o tempo entre envios no modo sticker definindo minutos.", "Checar o status atual do limite.", "Resetar o limite para o valor padrão."],
+        "exemplos_reais": [
+          {
+            "situacao": "Definir limite de 5 minutos por usuário.",
+            "comando": "<prefix>limitefigurinha 5",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "Limite definido para 5 minutos por usuário no modo sticker."
+          },
+          {
+            "situacao": "Verificar o status atual do limite.",
+            "comando": "<prefix>limitefigurinha status",
+            "resposta_esperada": "Status atual: limite de 5 minutos ativo entre envios de figurinhas.",
+            "variacao": "<prefix>limitefigurinha status."
+          },
+          {
+            "situacao": "Resetar o limite.",
+            "comando": "<prefix>limitefigurinha reset",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "Limite resetado para o padrão."
+          }
+        ],
+        "resposta_esperada": ["Comando executado com sucesso.", "Formato de uso inválido. Consulte metodos_de_uso.", "Permissão insuficiente para executar este comando."],
+        "erros_comuns_usuario": ["Não é admin do grupo ou o bot não tem permissão para operar no grupo.", "Uso fora do formato esperado (não usar números quando é para minutos) — use <prefix>limitefigurinha 5, <prefix>limitefigurinha status ou <prefix>limitefigurinha reset.", "Esquecer de incluir o <prefix> quando necessário (ex.: usar limitefigurinha em um grupo onde o prefixo não é necessário).", "Tentar executar sem estar no modo grupo ou sem autorização de admin."],
+        "passos_se_der_erro": ["Verifique se você é admin do grupo e se o bot tem permissão para ler mensagens no grupo.", "Use o formato correto: <prefix>limitefigurinha <valor> (um número de minutos) ou <prefix>limitefigurinha status ou <prefix>limitefigurinha reset.", "Se aparecer \"Formato de uso inválido\", corrija o comando para uma das opções aceitas.", "Se aparecer \"Permissão insuficiente...\", peça a um admin para conceder permissões ao bot.", "Se o problema persistir, tente novamente mais tarde ou em outro grupo e, se necessário, peça suporte ao responsável pelo bot."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -1895,6 +2098,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "newgroup",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Cria um novo grupo com um título e lista de participantes usando seu login Google. Não é necessário ser admin ou proprietário do grupo.",
+        "quando_usar": ["Iniciar uma nova conversa em grupo com várias pessoas", "Organizar estudos, viagens, projetos ou equipes em um único espaço", "Adicionar rapidamente um conjunto de contatos a um novo grupo com objetivo específico"],
+        "exemplos_reais": [
+          {
+            "situacao": "Criar grupo de estudo com colegas.",
+            "comando": "<prefix>novogrupo Estudo2026 @joao @maria",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "Pode adicionar mais participantes após a criação."
+          },
+          {
+            "situacao": "Organizar viagem com amigos.",
+            "comando": "<prefix>novogrupo Viagem2026 @ana @fernando @lucas",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "Quantidade variável de participantes."
+          },
+          {
+            "situacao": "Grupo de leitura.",
+            "comando": "<prefix>novogrupo LeituraClube @beatriz",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "Pode iniciar com 1 participante."
+          }
+        ],
+        "resposta_esperada": ["Comando executado com sucesso."],
+        "erros_comuns_usuario": ["Esquecer de incluir o título", "Não informar ao menos um participante", "Usar formato do comando sem o prefixo correto", "Título em branco ou apenas espaços", "Não estar logado com Google ao tentar criar o grupo"],
+        "passos_se_der_erro": ["1) Verifique o formato: <prefix>novogrupo <titulo> <participante1> [participante2 ...]", "2) Confirme que está logado com Google", "3) Garanta que pelo menos um participante seja informado", "4) Tente novamente com um título e participantes válidos", "5) Se o erro persistir, tente novamente mais tarde ou entre em contato com o suporte"],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -2115,6 +2347,29 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "add",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Adiciona participantes ao grupo atual.",
+        "quando_usar": ["Quando você precisa incluir novos membros rapidamente.", "Quando você tem as menções/JIDs prontos para adicionar de uma vez.", "Quando o grupo precisa atualizar a lista de participantes com várias pessoas de uma só vez."],
+        "exemplos_reais": [
+          {
+            "situacao": "Adicionar dois participantes de uma vez.",
+            "comando": "<prefix>adicionar @joao @maria",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "Incluir várias pessoas com um único comando."
+          },
+          {
+            "situacao": "Tentar adicionar sem permissão de admin.",
+            "comando": "<prefix>adicionar @carla",
+            "resposta_esperada": "Permissão insuficiente para executar este comando.",
+            "variacao": "Usuário não é admin do grupo."
+          }
+        ],
+        "resposta_esperada": ["Comando executado com sucesso.", "Formato de uso inválido. Consulte metodos_de_uso.", "Permissão insuficiente para executar este comando."],
+        "erros_comuns_usuario": ["Esquecer de mencionar os participantes ou usar o formato errado de menção (@nome).", "Usar o comando sem ser admin do grupo ou sem permissão necessária.", "Formato de uso incorreto, por exemplo, <prefix>adicionar sem mencionar participantes."],
+        "passos_se_der_erro": ["Verifique se você é admin do grupo e tem permissão para adicionar membros.", "Confira o formato: use @participante((s)) após <prefix>adicionar, sem espaços estranhos.", "Inclua pelo menos um participante na lista de membros.", "Tente novamente com o comando correto: <prefix>adicionar @participante1 @participante2 ...", "Caso persista, peça suporte com o registro da tentativa e o nome do grupo."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -2335,6 +2590,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "ban",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Remover participantes do grupo atual via comando. Requer ser admin do grupo.",
+        "quando_usar": ["Quando alguém viola regras (spam, assédio, links indesejados) ou precisa sair do grupo.", "Antes de banir, confirme que o alvo não é admin/owner e que você tem permissão para remover.", "Observação: não há restrição de Premium; funciona para planos comum e premium."],
+        "exemplos_reais": [
+          {
+            "situacao": "Participante está enviando spam constante.",
+            "comando": "<prefix>banir @usuario1",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "banir um único participante."
+          },
+          {
+            "situacao": "Tentativa de banir sem mencionar nenhum participante.",
+            "comando": "<prefix>banir",
+            "resposta_esperada": "Formato de uso inválido. Consulte metodos_de_uso.",
+            "variacao": "faltou argumento."
+          },
+          {
+            "situacao": "Usuário sem permissão tenta banir.",
+            "comando": "<prefix>banir @usuario2",
+            "resposta_esperada": "Permissão insuficiente para executar este comando.",
+            "variacao": "sem ser admin."
+          }
+        ],
+        "resposta_esperada": ["Comando executado com sucesso.", "Formato de uso inválido. Consulte metodos_de_uso.", "Permissão insuficiente para executar este comando."],
+        "erros_comuns_usuario": ["Não é admin do grupo.", "Tentar banir sem mencionar participantes.", "Tentar banir administradores/owner do grupo.", "Bot não tem permissão para remover membros no grupo.", "Esquecer de usar o prefixo correto ou deixar de mencionar."],
+        "passos_se_der_erro": ["Verifique se você é admin do grupo e se o bot tem permissão para remover membros.", "Garanta que pelo menos um participante seja mencionado com @ e que o comando use o prefix correto.", "Se o erro persistir, tente com apenas um participante e confirme se o alvo não é admin.", "Não banir administradores sem a autorização necessária; se o problema continuar, tente novamente mais tarde ou peça suporte."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -2555,6 +2839,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "up",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Promove participantes do grupo a administradores. Requer que você seja admin do grupo e que o login esteja ativo. Pode ser usado por planos comum ou premium.",
+        "quando_usar": ["Quando quiser delegar poderes de moderação a membros confiáveis.", "Para conceder privilégios administrativos a participantes que ajudam na gestão do grupo.", "Antes de usar, confirme que o participante é do grupo e será confiável como admin."],
+        "exemplos_reais": [
+          {
+            "situacao": "Promover um único participante.",
+            "comando": "<prefix>promover @Ana",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "ou <prefix>up @Ana."
+          },
+          {
+            "situacao": "Promover dois participantes.",
+            "comando": "<prefix>promover @Ana @Bruno",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "ou <prefix>up @Ana @Bruno."
+          },
+          {
+            "situacao": "Formato de uso incorreto.",
+            "comando": "<prefix>promover",
+            "resposta_esperada": "Formato de uso inválido. Consulte metodos_de_uso.",
+            "variacao": "tente <prefix>promover @participante."
+          }
+        ],
+        "resposta_esperada": ["Comando executado com sucesso.", "Formato de uso inválido. Consulte metodos_de_uso.", "Permissão insuficiente para executar este comando."],
+        "erros_comuns_usuario": ["Nao tem permissão de admin no grupo.", "Nao houve menção de participantes valida(s).", "Tentar promover fora de um grupo ou sem estar logado.", "Tentar promover alguém que já é administrador."],
+        "passos_se_der_erro": ["Verifique se você está no grupo e é admin do grupo.", "Certifique-se de mencionar pelo menos um participante válido com @nome ou JID.", "Tente novamente com <prefix>promover @participante.", "Se o erro persistir, verifique as mensagens de permissão ou contate o suporte."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -2775,6 +3088,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "down",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Rebaixa administradores para membros comuns dentro do grupo. Disponível para usuários dos planos comum e premium; não é restrito apenas a premium.",
+        "quando_usar": ["Quando um admin não precisa mais de privilégios", "Para alinhar as funções de moderadores ao nível de membro", "Para corrigir atribuição de permissões incorretas"],
+        "exemplos_reais": [
+          {
+            "situacao": "Você acidentalmente concedeu privilégios de admin a alguém e precisa rebaixá-lo.",
+            "comando": "<prefix>rebaixar @Joao",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "Uso simples com um participante."
+          },
+          {
+            "situacao": "Rebaixar vários administradores de uma vez.",
+            "comando": "<prefix>rebaixar @Ana @Carlos",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "Uso com múltiplos participantes."
+          },
+          {
+            "situacao": "Usuário sem permissão tenta usar o comando.",
+            "comando": "<prefix>rebaixar @Maria",
+            "resposta_esperada": "Permissão insuficiente para executar este comando.",
+            "variacao": "Sem privilégios de admin."
+          }
+        ],
+        "resposta_esperada": ["Comando executado com sucesso.", "Formato de uso inválido. Consulte metodos_de_uso.", "Permissão insuficiente para executar este comando."],
+        "erros_comuns_usuario": ["Esquecer de mencionar o participante", "Tentar rebaixar alguém que não é admin", "Executar o comando fora de um grupo", "Não possuir privilégios de admin/owner", "Usar o comando com o prefix incorreto"],
+        "passos_se_der_erro": ["Verifique que você está em um grupo e tem privilégios de admin/owner", "Mencione o participante correto (ex.: @Nome)", "Use o formato correto: <prefix>rebaixar @participante", "Aguarde a confirmação de que o cargo foi altered", "Se aparecer formato inválido, confira o formato e consulte metodos_de_uso"],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -2993,6 +3335,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "setsubject",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Altera o assunto do grupo. Você precisa ser admin do grupo e o grupo deve permitir mudanças no assunto.",
+        "quando_usar": ["Quando o tema do grupo estiver desatualizado ou não refletir a conversa", "Quando houver necessidade de esclarecer o foco do grupo para novos participantes", "Você é admin do grupo e quer deixar o assunto visível para todos", "Após receber orientação para mudar o assunto do grupo"],
+        "exemplos_reais": [
+          {
+            "situacao": "Alterar para um novo tema claro.",
+            "comando": "<prefix>assunto Novo tema do grupo",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "Uso comum com a primeira letra maiúscula no assunto."
+          },
+          {
+            "situacao": "Usuário não é admin.",
+            "comando": "<prefix>assunto Novo tema",
+            "resposta_esperada": "Permissão insuficiente para executar este comando.",
+            "variacao": "Usuario não é admin."
+          },
+          {
+            "situacao": "Formato inválido (faltando o texto do assunto).",
+            "comando": "<prefix>assunto",
+            "resposta_esperada": "Formato de uso inválido. Consulte metodos_de_uso.",
+            "variacao": "Faltando o texto do assunto."
+          }
+        ],
+        "resposta_esperada": ["Comando executado com sucesso.", "Formato de uso inválido. Consulte metodos_de_uso.", "Permissão insuficiente para executar este comando."],
+        "erros_comuns_usuario": ["Não ser admin do grupo", "Não estar no grupo", "Assunto vazio ou apenas espaços", "Usar prefixo incorreto ao comando", "Digitar o comando sem o formato correto (<prefix>assunto <novo assunto>)"],
+        "passos_se_der_erro": ["1. Confirme que você está no grupo.", "2. Verifique se você é admin do grupo.", "3. Use o formato correto: <prefix>assunto <novo assunto>.", "4. Garanta que o assunto não está vazio.", "5. Tente novamente. Se o erro persistir, peça ajuda ao administrador do grupo."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -3211,6 +3582,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "setdesc",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Permite ao(a) admin do grupo alterar a descrição do grupo. O novo texto precisa ser não vazio. Disponível para planos comum e premium. Requer grupo, admin e login Google.",
+        "quando_usar": ["Quando o administrador quiser atualizar a descrição para refletir o tema atual do grupo.", "Antes de eventos ou mudanças, para manter a descrição atualizada.", "Ao corrigir informações desatualizadas ou ambíguas na descrição."],
+        "exemplos_reais": [
+          {
+            "situacao": "Atualizar a descrição para refletir o tema do grupo.",
+            "comando": "<prefix>descricao Grupo de estudo sobre bots WhatsApp",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "uso simples."
+          },
+          {
+            "situacao": "Usar o alias setdesc.",
+            "comando": "<prefix>setdesc Grupo de estudo sobre bots",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "usa alias."
+          },
+          {
+            "situacao": "Descrição vazia.",
+            "comando": "<prefix>descricao",
+            "resposta_esperada": "Formato de uso inválido. Consulte metodos_de_uso.",
+            "variacao": "descricao vazia."
+          }
+        ],
+        "resposta_esperada": ["Comando executado com sucesso.", "Formato de uso inválido. Consulte metodos_de_uso.", "Permissão insuficiente para executar este comando."],
+        "erros_comuns_usuario": ["Nao estar em um grupo", "Nao ser admin do grupo", "Descricao vazia ou apenas espaços", "Formato incorreto: esquecer o <prefix>", "Tentar alterar sem possuir permissao"],
+        "passos_se_der_erro": ["Verifique se você está no grupo correto e se o bot pode agir nele", "Confirme que você tem permissão de admin", "Envie o comando com uma descricao não vazia: <prefix>descricao Nova descricao", "Se aparecer erro de permissão, peça ajuda ao administrator do grupo", "Se o problema persistir, tente novamente mais tarde ou contate o suporte"],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -3430,6 +3830,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "setgroup",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Ajuda prática para alterar o estado do grupo com o comando <prefix>configgrupo [modo]. Requer ser admin, estar no grupo e login Google.",
+        "quando_usar": ["Quando você precisa mudar o modo do grupo (anuncio, not_announcement, locked, unlocked).", "Quando você é admin do grupo e tem login Google ativo."],
+        "exemplos_reais": [
+          {
+            "situacao": "Alterar o grupo para anúncio.",
+            "comando": "<prefix>configgrupo announcement",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "configurar o grupo como anúncio."
+          },
+          {
+            "situacao": "Desbloquear o grupo para permitir mensagens.",
+            "comando": "<prefix>configgrupo unlocked",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "desbloquear o grupo."
+          },
+          {
+            "situacao": "Tentar alterar sem ser admin.",
+            "comando": "<prefix>configgrupo locked",
+            "resposta_esperada": "Permissão insuficiente para executar este comando.",
+            "variacao": "tentativa sem permissão de admin."
+          }
+        ],
+        "resposta_esperada": ["Comando executado com sucesso.", "Permissão insuficiente para executar este comando.", "Formato de uso inválido. Consulte metodos_de_uso."],
+        "erros_comuns_usuario": ["Não é admin do grupo ao tentar usar o comando.", "Tentar usar o comando fora de um grupo.", "Usar um modo inválido ou incorreto (ex.: not_announcement com erro de digitação).", "Não estar logado com Google ou não ter acesso ao grupo."],
+        "passos_se_der_erro": ["1) Confirme que você é admin do grupo.", "2) Verifique que está no chat do grupo correto.", "3) Valide o modo informado: 'announcement', 'not_announcement', 'locked', 'unlocked'.", "4) Refaça o comando com o formato correto: <prefix>configgrupo <modo>.", "5) Se o erro persistir, peça suporte com captura de tela e descrição do problema."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -3621,6 +4050,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "leave",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Faz o bot sair do grupo quando solicitado por um admin.",
+        "quando_usar": ["Quando o grupo não precisa mais do bot.", "Quando um admin decide que o bot não deve ficar no grupo.", "Se o bot entrou por engano e precisa sair."],
+        "exemplos_reais": [
+          {
+            "situacao": "Você é admin do grupo e quer que o bot saia.",
+            "comando": "<prefix>sair",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "<prefix>leave."
+          },
+          {
+            "situacao": "Usuário tenta usar sem permissão de admin.",
+            "comando": "<prefix>sair",
+            "resposta_esperada": "Permissão insuficiente para executar este comando.",
+            "variacao": "<prefix>leave."
+          },
+          {
+            "situacao": "Formato de uso inválido (ex.: adicionar parâmetro extra).",
+            "comando": "<prefix>sair extra",
+            "resposta_esperada": "Formato de uso inválido. Consulte metodos_de_uso.",
+            "variacao": "<prefix>sair."
+          }
+        ],
+        "resposta_esperada": ["Comando executado com sucesso.", "Permissão insuficiente para executar este comando.", "Formato de uso inválido. Consulte metodos_de_uso."],
+        "erros_comuns_usuario": ["Tentar usar o comando sem ser admin do grupo.", "Usar parâmetros extras ou comandos adicionais.", "Esquecer de usar o prefix correto.", "Tentar usar o comando fora de um grupo.", "Tentar usar o comando sem entender que o bot exige permissão de admin."],
+        "passos_se_der_erro": ["1) Confirme que você é admin do grupo.", "2) Verifique se o bot está no grupo e se você tem permissão para emitir comandos.", "3) Use apenas o comando de acordo com o uso: <prefix>sair (sem parâmetros).", "4) Tente novamente após confirmar as permissões.", "5) Se o erro persistir, registre a mensagem de erro e peça ajuda ao suporte."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -3812,6 +4270,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "invite",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Mostra o código de convite atual do grupo. Disponível para planos comum ou premium.",
+        "quando_usar": ["Quando precisar compartilhar o código de convite com novos membros.", "Antes de convidar, pegue o código atual para garantir que está ativo.", "Se o código do grupo mudou, use este comando novamente para obter o novo código."],
+        "exemplos_reais": [
+          {
+            "situacao": "Convidar novo membro que está fora do grupo.",
+            "comando": "<prefix>convite",
+            "resposta_esperada": "Código de convite atual exibido: https://chat.whatsapp.com/EXEMPLO.",
+            "variacao": "com link de convite."
+          },
+          {
+            "situacao": "Usuario nao admin tentando ver o codigo.",
+            "comando": "<prefix>convite",
+            "resposta_esperada": "Permissão insuficiente para executar este comando.",
+            "variacao": "sem privilégios de admin."
+          },
+          {
+            "situacao": "Formato de uso incorreto.",
+            "comando": "<prefix>convite agora",
+            "resposta_esperada": "Formato de uso inválido. Consulte metodos_de_uso.",
+            "variacao": "erro de formatacao."
+          }
+        ],
+        "resposta_esperada": ["Código de convite atual do grupo é exibido, por exemplo, um link de convite.", "Se o usuário não tem permissão, aparece a mensagem de permissão insuficiente."],
+        "erros_comuns_usuario": ["Nao ser admin do grupo", "Tentar usar o comando fora do grupo", "Esquecer de usar o prefixo correto (<prefix>)", "Formato de uso incorreto (usou argumentos ou texto adicional)"],
+        "passos_se_der_erro": ["Verifique se voce é admin do grupo", "Confirme que voce está no grupo correto e use <prefix>convite", "Use o comando exatamente sem argumentos adicionais", "Se o problema continuar, consulte o administrador do grupo ou suporte do bot"],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -4003,6 +4490,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "revoke",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Revoga o código de convite atual do grupo e gera um novo código, mantendo o controle de quem pode entrar no grupo.",
+        "quando_usar": ["Quando o link de convite foi exposto ou há suspeita de uso indevido.", "Ao renovar as regras de acesso do grupo e exigir um novo código de convite.", "Quando você é admin do grupo e precisa atualizar o código de convite sem intervir nos membros atuais."],
+        "exemplos_reais": [
+          {
+            "situacao": "Administrador do grupo quer cancelar o link antigo após suspeita de uso indevido.",
+            "comando": "<prefix>revogarconvite",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "<prefix>revoke."
+          },
+          {
+            "situacao": "Usuário sem privilégios tenta revogar o convite.",
+            "comando": "<prefix>revogarconvite",
+            "resposta_esperada": "Permissão insuficiente para executar este comando.",
+            "variacao": "<prefix>revogarconvite (sem privilégios)."
+          },
+          {
+            "situacao": "Formato de uso incorreto.",
+            "comando": "<prefix>revogarconvite",
+            "resposta_esperada": "Formato de uso inválido. Consulte metodos_de_uso.",
+            "variacao": "<prefix>revogarconvite hoje."
+          }
+        ],
+        "resposta_esperada": ["Comando executado com sucesso.", "Formato de uso inválido. Consulte metodos_de_uso.", "Permissão insuficiente para executar este comando."],
+        "erros_comuns_usuario": ["Assegurar que você está no grupo certo e tem privilêgios de admin.", "Usar o comando fora do contexto de um grupo ou sem estar logado como admin.", "Digitar o prefix errado ou esquecer o prefixo ao digitar o comando.", "Tentar usar o comando com argumentos ou formato não suportado."],
+        "passos_se_der_erro": ["Verifique se você é admin do grupo atual e está no grupo correto.", "Digite exatamente o comando com o prefixo correto: <prefix>revogarconvite", "Se o erro for de formato, consulte metodos_de_uso para o formato correto e tente novamente.", "Se o problema persistir, peça suporte com o ID do grupo e a mensagem de erro para orientação adicional."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -4216,6 +4732,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "join",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Use este comando para fazer o bot entrar em um grupo usando um código de convite. Requer login com Google.",
+        "quando_usar": ["Você recebeu um código de convite de grupo e quer que o bot entre automaticamente.", "Precisa que o bot participe de um grupo para ajudar com mensagens ou automações.", "O código de convite foi fornecido por quem administra o grupo e você quer testar a entrada do bot."],
+        "exemplos_reais": [
+          {
+            "situacao": "Entrar com um código válido.",
+            "comando": "<prefix>entrar <codigo_de_convite>",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "codigo_de_convite válido."
+          },
+          {
+            "situacao": "Código de convite ausente.",
+            "comando": "<prefix>entrar",
+            "resposta_esperada": "Formato de uso inválido. Consulte metodos_de_uso.",
+            "variacao": "falta o código."
+          },
+          {
+            "situacao": "Login Google não realizado.",
+            "comando": "<prefix>entrar <codigo_de_convite>",
+            "resposta_esperada": "Permissão insuficiente para executar este comando.",
+            "variacao": "sem autenticação no Google."
+          }
+        ],
+        "resposta_esperada": ["Comando executado com sucesso.", "Formato de uso inválido. Consulte metodos_de_uso.", "Permissão insuficiente para executar este comando."],
+        "erros_comuns_usuario": ["Esquecer de fornecer o código de convite.", "Digitar o código com caracteres errados ou espaços.", "Não estar logado com Google ao tentar usar o comando.", "Tentar usar o comando em situação onde o código não é permitido."],
+        "passos_se_der_erro": ["Verifique o código de convite: confirme se está correto e ativo.", "Execute o comando no formato correto: <prefix>entrar <codigo_de_convite>.", "Faça login com a conta Google associada, se necessário.", "Se o grupo exigir permissões adicionais, confirme com o admin.", "Caso o erro persista, peça suporte técnico com o código recebido."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -4429,6 +4974,29 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "infofrominvite",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Permite ver informações do grupo associado a um código de convite. Requer login com Google. Disponível para planos comuns e premium.",
+        "quando_usar": ["Você recebeu um código de convite e quer confirmar a que grupo ele pertence e ver informações rápidas antes de entrar.", "Precisa checar detalhes do grupo sem ser membro ou sem exigir permissões administrativas."],
+        "exemplos_reais": [
+          {
+            "situacao": "Ver dados de um grupo antes de participar usando código válido.",
+            "comando": "<prefix>infoconvite AB12Cd34",
+            "resposta_esperada": "O bot exibe dados do grupo associado ao código de convite, como nome do grupo, uma descrição breve e informações básicas de participação (quando permitido).",
+            "variacao": "Outra forma: <prefix>infofrominvite AB12Cd34."
+          },
+          {
+            "situacao": "Código de convite inválido ou expirado.",
+            "comando": "<prefix>infoconvite 9999invalid",
+            "resposta_esperada": "Mensagem de erro indicando que o código é inválido ou expirado, com instruções para obter um código válido.",
+            "variacao": "Alias: <prefix>infofrominvite 9999invalid."
+          }
+        ],
+        "resposta_esperada": ["Retorna dados do grupo vinculado ao código de convite.", "Caso o código seja inválido ou expirado, exibe uma mensagem de erro com instruções para obter um código válido."],
+        "erros_comuns_usuario": ["Não informar o código de convite.", "Código informado com espaços extras ou caracteres incorretos.", "Código de convite expirado ou revogado.", "Usuário não está logado com a conta Google.", "Usar o comando em formato diferente do esperado (sem <prefix> ou sem o espaço)."],
+        "passos_se_der_erro": ["Confirme que você está conectado com uma conta Google válida.", "Copie o código de convite exatamente como fornecido e cole após o prefixo.", "Execute o comando novamente com <prefix>infoconvite <codigo_de_convite>.", "Se o erro persistir, peça ao emissor do código uma nova versão ou confirme se o código ainda é válido.", "Verifique se o código não foi digitado com espaços extras ou caracteres trocados."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -4642,6 +5210,29 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "metadata",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Mostra metadados de um grupo informado ou do grupo atual.",
+        "quando_usar": ["Precisa verificar informações básicas do grupo, como nome, descrição, membros, etc.", "Quiser confirmar dados do grupo atual sem especificar JID.", "Quiser checar metadados de um grupo específico usando o JID."],
+        "exemplos_reais": [
+          {
+            "situacao": "Ver metadados do grupo atual.",
+            "comando": "<prefix>metadados",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "Formato de uso inválido. Consulte metodos_de_uso."
+          },
+          {
+            "situacao": "Ver metadados de um grupo específico usando o JID.",
+            "comando": "<prefix>metadados <group_jid>",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "<group_jid> deve ser substituído pelo JID real do grupo."
+          }
+        ],
+        "resposta_esperada": ["Comando executado com sucesso."],
+        "erros_comuns_usuario": ["Formato de uso inválido. Use <prefix>metadados ou <prefix>metadados <group_jid>.", "Você não tem permissão de admin nesse grupo.", "JID do grupo informado é inválido ou não existente.", "O bot não está presente no grupo ou não pode acessar os metadados.", "Tente novamente mais tarde se o serviço estiver indisponível."],
+        "passos_se_der_erro": ["Verifique se você é admin do grupo onde executa o comando.", "Confirme se está usando a sintaxe correta: <prefix>metadados ou <prefix>metadados <group_jid>.", "Caso use <group_jid>, confirme que o JID é válido.", "Certifique-se de que o bot tenha permissão para ler metadados do grupo.", "Se o problema persistir, reinicie o bot ou entre em contato com o suporte."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -4833,6 +5424,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "requests",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Exibe as solicitações pendentes para entrar no grupo, para que o admin possa aprovar ou rejeitar.",
+        "quando_usar": ["Quando você é admin e precisa ver quem pediu para entrar no grupo.", "Ao verificar novas solicitações pendentes e decidir quem aprovar.", "Para confirmar se há solicitações que precisam de ação."],
+        "exemplos_reais": [
+          {
+            "situacao": "Você é admin e quer ver quem pediu para entrar no grupo.",
+            "comando": "<prefix>solicitacoes",
+            "resposta_esperada": "Aqui estão as solicitações pendentes: João pediu para entrar; Maria pediu para entrar.",
+            "variacao": "lista simples com poucos pedidos."
+          },
+          {
+            "situacao": "Há mais de 5 solicitações pendentes e você quer visualizar tudo.",
+            "comando": "<prefix>solicitacoes",
+            "resposta_esperada": "Aqui estão as solicitações pendentes: João, Maria, Carlos, Ana, Pedro.",
+            "variacao": "lista com várias entradas."
+          },
+          {
+            "situacao": "Você não tem permissão de admin e tenta usar o comando.",
+            "comando": "<prefix>solicitacoes",
+            "resposta_esperada": "Permissão insuficiente para executar este comando.",
+            "variacao": "sem permissão de admin."
+          }
+        ],
+        "resposta_esperada": ["Lista de solicitações pendentes para o grupo, com opções de aprovação ou rejeição.", "Exibir mensagem quando não houver pendentes.", "Mensagens de erro claras quando o usuário não tem permissão ou usa o formato errado."],
+        "erros_comuns_usuario": ["Esquecer o prefixo ou digitar <prefix> solicitacoes com espaço", "Tentar usar o comando sem ter permissão de admin", "Usar o comando em outro chat/grupo", "Não haver solicitações pendentes e esperar uma lista"],
+        "passos_se_der_erro": ["1) Confirme que você está no grupo certo e tem papel de admin.", "2) Use exatamente o formato: <prefix>solicitacoes (sem espaços extras).", "3) Se receber formato de uso inválido, corrija a sintaxe e tente novamente.", "4) Se não houver pendentes, esperar a próxima solicitação ou avisar que não há itens.", "5) Se o bot não responder, verifique a conexão e tente novamente após alguns segundos."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -5075,6 +5695,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "updaterequests",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Aprova ou rejeita solicitações de entrada de participantes no grupo. Pode ser usado em planos comuns e premium.",
+        "quando_usar": ["Quando houver novas solicitações de entrada que precisam de aprovação.", "Se você é admin do grupo e tem permissão para gerenciar membros.", "Ao revisar várias solicitações de uma vez."],
+        "exemplos_reais": [
+          {
+            "situacao": "Aprovar a entrada de João e Maria que pediram entrada no grupo.",
+            "comando": "<prefix>atualizarsolicitacoes approve @joao @maria",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "approve com múltiplos participantes."
+          },
+          {
+            "situacao": "Rejeitar a entrada de Carlos.",
+            "comando": "<prefix>atualizarsolicitacoes reject @carlos",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "reject de um participante."
+          },
+          {
+            "situacao": "Formato incorreto ou erro de digitação no comando.",
+            "comando": "<prefix>atualizarsolicitacoes aprov @joao",
+            "resposta_esperada": "Formato de uso inválido. Consulte metodos_de_uso.",
+            "variacao": "erro de digitar a palavra correta."
+          }
+        ],
+        "resposta_esperada": ["Comando executado com sucesso.", "Formato de uso inválido. Consulte metodos_de_uso.", "Permissão insuficiente para executar este comando."],
+        "erros_comuns_usuario": ["Não mencionar participantes ao chamar o comando.", "Usar uma ação diferente de approve ou reject.", "Não ter permissão de admin ou gerenciar o grupo.", "Usar o comando em contextos ou grupos não permitidos.", "Esquecer do prefixo opcional <prefix> quando necessário."],
+        "passos_se_der_erro": ["Verifique se você é admin do grupo e tem permissão para gerenciar membros.", "Confirme o formato: <prefix>atualizarsolicitacoes <approve|reject> @participante1 [@participante2 ...]).", "Tente novamente com um único participante para isolar o problema.", "Se o erro persistir, peça ajuda ao admin do grupo ou verifique as políticas do bot.", "Certifique-se de que o grupo permite solicitações de entrada"],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -5289,6 +5938,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "autorequests",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Permite ativar, desativar ou checar a veracidade da aprovação automática de solicitações no grupo.",
+        "quando_usar": ["Ativar a aprovação automática para agilizar solicitações de membros.", "Desativar a aprovação automática quando você quiser revisar cada solicitação.", "Verificar o estado atual (ligado/desligado) da auto aprovação."],
+        "exemplos_reais": [
+          {
+            "situacao": "Administrador quer ativar a aprovação automática no grupo.",
+            "comando": "<prefix>autosolicitacoes on",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "<prefix>autorequests on."
+          },
+          {
+            "situacao": "Administrador desativa a aprovação automática.",
+            "comando": "<prefix>autosolicitacoes off",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "<prefix>autorequests off."
+          },
+          {
+            "situacao": "Administrador quer verificar o estado atual.",
+            "comando": "<prefix>autosolicitacoes status",
+            "resposta_esperada": "Estado atual: on/off (conforme estado real).",
+            "variacao": "<prefix>autorequests status."
+          }
+        ],
+        "resposta_esperada": ["Comando executado com sucesso.", "Formato de uso inválido. Consulte metodos_de_uso.", "Permissão insuficiente para executar este comando."],
+        "erros_comuns_usuario": ["Nao eh admin do grupo ou nao possui permissao.", "Esqueceu de usar o prefixo <prefix> na chamada.", "Uso incorreto: informe on, off ou status."],
+        "passos_se_der_erro": ["Confirme que voce eh admin do grupo.", "Use o prefix correto: <prefix>autosolicitacoes on/off/status.", "Verifique se o bot tem permissoes para ler e enviar mensagens no grupo.", "Tente novamente; se persistir, peça suporte com a captura de tela."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -5502,6 +6180,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "temp",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Define o tempo de expiração das mensagens no grupo (ephemeral). As mensagens passam a desaparecer automaticamente após o tempo informado.",
+        "quando_usar": ["Quando você quer reduzir ruído mantendo o grupo limpo após um período de tempo.", "Para conversas com informações sensíveis que não devem ficar salvas no histórico do grupo.", "Ao testar respostas ou fluxos que devem sumir rápido para manter o foco no tema."],
+        "exemplos_reais": [
+          {
+            "situacao": "Grupo de projeto onde as tarefas não devem permanecer no chat por muito tempo.",
+            "comando": "<prefix>temporarias 60",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "uso padrão com duração de 60 segundos."
+          },
+          {
+            "situacao": "Usuario não é admin tentando configurar.",
+            "comando": "<prefix>temporarias 60",
+            "resposta_esperada": "Permissão insuficiente para executar este comando.",
+            "variacao": "usuario sem permissão de admin."
+          },
+          {
+            "situacao": "Formato de duração inválido.",
+            "comando": "<prefix>temporarias abc",
+            "resposta_esperada": "Formato de uso inválido. Consulte metodos_de_uso.",
+            "variacao": "valor não inteiro."
+          }
+        ],
+        "resposta_esperada": ["Comando executado com sucesso.", "Formato de uso inválido. Consulte metodos_de_uso.", "Permissão insuficiente para executar este comando."],
+        "erros_comuns_usuario": ["Não é admin do grupo", "Tentar usar em conversa privada (não no grupo)", "Duração menor que 1 ou valor não numérico", "Esquecer de incluir o <prefix> ou usar o alias incorreto"],
+        "passos_se_der_erro": ["Verifique se você é admin do grupo.", "Confirme que está executando no grupo e não em chat privado.", "Verifique a sintaxe: <prefix>temporarias <duracao_em_segundos> ou <prefix>temp <duracao_em_segundos>.", "Informe uma duração positiva (ex.: 60).", "Se o problema persistir, peça suporte ao administrador do grupo ou verifique as permissões do bot no grupo."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -5715,6 +6422,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "addmode",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Defina quem pode adicionar participantes no grupo: todos os membros ou apenas admins.",
+        "quando_usar": ["Você quer controlar quem pode convidar novas pessoas para o grupo.", "Observou convites indesejados e quer restringir quem pode convidar.", "Antes de gerenciar um grupo grande, estabeleça regras claras de convite.", "Alterou a forma de gerenciar convites e precisa aplicar imediatamente."],
+        "exemplos_reais": [
+          {
+            "situacao": "Quero que qualquer membro possa adicionar participantes.",
+            "comando": "<prefix>modoadicao all_member_add",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "Para reverter, use <prefix>modoadicao admin_add."
+          },
+          {
+            "situacao": "Quero que apenas admins possam adicionar participantes.",
+            "comando": "<prefix>modoadicao admin_add",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "Se quiser permitir a todos depois, use <prefix>modoadicao all_member_add."
+          },
+          {
+            "situacao": "Esqueci de colocar o modo e tentei usar o comando.",
+            "comando": "<prefix>modoadicao",
+            "resposta_esperada": "Formato de uso inválido. Consulte metodos_de_uso.",
+            "variacao": "Tente <prefix>modoadicao all_member_add."
+          }
+        ],
+        "resposta_esperada": ["O comando aplica quem pode adicionar participantes (todos ou apenas admins). Em caso de sucesso, a resposta é: Comando executado com sucesso."],
+        "erros_comuns_usuario": ["Não informar o modo (usar apenas <prefix>modoadicao).", "Tentar executar sem ter permissão de admin.", "Usar o modo errado para a situação (por exemplo, usar admin_add quando quer permitir a todos).", "Não estar em um grupo ou o bot não ter permissão para gerenciar membros (requisitos não atendidos)."],
+        "passos_se_der_erro": ["Verifique se você é admin ou proprietário do grupo.", "Verifique o comando correto: <prefix>modoadicao all_member_add ou <prefix>modoadicao admin_add.", "Certifique-se de que o bot tem permissão para gerenciar participantes no grupo.", "Se o erro persistir, peça ajuda a outro admin ou procure suporte com a mensagem de erro recebida."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -5929,6 +6665,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "prefix",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Gerencia o prefixo de comandos do bot no grupo: definir, checar e restaurar o prefixo atual.",
+        "quando_usar": ["Quando você quer personalizar o prefixo de comandos do bot no grupo.", "Quando quiser saber qual é o prefixo atual.", "Quando precisar resetar para o prefixo padrão."],
+        "exemplos_reais": [
+          {
+            "situacao": "Administrador quer definir o prefixo para ! no grupo.",
+            "comando": "<prefixo>prefixo !",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "Prefixo alterado para !."
+          },
+          {
+            "situacao": "Verificar qual é o prefixo atual.",
+            "comando": "<prefixo>prefixo status",
+            "resposta_esperada": "O prefixo atual é '<prefixo>'.",
+            "variacao": "Consulta de status no grupo."
+          },
+          {
+            "situacao": "Restaurar o prefixo ao padrão.",
+            "comando": "<prefixo>prefixo reset",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "Restaurando para o prefixo original."
+          }
+        ],
+        "resposta_esperada": ["Comando executado com sucesso.", "Formato de uso inválido. Consulte metodos_de_uso.", "Permissão insuficiente para executar este comando.", "O prefixo atual é '<prefixo>'."],
+        "erros_comuns_usuario": ["Não é admin do grupo", "Não fornecer o argumento obrigatório após <prefixo>prefixo", "Tentar usar o comando sem estar no grupo", "Formato de uso incorreto ou desconhecido", "Tentar definir prefixo com caracteres inválidos"],
+        "passos_se_der_erro": ["1) Confirme se você é admin do grupo.", "2) Verifique se incluiu o argumento obrigatório após <prefixo>prefixo (novo_prefixo, status ou reset).", "3) Se é erro de permissão, peça ao dono ou admin do grupo para conceder permissões ao bot.", "4) Reexecute o comando com um dos formatos válidos: <prefixo>prefixo <novo_prefixo>, <prefixo>prefixo status ou <prefixo>prefixo reset.", "5) Se o problema persistir, registre o grupo e procure suporte com as informações de uso."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -6169,6 +6934,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "welcome",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Configura mensagens/midia de boas-vindas no grupo. Ativa, desativa ou define a mensagem que será enviada aos novos membros.",
+        "quando_usar": ["Quero ativar a mensagem de boas-vindas ao entrar no grupo.", "Preciso desativar a saudação automática temporariamente.", "Quero definir ou atualizar o texto/mídia que os novos membros verão ao entrar."],
+        "exemplos_reais": [
+          {
+            "situacao": "Ativar as boas-vindas no grupo.",
+            "comando": "<prefix>boasvindas on",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "<prefix> boasvindas on."
+          },
+          {
+            "situacao": "Desativar as boas-vindas.",
+            "comando": "<prefix>boasvindas off",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "<prefix>boasvindas off."
+          },
+          {
+            "situacao": "Definir a mensagem de boas-vindas com texto.",
+            "comando": "<prefix>boasvindas set Olá, bem-vindos ao grupo! Por favor, leia as regras.",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "<prefix>boasvindas set Olá, bem-vindos ao grupo!"
+          }
+        ],
+        "resposta_esperada": ["Comando executado com sucesso."],
+        "erros_comuns_usuario": ["Não está em um grupo ou você não é admin.", "Uso incorreto do formato (on|off|set).", "Ao usar set, não foi informado texto ou mídia após o comando.", "Prefixo não incluído ou incorreto."],
+        "passos_se_der_erro": ["Verifique se está em grupo e se você é admin do grupo.", "Confirme o formato do comando: on, off ou set.", "Se usar set, inclua a mensagem/texto ou a mídia após o set.", "Tente novamente com o prefix correto. Se o problema persistir, consulte o suporte."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -6409,6 +7203,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "farewell",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Configura mensagens/midia de despedida no grupo. Ativa, desativa ou define a mensagem que aparece quando alguém sai do grupo.",
+        "quando_usar": ["Ativar a despedida no grupo.", "Desativar a despedida no grupo.", "Definir ou atualizar a mensagem/midia de despedida (texto, caminho local ou mídia anexada)."],
+        "exemplos_reais": [
+          {
+            "situacao": "Ativar a despedida no grupo.",
+            "comando": "<prefix>despedida on",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "<prefix>despedida on (ativar)."
+          },
+          {
+            "situacao": "Desativar a despedida no grupo.",
+            "comando": "<prefix>despedida off",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "<prefix>despedida off (desativar)."
+          },
+          {
+            "situacao": "Definir mensagem de despedida com texto.",
+            "comando": "<prefix>despedida set Boa viagem a todos!",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "<prefix>despedida set Obrigado por participar! :)."
+          }
+        ],
+        "resposta_esperada": ["Comando executado com sucesso.", "Formato de uso inválido. Consulte metodos_de_uso.", "Permissão insuficiente para executar este comando."],
+        "erros_comuns_usuario": ["Você não é admin do grupo.", "Formato incorreto ao usar o modo set (inclua a mensagem/midia).", "Tentativa de uso em grupo sem estar com login permitido ou sem permissão de admin."],
+        "passos_se_der_erro": ["Verifique se você é admin do grupo.", "Confirme o formato: use on, off ou set e, se for set, inclua a mensagem ou o caminho da mídia.", "Garanta que o grupo está associado à conta com Google Login ativo.", "Tente novamente; se o problema persistir, procure suporte com a mensagem de erro recebida."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -6623,6 +7446,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "captcha",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Permite ativar, desativar ou checar o status do captcha para novos membros em um grupo.",
+        "quando_usar": ["Você é admin e quer exigir captcha para novos membros.", "Você precisa verificar se o captcha está ativo no grupo atual.", "Precisa confirmar o estado atual do recurso."],
+        "exemplos_reais": [
+          {
+            "situacao": "Ativar captcha em um grupo onde ele está desativado.",
+            "comando": "<prefix>captcha on",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "<prefix>captcha on (sem espaço extra)."
+          },
+          {
+            "situacao": "Desativar captcha quando não é mais necessário.",
+            "comando": "<prefix>captcha off",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "<prefix>captcha off (sem espaços)."
+          },
+          {
+            "situacao": "Ver o status atual do captcha.",
+            "comando": "<prefix>captcha status",
+            "resposta_esperada": "Status atual: on/off (exibição pelo bot).",
+            "variacao": "<prefix>captcha status."
+          }
+        ],
+        "resposta_esperada": ["Comando executado com sucesso.", "Status atual do captcha exibido pelo bot (on/off)."],
+        "erros_comuns_usuario": ["Formato de uso inválido. Use <prefix>captcha on|off|status.", "Você não é admin do grupo ou não possui permissão para alterar as configurações.", "O comando não funciona em chats sem o contexto de grupo ou sem autenticação Google.", "Tente usar o comando exatamente como informado, sem caracteres extras."],
+        "passos_se_der_erro": ["Confirme que você está no grupo correto e é admin.", "Digite exatamente: <prefix>captcha on|off|status.", "Se o erro persistir, tente novamente mais tarde ou peça a outro admin para testar.", "Se houver mensagem de permissão, revise as permissões do bot no grupo."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -6868,6 +7720,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "antilink",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Gerencia o bloqueio de links no grupo: liga/desliga o filtro, lista itens, e adiciona redes ou domínios permitidos.",
+        "quando_usar": ["Quando alguém posta um link que você não quer permitido no grupo.", "Para ativar ou desativar o filtro de links.", "Para ver quais redes ou domínios estão permitidos.", "Para adicionar um domínio ou rede confiável."],
+        "exemplos_reais": [
+          {
+            "situacao": "Ativar o filtro pela primeira vez.",
+            "comando": "<prefix>antilink on",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "iniciando o filtro no grupo atual."
+          },
+          {
+            "situacao": "Desativar o filtro temporariamente.",
+            "comando": "<prefix>antilink off",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "desativar o filtro sem remover a configuração."
+          },
+          {
+            "situacao": "Permitir uma rede específica.",
+            "comando": "<prefix>antilink allow <rede>",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "permitindo 'example.net'."
+          }
+        ],
+        "resposta_esperada": ["Comando executado com sucesso."],
+        "erros_comuns_usuario": ["Você não é admin do grupo.", "Formato de uso inválido. Use <prefix>antilink <subcomando> com os argumentos corretos.", "Rede ou domínio não informado após o subcomando allow/disallow/add.", "O grupo não permite esse comando por restrições de configuração."],
+        "passos_se_der_erro": ["Verifique se você está como admin do grupo.", "Confira o subcomando e os argumentos, usando <prefix>antilink list para confirmar o formato.", "Tente novamente com o prefix correto e, se necessário, remova ou adicione redes/domínios.", "Se o problema continuar, peça suporte ao admin do grupo ou contate o suporte do bot."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -7082,6 +7963,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "noticias",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Comando para ativar, desativar ou checar o envio automático de notícias no grupo.",
+        "quando_usar": ["Para ligar o envio automático de notícias no grupo.", "Para desativar o envio automático de notícias no grupo.", "Para verificar o status atual do envio de notícias."],
+        "exemplos_reais": [
+          {
+            "situacao": "Você quer ativar o envio automático de notícias no grupo.",
+            "comando": "<prefix>noticias on",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "ativar/ligar."
+          },
+          {
+            "situacao": "Você quer desativar o envio automático de notícias no grupo.",
+            "comando": "<prefix>noticias off",
+            "resposta_esperada": "Comando executado com sucesso.",
+            "variacao": "desativar/desligar."
+          },
+          {
+            "situacao": "Você quer checar o status atual do envio de notícias.",
+            "comando": "<prefix>noticias status",
+            "resposta_esperada": "Status atual: ativo ou desativado.",
+            "variacao": "status."
+          }
+        ],
+        "resposta_esperada": ["Comando executado com sucesso.", "Status atual: ativo", "Status atual: desativado"],
+        "erros_comuns_usuario": ["Esquecer de colocar o prefixo antes do comando.", "Tentar usar em grupo sem que o bot tenha sido adicionado ao grupo.", "Não possuir permissões de admin no grupo.", "Utilizar formato incorreto do comando (ex.: noticias on sem o prefix).", "Confundir a palavra on/off com status."],
+        "passos_se_der_erro": ["Confirme que você é admin do grupo e que o bot está no grupo.", "Verifique se o bot tem permissões suficientes para ler mensagens.", "Use o prefix correto (ex.: <prefix>noticias on).", "Tente novamente após confirmar que o grupo aceita mensagens com o bot.", "Se o erro persistir, peça ajuda com o ID do grupo e o comando utilizado."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     }
   ],

@@ -335,6 +335,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "classificacao",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Mostra os 5 membros mais ativos do grupo. Não requer Premium.",
+        "quando_usar": ["Quando quiser ver quem participa mais no grupo.", "Antes de uma discussão ou decisão, para identificar os participantes mais ativos.", "Para comparar participação entre diferentes períodos."],
+        "exemplos_reais": [
+          {
+            "situacao": "Quero ver quem são os 5 membros mais ativos no grupo agora.",
+            "comando": "<prefix>classificacao",
+            "resposta_esperada": "Top 5 ativos no grupo: 1) @usuario1, 2) @usuario2, 3) @usuario3, 4) @usuario4, 5) @usuario5.",
+            "variacao": "<prefix>rank."
+          },
+          {
+            "situacao": "Quero o mesmo resultado usando outro atalho.",
+            "comando": "<prefix>rank",
+            "resposta_esperada": "Top 5 ativos no grupo: 1) @usuario1, 2) @usuario2, 3) @usuario3, 4) @usuario4, 5) @usuario5.",
+            "variacao": "<prefix>classificacao."
+          },
+          {
+            "situacao": "Outra forma rápida de ver o top 5.",
+            "comando": "<prefix>top5",
+            "resposta_esperada": "Top 5 ativos no grupo: 1) @usuario1, 2) @usuario2, 3) @usuario3, 4) @usuario4, 5) @usuario5.",
+            "variacao": "<prefix>classificacao."
+          }
+        ],
+        "resposta_esperada": ["A lista com os 5 membros mais ativos no grupo é exibida."],
+        "erros_comuns_usuario": ["Não está em um grupo ao enviar o comando.", "Ainda não fez login com Google no app.", "Formato do comando incorreto; use um dos métodos de uso: <prefix>classificacao, <prefix>rank, <prefix>top5.", "O grupo não possui participantes ativos suficientes."],
+        "passos_se_der_erro": ["Confira se você está dentro de um grupo.", "Verifique se você está logado com Google.", "Envie o comando correto: <prefix>classificacao, <prefix>rank ou <prefix>top5.", "Tente novamente em poucos segundos.", "Se o erro persistir, peça para o admin revisar as permissões."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -531,6 +560,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "classificacaoglobal",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Mostra o top 5 global de atividade. Use para ver quem lidera a atividade mundial e comparar com seu desempenho.",
+        "quando_usar": ["Quero saber quem está no topo da atividade global agora.", "Quero comparar meu desempenho com o ranking global.", "Preciso de uma visão rápida do ranking mundial sem dados locais."],
+        "exemplos_reais": [
+          {
+            "situacao": "Quero ver o ranking global rapidamente.",
+            "comando": "<prefix>classificacaoglobal",
+            "resposta_esperada": "Top 5 global de atividade exibidos com nomes e pontos. Ex.: 1) Nome - 980 pts, 2) Nome2 - 950 pts, ...",
+            "variacao": "<prefix>globalrank."
+          },
+          {
+            "situacao": "Quero usar a outra forma de comando para o ranking.",
+            "comando": "<prefix>globalrank",
+            "resposta_esperada": "Top 5 global de atividade exibidos com nomes e pontos.",
+            "variacao": "<prefix>classificacaoglobal."
+          },
+          {
+            "situacao": "Não estou logado com Google e tento ver o ranking.",
+            "comando": "<prefix>classificacaoglobal",
+            "resposta_esperada": "Você precisa estar logado com sua conta Google para ver o ranking global.",
+            "variacao": "Sem login Google."
+          }
+        ],
+        "resposta_esperada": ["Top 5 global de atividade exibidos com nomes e pontos.", "Se não houver dados, será exibida mensagem informando a ausência de resultados para o ranking global."],
+        "erros_comuns_usuario": ["Esquecer o prefixo no início do comando.", "Digitar o comando com espaços extras ou caracteres não reconhecidos.", "Tentar usar sem estar logado com Google (googleLogin requerido).", "Usar uma forma de comando incorreta ou digitá-lo com erro de grafia."],
+        "passos_se_der_erro": ["Confira se está logado com a conta Google ligada.", "Digite novamente um dos comandos válidos: <prefix>classificacaoglobal ou <prefix>globalrank.", "Verifique se não há espaço extra ou caracteres estranhos no comando.", "Se o problema persistir, peça ajuda e informe a mensagem de erro e o comando utilizado."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     }
   ],

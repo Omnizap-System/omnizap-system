@@ -7,7 +7,7 @@ Este arquivo e destinado a agentes de IA para gerar respostas no contexto dos co
 - arquivo_base: `app/modules/quoteModule/commandConfig.json`
 - schema_version: `2.0.0`
 - module_enabled: `true`
-- generated_at: `2026-03-11T02:35:17.177Z`
+- generated_at: `2026-03-17T04:04:14.195Z`
 
 ## Escopo do Modulo
 
@@ -171,7 +171,7 @@ Este arquivo e destinado a agentes de IA para gerar respostas no contexto dos co
 - docs:
 - summary: Transforma texto em figurinha estilo quote.
 - usage_examples: <prefix>citar seu texto, <prefix>qc @usuario texto
-- usage*variants.default: 🖼️ \_Citar*, , Use assim:, _<prefix>citar_ sua mensagem, , Ou responda uma mensagem com:, _<prefix>citar_
+- usage_variants.default: 🖼️ _Citar_, , Use assim:, _<prefix>citar_ sua mensagem, , Ou responda uma mensagem com:, _<prefix>citar_
 - behavior:
 - type: argument_driven
 - allowed_actions: (nenhum)

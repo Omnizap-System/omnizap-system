@@ -357,6 +357,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "menu",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Exibe o menu principal ou um menu por categoria. Use <prefix>menu para ver opções; <prefix>menu <categoria> para abrir uma categoria específica.",
+        "quando_usar": ["Quando quiser ver as opções disponíveis do bot de forma rápida.", "Para navegar entre categorias como anime ou stats sem buscar comandos específicos.", "Quando precisar confirmar quais itens existem antes de usa-los com um comando específico."],
+        "exemplos_reais": [
+          {
+            "situacao": "Usuário quer ver o menu principal.",
+            "comando": "<prefix>menu",
+            "resposta_esperada": "O menu principal com as opções fica visível.",
+            "variacao": "sem argumento."
+          },
+          {
+            "situacao": "Usuário quer ver o menu da categoria anime.",
+            "comando": "<prefix>menu anime",
+            "resposta_esperada": "Menu da categoria 'anime' exibido com opções correspondentes.",
+            "variacao": "com categoria."
+          },
+          {
+            "situacao": "Usuário quer ver o menu de estatísticas.",
+            "comando": "<prefix>menu stats",
+            "resposta_esperada": "Menu de estatísticas exibido com opções relacionadas.",
+            "variacao": "com categoria."
+          }
+        ],
+        "resposta_esperada": ["Menu carregado com as opções disponíveis.", "Menu da categoria exibido com opções correspondentes.", "Menu de estatísticas exibido com opções relevantes."],
+        "erros_comuns_usuario": ["Formato de uso incorreto. Use <prefix>menu ou <prefix>menu <categoria>.", "Categoria digitada não existe ou está incorreta.", "Não estar logado com Google quando o comando exigir autenticação.", "Digitar espaços extras ou caracteres não suportados na sintaxe do comando."],
+        "passos_se_der_erro": ["Verifique o formato: <prefix>menu ou <prefix>menu <categoria>.", "Confirme se a categoria informada existe entre as opções válidas.", "Assegure-se de estar logado com Google, se necessário.", "Tente novamente; se persistir, envie uma captura de tela do erro para apoio."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     }
   ],

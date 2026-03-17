@@ -357,6 +357,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "waifu",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Guia rápido para usar o comando waifu e receber uma imagem de anime (SFW) da categoria escolhida.",
+        "quando_usar": ["Quando você quer uma imagem de anime específica (ex.: neko, waifu) sem enviar outras perguntas."],
+        "exemplos_reais": [
+          {
+            "situacao": "Quero uma imagem de neko.",
+            "comando": "<prefix>waifu neko",
+            "resposta_esperada": "✅ Imagem enviada com sucesso! Exemplo de próximo pedido: <prefix>waifu hug.",
+            "variacao": "Usando alias: <prefix>wp neko."
+          },
+          {
+            "situacao": "Não informei a categoria.",
+            "comando": "<prefix>waifu",
+            "resposta_esperada": "❗ Categoria inválida ou ausente. Exemplos: <prefix>waifu neko | <prefix>wp waifu Veja a lista completa em <prefix>waifuajuda.",
+            "variacao": "Tente: <prefix>waifu neko."
+          },
+          {
+            "situacao": "Categoria não suportada.",
+            "comando": "<prefix>waifu dragon",
+            "resposta_esperada": "❗ Categoria inválida ou ausente. Exemplos: <prefix>waifu neko | <prefix>wp waifu Veja a lista completa em <prefix>waifuajuda.",
+            "variacao": "Tente uma categoria comum como neko ou waifu."
+          }
+        ],
+        "resposta_esperada": ["O bot envia uma imagem de anime da categoria solicitada (SFW)."],
+        "erros_comuns_usuario": ["Esquecer de indicar a categoria", "Usar uma categoria não suportada", "Usar o comando sem o prefixo quando necessário", "Erro de conexão temporário"],
+        "passos_se_der_erro": ["1. Verifique se digitou a categoria corretamente. 2. Use o formato com prefixo: <prefix>waifu <categoria> ou <prefix>wp <categoria>. 3. Se receber erro de categoria, peça a lista de categorias com <prefix>waifuajuda e es"],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -575,6 +604,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "waifunsfw",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Envie imagens NSFW de waifus em grupos autorizados. Requer Premium e NSFW ativo. Use <prefix>waifunsfw <categoria> ou <prefix>wpnsfw <waifu>.",
+        "quando_usar": ["Quando o grupo tiver NSFW ativo e você for assinante Premium.", "Para solicitar uma imagem NSFW de uma categoria válida (ex.: neko, waifu, etc.).", "Para confirmar qual variedade de conteúdo NSFW está disponível no momento."],
+        "exemplos_reais": [
+          {
+            "situacao": "Grupo com NSFW ativo e usuário Premium solicita neko.",
+            "comando": "<prefix>waifunsfw neko",
+            "resposta_esperada": "🔞 Imagem NSFW enviada. Exemplo de próximo pedido: <prefix>waifunsfw neko.",
+            "variacao": "neko."
+          },
+          {
+            "situacao": "Grupo sem Premium ou NSFW ativo.",
+            "comando": "<prefix>waifunsfw neko",
+            "resposta_esperada": "🔒 Este comando NSFW exige acesso Premium. Em grupos, também é preciso NSFW ativo com <prefix>nsfw on.",
+            "variacao": "premium_required."
+          },
+          {
+            "situacao": "Categoria NSFW inválida.",
+            "comando": "<prefix>waifunsfw manga",
+            "resposta_esperada": "❗ Categoria NSFW inválida ou ausente. Exemplos: <prefix>waifunsfw waifu | <prefix>wpnsfw neko Veja opções em <prefix>waifuajuda.",
+            "variacao": "categoria_invalida."
+          }
+        ],
+        "resposta_esperada": ["🔞 Imagem NSFW enviada. Exemplo de próximo pedido: <prefix>waifunsfw neko", "❗ Categoria NSFW inválida ou ausente. Exemplos: <prefix>waifunsfw waifu | <prefix>wpnsfw neko Veja opções em <prefix>waifuajuda.", "🔒 Este comando NSFW exige acesso Premium. Em grupos, também é preciso NSFW ativo com <prefix>nsfw on."],
+        "erros_comuns_usuario": ["Não informar a categoria NSFW", "Categoria informada não é suportada", "NSFW não está ativo no grupo", "Usuário não possui assinatura Premium"],
+        "passos_se_der_erro": ["Verifique se o NSFW está ativo no grupo com <prefix>nsfw on e peça ao admin para ativar, se necessário.", "Confirme que você possui uma assinatura Premium válida para usar o comando.", "Certifique-se de digitar uma categoria NSFW suportada, por exemplo neko, waifu, etc.", "Tente novamente com uma categoria diferente ou em outro momento; se o problema persistir, peça ajuda ao administrador do grupo."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     },
     {
@@ -771,6 +829,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "waifuajuda",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Guia rápido das categorias de fotos anime que posso enviar. Mostra todas as opções disponíveis e como usar o comando. Não é necessário Premium; funciona para planos comum e premium.",
+        "quando_usar": ["Quando você quer conhecer todas as categorias de fotos disponíveis sem digitar argumentos", "Quando precisa confirmar que o comando não aceita parâmetros", "Quando desejar usar o alias wppicshelp para abrir o guia rapidamente"],
+        "exemplos_reais": [
+          {
+            "situacao": "Usuário quer abrir o guia rapidamente com o prefix.",
+            "comando": "<prefix>waifuajuda",
+            "resposta_esperada": "Guia de categorias exibido. Exemplo: <prefix>waifu neko.",
+            "variacao": "uso direto com <prefix>."
+          },
+          {
+            "situacao": "Usuário prefere usar o alias.",
+            "comando": "wppicshelp",
+            "resposta_esperada": "Guia de categorias exibido. Observação: você pode usar <prefix>waifu neko para abrir uma categoria específica.",
+            "variacao": "alias."
+          },
+          {
+            "situacao": "Usuário está em contexto privado ou grupo permitido.",
+            "comando": "<prefix>waifuajuda",
+            "resposta_esperada": "Guia pronto. Veja as categorias disponíveis e escolha uma: neko, shinobu, etc.",
+            "variacao": "contexto privado ou grupo permitido."
+          }
+        ],
+        "resposta_esperada": ["Guia de categorias exibido com sucesso. Use <prefix>waifu neko para ver fotos de uma categoria específica."],
+        "erros_comuns_usuario": ["Tentar usar o comando com argumentos, quando ele não exige nenhum.", "Esquecer de incluir o prefixo, por exemplo usar 'waifuajuda' sem o prefixo.", "Tentar usar em contexto onde o guia não pode ser exibido (contextos não suportados)."],
+        "passos_se_der_erro": ["Verifique se o comando está sendo usado em um contexto permitido (privado ou grupo permitido).", "Tente novamente com o prefix correto: <prefix>waifuajuda.", "Se o guia não aparecer, tente novamente mais tarde ou entre em contato com o suporte."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     }
   ],

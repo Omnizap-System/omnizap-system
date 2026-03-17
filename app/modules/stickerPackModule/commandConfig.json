@@ -378,6 +378,35 @@
         "schema": "legacy_v1_and_v2",
         "legacy_name": "pacote",
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
+      },
+      "user_experience": {
+        "resumo_usuario": "Gerencie packs de figurinhas: criar, listar, adicionar figurinhas e enviar packs para contatos.",
+        "quando_usar": ["Criar um novo pack de figurinhas.", "Ver a lista de packs existentes.", "Adicionar figurinhas a um pack existente.", "Enviar um pack para alguém."],
+        "exemplos_reais": [
+          {
+            "situacao": "Criar um pack de figurinhas.",
+            "comando": "<prefix>pacote create meupack",
+            "resposta_esperada": "Pack criado com sucesso.",
+            "variacao": "Use nomes simples, sem aspas. Ex.: meupack."
+          },
+          {
+            "situacao": "Listar todos os packs.",
+            "comando": "<prefix>pacote list",
+            "resposta_esperada": "Listagem exibida com todos os packs.",
+            "variacao": "Pode retornar vários nomes; observe a lista completa."
+          },
+          {
+            "situacao": "Adicionar figurinhas a um pack existente.",
+            "comando": "<prefix>pacote add meupack",
+            "resposta_esperada": "Figurinhas adicionadas ao pack 'meupack'.",
+            "variacao": "Se houver figurinhas disponíveis, elas são incluídas."
+          }
+        ],
+        "resposta_esperada": ["Comando executado com sucesso.", "Formato de uso inválido. Consulte metodos_de_uso.", "Permissão insuficiente para executar este comando."],
+        "erros_comuns_usuario": ["Esquecer de usar o prefixo correto no início do comando.", "Digitar o subcomando errado ou sem o parâmetro necessário.", "Tentar adicionar figurinhas sem indicar o pack ou sem estar logado.", "Tentar enviar sem ter criado ou sem selecionar um pack existente.", "Não estar logado com Google quando o comando exigir login."],
+        "passos_se_der_erro": ["Use <prefix>pacote help para confirmar a sintaxe correta.", "Verifique se o subcomando está entre create, list, add ou send e inclua os parâmetros necessários.", "Confirme que você está logado com Google, conforme exigido.", "Tente novamente após ajustar o comando. Se o erro persistir, copie a mensagem de erro e tente novamente mais tarde.", "Se não resolver, aguarde alguns minutos e procure ajuda com os detalhes do comando executado."],
+        "resumo_usuario_origem": "auto_ia_assistida",
+        "resumo_usuario_revisao_pendente": true
       }
     }
   ],
