@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import OpenAI from 'openai';
 import { getAiHelpCachedResponse, upsertAiHelpCachedResponse } from './aiHelpResponseCacheRepository.js';
-import { createGeminiTextService, DEFAULT_GEMINI_MODEL } from './geminiService.js';
+import { createGeminiTextService, DEFAULT_GEMINI_MODEL, isGeminiAuthReady } from './geminiService.js';
 
 const DEFAULT_FAQ_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const DEFAULT_MAX_RESPONSE_CHARS = 3400;
@@ -169,6 +169,16 @@ const normalizeLlmProvider = (value, fallback = 'gemini') => {
   return fallback;
 };
 
+const normalizeGeminiAuthMode = (value, fallback = 'cli') => {
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase();
+  if (normalized === 'api_key') return 'api_key';
+  if (normalized === 'cli') return 'cli';
+  if (normalized === 'auto') return 'auto';
+  return fallback;
+};
+
 const looksLikeGeminiModel = (value) =>
   String(value || '')
     .trim()
@@ -241,7 +251,13 @@ export const createModuleAiHelpService = ({ moduleKey, moduleLabel = 'modulo', e
     const cachePathValue = String(faq.cache_file || '').trim();
     const cachePath = cachePathValue ? path.resolve(process.cwd(), cachePathValue) : path.join(process.cwd(), 'data', 'cache', `${moduleKey}-ai-faq-cache.json`);
 
-    const provider = normalizeLlmProvider(envValue('PROVIDER') || llm.provider || process.env.AI_HELP_LLM_PROVIDER, process.env.GEMINI_API_KEY ? 'gemini' : 'openai');
+    const geminiAuthMode = normalizeGeminiAuthMode(envValue('GEMINI_AUTH_MODE') || llm.gemini_auth_mode || process.env.GEMINI_AUTH_MODE, 'cli');
+    const hasGeminiAuthHint = isGeminiAuthReady({
+      authMode: geminiAuthMode,
+      apiKey: process.env.GEMINI_API_KEY,
+      cliCommand: process.env.GEMINI_CLI_COMMAND || 'gemini',
+    });
+    const provider = normalizeLlmProvider(envValue('PROVIDER') || llm.provider || process.env.AI_HELP_LLM_PROVIDER, hasGeminiAuthHint ? 'gemini' : 'openai');
     const defaultModelByProvider = provider === 'gemini' ? process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL : process.env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL;
     const rawModel = String(envValue('MODEL') || llm.model || defaultModelByProvider).trim() || defaultModelByProvider;
     const modelFromEnv = String(envValue('MODEL') || '').trim();
@@ -271,6 +287,7 @@ export const createModuleAiHelpService = ({ moduleKey, moduleLabel = 'modulo', e
             .trim()
             .toLowerCase() !== 'false',
         provider,
+        geminiAuthMode,
         model: resolvedModel,
         maxResponseChars: Math.max(400, toPositiveInt(envValue('MAX_RESPONSE_CHARS') || llm.max_response_chars, DEFAULT_MAX_RESPONSE_CHARS, 400)),
         maxAgentContextChars: Math.max(2_000, toPositiveInt(envValue('MAX_AGENT_CONTEXT_CHARS') || llm.max_agent_context_chars, DEFAULT_MAX_AGENT_CONTEXT_CHARS, 2_000)),
@@ -286,6 +303,7 @@ export const createModuleAiHelpService = ({ moduleKey, moduleLabel = 'modulo', e
   let faqGenerationPromise = null;
   let cachedOpenAIClient = null;
   let cachedGeminiService = null;
+  let cachedGeminiServiceKey = '';
 
   const createEmptyCache = () => ({
     version: FAQ_CACHE_VERSION,
@@ -441,7 +459,14 @@ export const createModuleAiHelpService = ({ moduleKey, moduleLabel = 'modulo', e
       .join('\n');
   };
 
-  const isGeminiReady = () => Boolean(String(process.env.GEMINI_API_KEY || '').trim());
+  const isGeminiReady = () => {
+    const config = getAiHelpConfig();
+    return isGeminiAuthReady({
+      authMode: config.llm.geminiAuthMode,
+      apiKey: process.env.GEMINI_API_KEY,
+      cliCommand: process.env.GEMINI_CLI_COMMAND || 'gemini',
+    });
+  };
   const isOpenAIReady = () => Boolean(String(process.env.OPENAI_API_KEY || '').trim());
   const isProviderReady = (provider) => (provider === 'gemini' ? isGeminiReady() : isOpenAIReady());
 
@@ -453,12 +478,16 @@ export const createModuleAiHelpService = ({ moduleKey, moduleLabel = 'modulo', e
   const getGeminiService = () => {
     if (!isGeminiReady()) return null;
     const config = getAiHelpConfig();
-    if (!cachedGeminiService) {
+    const currentServiceKey = `${config.llm.model}|${config.llm.timeoutMs}|${config.llm.geminiAuthMode}|${process.env.GEMINI_CLI_COMMAND || 'gemini'}|${Boolean(String(process.env.GEMINI_API_KEY || '').trim())}`;
+    if (!cachedGeminiService || cachedGeminiServiceKey !== currentServiceKey) {
       cachedGeminiService = createGeminiTextService({
         apiKey: process.env.GEMINI_API_KEY,
         defaultModel: config.llm.model || process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL,
         timeoutMs: config.llm.timeoutMs,
+        authMode: config.llm.geminiAuthMode,
+        cliCommand: process.env.GEMINI_CLI_COMMAND || 'gemini',
       });
+      cachedGeminiServiceKey = currentServiceKey;
     }
     return cachedGeminiService;
   };

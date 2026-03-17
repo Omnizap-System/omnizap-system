@@ -4,9 +4,13 @@ import path from 'node:path';
 import OpenAI from 'openai';
 import { z } from 'zod';
 
+import { toUnixMs as __timeNowMs } from '#time';
 import logger from '#logger';
+import { createGeminiTextService, DEFAULT_GEMINI_MODEL, isGeminiAuthReady } from './geminiService.js';
 
-const DEFAULT_MODEL = 'gpt-4o-mini';
+const DEFAULT_MODEL = DEFAULT_GEMINI_MODEL;
+const DEFAULT_PROVIDER = 'gemini';
+const DEFAULT_GEMINI_AUTH_MODE = 'cli';
 const DEFAULT_TIMEOUT_MS = 25_000;
 const DEFAULT_CONTEXT_MAX_CHARS = 5_200;
 const DEFAULT_AGENT_MAX_CHARS = 2_400;
@@ -28,13 +32,52 @@ const parseEnvFloat = (value, fallback, min, max) => {
   return Math.max(min, Math.min(max, parsed));
 };
 
+const normalizeProvider = (value, fallback = DEFAULT_PROVIDER) => {
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase();
+  if (normalized === 'gemini') return 'gemini';
+  if (normalized === 'openai') return 'openai';
+  return fallback;
+};
+
+const normalizeGeminiAuthMode = (value, fallback = DEFAULT_GEMINI_AUTH_MODE) => {
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase();
+  if (normalized === 'api_key') return 'api_key';
+  if (normalized === 'cli') return 'cli';
+  if (normalized === 'auto') return 'auto';
+  return fallback;
+};
+
+const looksLikeGeminiModel = (value) =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .includes('gemini');
+
+const looksLikeOpenAiModel = (value) => {
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase();
+  if (!normalized) return false;
+  return normalized.startsWith('gpt-') || normalized.startsWith('o1') || normalized.startsWith('o3') || normalized.startsWith('o4') || normalized.startsWith('text-');
+};
+
+const COMMAND_CONFIG_ENRICHMENT_PROVIDER = normalizeProvider(process.env.COMMAND_CONFIG_ENRICHMENT_WORKER_PROVIDER || process.env.AI_HELP_LLM_PROVIDER || DEFAULT_PROVIDER, DEFAULT_PROVIDER);
 const COMMAND_CONFIG_ENRICHMENT_MODEL = String(process.env.COMMAND_CONFIG_ENRICHMENT_WORKER_MODEL || DEFAULT_MODEL).trim() || DEFAULT_MODEL;
+const COMMAND_CONFIG_ENRICHMENT_GEMINI_MODEL = looksLikeGeminiModel(COMMAND_CONFIG_ENRICHMENT_MODEL) ? COMMAND_CONFIG_ENRICHMENT_MODEL : String(process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL).trim() || DEFAULT_GEMINI_MODEL;
+const COMMAND_CONFIG_ENRICHMENT_OPENAI_MODEL = looksLikeOpenAiModel(COMMAND_CONFIG_ENRICHMENT_MODEL) ? COMMAND_CONFIG_ENRICHMENT_MODEL : String(process.env.OPENAI_MODEL || 'gpt-5-nano').trim() || 'gpt-5-nano';
 const COMMAND_CONFIG_ENRICHMENT_TIMEOUT_MS = parseEnvInt(process.env.COMMAND_CONFIG_ENRICHMENT_WORKER_TIMEOUT_MS, DEFAULT_TIMEOUT_MS, 5_000, 90_000);
 const COMMAND_CONFIG_ENRICHMENT_CONTEXT_MAX_CHARS = parseEnvInt(process.env.COMMAND_CONFIG_ENRICHMENT_CONTEXT_MAX_CHARS, DEFAULT_CONTEXT_MAX_CHARS, 1_500, 16_000);
 const COMMAND_CONFIG_ENRICHMENT_AGENT_MAX_CHARS = parseEnvInt(process.env.COMMAND_CONFIG_ENRICHMENT_AGENT_MAX_CHARS, DEFAULT_AGENT_MAX_CHARS, 600, 8_000);
 const COMMAND_CONFIG_ENRICHMENT_SOURCE_FILE_MAX_CHARS = parseEnvInt(process.env.COMMAND_CONFIG_ENRICHMENT_SOURCE_FILE_MAX_CHARS, DEFAULT_SOURCE_FILE_MAX_CHARS, 400, 5_000);
 const COMMAND_CONFIG_ENRICHMENT_MAX_SOURCE_FILES = parseEnvInt(process.env.COMMAND_CONFIG_ENRICHMENT_MAX_SOURCE_FILES, DEFAULT_MAX_SOURCE_FILES, 1, 8);
 const COMMAND_CONFIG_ENRICHMENT_BASE_CONFIDENCE = parseEnvFloat(process.env.COMMAND_CONFIG_ENRICHMENT_BASE_CONFIDENCE, 0.55, 0.1, 1);
+const COMMAND_CONFIG_ENRICHMENT_PROVIDER_FAILURE_COOLDOWN_MS = parseEnvInt(process.env.COMMAND_CONFIG_ENRICHMENT_PROVIDER_FAILURE_COOLDOWN_MS, 15 * 60 * 1000, 30_000, 24 * 60 * 60 * 1000);
+const COMMAND_CONFIG_ENRICHMENT_GEMINI_AUTH_MODE = normalizeGeminiAuthMode(process.env.COMMAND_CONFIG_ENRICHMENT_WORKER_GEMINI_AUTH_MODE || process.env.GEMINI_AUTH_MODE || DEFAULT_GEMINI_AUTH_MODE, DEFAULT_GEMINI_AUTH_MODE);
+const COMMAND_CONFIG_ENRICHMENT_GEMINI_CLI_COMMAND = String(process.env.COMMAND_CONFIG_ENRICHMENT_WORKER_GEMINI_CLI_COMMAND || process.env.GEMINI_CLI_COMMAND || 'gemini').trim() || 'gemini';
 
 const AI_ENRICHMENT_OUTPUT_SCHEMA = z
   .object({
@@ -48,6 +91,12 @@ const AI_ENRICHMENT_OUTPUT_SCHEMA = z
   .strict();
 
 let cachedClient = null;
+let cachedGeminiService = null;
+let cachedGeminiServiceKey = '';
+const providerCooldownUntil = {
+  gemini: 0,
+  openai: 0,
+};
 
 const moduleConfigCache = new Map();
 const fileTextCache = new Map();
@@ -103,6 +152,60 @@ const parseJsonSafe = (value) => {
   } catch {
     return null;
   }
+};
+
+const parseJsonFromModelOutput = (rawOutput) => {
+  const direct = parseJsonSafe(rawOutput);
+  if (direct && typeof direct === 'object') return direct;
+
+  const text = String(rawOutput || '').trim();
+  if (!text) return null;
+
+  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenceMatch?.[1]) {
+    const fenced = parseJsonSafe(fenceMatch[1]);
+    if (fenced && typeof fenced === 'object') return fenced;
+  }
+
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start >= 0 && end > start) {
+    const sliced = parseJsonSafe(text.slice(start, end + 1));
+    if (sliced && typeof sliced === 'object') return sliced;
+  }
+
+  return null;
+};
+
+const isProviderInCooldown = (provider) => {
+  const now = __timeNowMs();
+  const safeProvider = provider === 'openai' ? 'openai' : 'gemini';
+  return Number(providerCooldownUntil[safeProvider] || 0) > now;
+};
+
+const shouldApplyProviderCooldown = (provider, error) => {
+  const message = normalizeText(error?.message || error);
+  if (!message) return false;
+
+  const hardErrorPatterns = [
+    'modelnotfound',
+    'does not exist',
+    'requested entity was not found',
+    'permission denied',
+    'unauthorized',
+    'invalid api key',
+    'quota',
+    '429',
+  ];
+  if (hardErrorPatterns.some((token) => message.includes(token))) return true;
+  return false;
+};
+
+const markProviderCooldown = (provider, error) => {
+  if (!shouldApplyProviderCooldown(provider, error)) return false;
+  const safeProvider = provider === 'openai' ? 'openai' : 'gemini';
+  providerCooldownUntil[safeProvider] = __timeNowMs() + COMMAND_CONFIG_ENRICHMENT_PROVIDER_FAILURE_COOLDOWN_MS;
+  return true;
 };
 
 const uniqueList = (values = [], { maxItems = DEFAULT_MAX_LIST_ITEMS, maxLength = 200, normalizeMode = 'display' } = {}) => {
@@ -173,6 +276,86 @@ const getOpenAIClient = () => {
     });
   }
   return cachedClient;
+};
+
+const isGeminiReady = () =>
+  isGeminiAuthReady({
+    authMode: COMMAND_CONFIG_ENRICHMENT_GEMINI_AUTH_MODE,
+    apiKey: process.env.GEMINI_API_KEY,
+    cliCommand: COMMAND_CONFIG_ENRICHMENT_GEMINI_CLI_COMMAND,
+  });
+
+const isOpenAiReady = () => Boolean(String(process.env.OPENAI_API_KEY || '').trim());
+
+const getGeminiService = () => {
+  if (!isGeminiReady()) return null;
+
+  const serviceKey = `${COMMAND_CONFIG_ENRICHMENT_MODEL}|${COMMAND_CONFIG_ENRICHMENT_TIMEOUT_MS}|${COMMAND_CONFIG_ENRICHMENT_GEMINI_AUTH_MODE}|${COMMAND_CONFIG_ENRICHMENT_GEMINI_CLI_COMMAND}|${Boolean(String(process.env.GEMINI_API_KEY || '').trim())}`;
+  if (!cachedGeminiService || cachedGeminiServiceKey !== serviceKey) {
+    cachedGeminiService = createGeminiTextService({
+      apiKey: process.env.GEMINI_API_KEY,
+      defaultModel: COMMAND_CONFIG_ENRICHMENT_GEMINI_MODEL,
+      timeoutMs: COMMAND_CONFIG_ENRICHMENT_TIMEOUT_MS,
+      authMode: COMMAND_CONFIG_ENRICHMENT_GEMINI_AUTH_MODE,
+      cliCommand: COMMAND_CONFIG_ENRICHMENT_GEMINI_CLI_COMMAND,
+    });
+    cachedGeminiServiceKey = serviceKey;
+  }
+  return cachedGeminiService;
+};
+
+const callGeminiEnrichment = async ({ systemPrompt, contextPayload }) => {
+  const service = getGeminiService();
+  if (!service) return null;
+
+  const response = await service.generateText({
+    instructions: systemPrompt,
+    userPrompt: contextPayload,
+    model: COMMAND_CONFIG_ENRICHMENT_GEMINI_MODEL,
+  });
+
+  const text = String(response?.text || '').trim();
+  if (!text) return null;
+  return {
+    provider: 'gemini',
+    model: String(response?.model || COMMAND_CONFIG_ENRICHMENT_GEMINI_MODEL).trim() || COMMAND_CONFIG_ENRICHMENT_GEMINI_MODEL,
+    outputText: text,
+  };
+};
+
+const callOpenAiEnrichment = async ({ systemPrompt, contextPayload }) => {
+  if (!isOpenAiReady()) return null;
+
+  const client = getOpenAIClient();
+  const completion = await client.chat.completions.create({
+    model: COMMAND_CONFIG_ENRICHMENT_OPENAI_MODEL,
+    response_format: { type: 'json_object' },
+    messages: [
+      {
+        role: 'system',
+        content: systemPrompt,
+      },
+      {
+        role: 'user',
+        content: contextPayload,
+      },
+    ],
+  });
+
+  const message = completion?.choices?.[0]?.message || {};
+  const outputText = extractTextFromAssistantMessage(message);
+  if (!outputText) return null;
+  return {
+    provider: 'openai',
+    model: COMMAND_CONFIG_ENRICHMENT_OPENAI_MODEL,
+    outputText,
+  };
+};
+
+const resolveLlmCallOrder = () => {
+  const primary = normalizeProvider(COMMAND_CONFIG_ENRICHMENT_PROVIDER, DEFAULT_PROVIDER);
+  const fallback = primary === 'gemini' ? 'openai' : 'gemini';
+  return [primary, fallback];
 };
 
 const isFilePathInside = (baseDir, candidatePath) => {
@@ -333,7 +516,7 @@ const buildCommandContextPayload = async ({ learningEvent, toolRecord }) => {
 };
 
 const parseAndSanitizeOutput = (rawJson) => {
-  const parsed = parseJsonSafe(rawJson);
+  const parsed = parseJsonFromModelOutput(rawJson);
   if (!parsed || typeof parsed !== 'object') return null;
 
   const validated = AI_ENRICHMENT_OUTPUT_SCHEMA.safeParse(parsed);
@@ -379,7 +562,7 @@ const buildHeuristicSuggestion = ({ learningEvent, toolRecord }) => {
   };
 };
 
-const isLlmReady = () => Boolean(process.env.OPENAI_API_KEY);
+const isLlmReady = () => isGeminiReady() || isOpenAiReady();
 
 export const generateCommandConfigEnrichmentSuggestion = async ({ learningEvent, toolRecord } = {}) => {
   if (!learningEvent || !toolRecord) return null;
@@ -390,63 +573,71 @@ export const generateCommandConfigEnrichmentSuggestion = async ({ learningEvent,
   }
 
   const contextPayload = await buildCommandContextPayload({ learningEvent, toolRecord });
-  const client = getOpenAIClient();
+  const systemPrompt = buildSystemPrompt();
 
-  let completion = null;
-  try {
-    completion = await client.chat.completions.create({
-      model: COMMAND_CONFIG_ENRICHMENT_MODEL,
-      temperature: 0.15,
-      response_format: { type: 'json_object' },
-      messages: [
-        {
-          role: 'system',
-          content: buildSystemPrompt(),
-        },
-        {
-          role: 'user',
-          content: contextPayload,
-        },
-      ],
-    });
-  } catch (error) {
-    logger.warn('Falha ao gerar enriquecimento de commandConfig com LLM.', {
-      action: 'command_config_enrichment_llm_failed',
-      module: toolRecord?.moduleKey || null,
-      command: toolRecord?.commandName || null,
-      event_id: learningEvent?.id || null,
-      error: error?.message,
-    });
-    return fallbackSuggestion;
+  const providerOrder = resolveLlmCallOrder();
+  for (const provider of providerOrder) {
+    if (isProviderInCooldown(provider)) {
+      continue;
+    }
+
+    try {
+      const llmOutput =
+        provider === 'gemini'
+          ? await callGeminiEnrichment({
+              systemPrompt,
+              contextPayload,
+            })
+          : await callOpenAiEnrichment({
+              systemPrompt,
+              contextPayload,
+            });
+
+      if (!llmOutput?.outputText) continue;
+
+      const parsed = parseAndSanitizeOutput(llmOutput.outputText);
+      if (!parsed || !isSuggestionMeaningful(parsed.suggestion)) continue;
+
+      const eventConfidence = clamp01(learningEvent?.confidence);
+      const successSignal = learningEvent?.success ? 0.12 : 0.03;
+      const finalConfidence = clamp01(parsed.modelConfidence * 0.72 + eventConfidence * 0.18 + successSignal);
+
+      return {
+        suggestion: parsed.suggestion,
+        confidence: finalConfidence,
+        source: `llm_${provider}`,
+        modelName: llmOutput.model || COMMAND_CONFIG_ENRICHMENT_MODEL,
+      };
+    } catch (error) {
+      logger.warn('Falha ao gerar enriquecimento de commandConfig com LLM.', {
+        action: 'command_config_enrichment_llm_failed',
+        module: toolRecord?.moduleKey || null,
+        command: toolRecord?.commandName || null,
+        event_id: learningEvent?.id || null,
+        provider,
+        provider_cooldown_applied: markProviderCooldown(provider, error),
+        error: error?.message,
+      });
+    }
   }
 
-  const message = completion?.choices?.[0]?.message || {};
-  const rawJson = extractTextFromAssistantMessage(message);
-  const parsed = parseAndSanitizeOutput(rawJson);
-
-  if (!parsed || !isSuggestionMeaningful(parsed.suggestion)) {
-    return fallbackSuggestion;
-  }
-
-  const eventConfidence = clamp01(learningEvent?.confidence);
-  const successSignal = learningEvent?.success ? 0.12 : 0.03;
-  const finalConfidence = clamp01(parsed.modelConfidence * 0.72 + eventConfidence * 0.18 + successSignal);
-
-  return {
-    suggestion: parsed.suggestion,
-    confidence: finalConfidence,
-    source: 'llm',
-    modelName: COMMAND_CONFIG_ENRICHMENT_MODEL,
-  };
+  return fallbackSuggestion;
 };
 
 export const getCommandConfigEnrichmentServiceConfig = () => ({
+  provider: COMMAND_CONFIG_ENRICHMENT_PROVIDER,
   model: COMMAND_CONFIG_ENRICHMENT_MODEL,
+  geminiModel: COMMAND_CONFIG_ENRICHMENT_GEMINI_MODEL,
+  openaiModel: COMMAND_CONFIG_ENRICHMENT_OPENAI_MODEL,
   timeoutMs: COMMAND_CONFIG_ENRICHMENT_TIMEOUT_MS,
   contextMaxChars: COMMAND_CONFIG_ENRICHMENT_CONTEXT_MAX_CHARS,
   agentMaxChars: COMMAND_CONFIG_ENRICHMENT_AGENT_MAX_CHARS,
   sourceFileMaxChars: COMMAND_CONFIG_ENRICHMENT_SOURCE_FILE_MAX_CHARS,
   maxSourceFiles: COMMAND_CONFIG_ENRICHMENT_MAX_SOURCE_FILES,
   baseConfidence: COMMAND_CONFIG_ENRICHMENT_BASE_CONFIDENCE,
+  geminiAuthMode: COMMAND_CONFIG_ENRICHMENT_GEMINI_AUTH_MODE,
+  hasGeminiAuth: isGeminiReady(),
+  hasOpenAiApiKey: isOpenAiReady(),
   hasApiKey: isLlmReady(),
+  providerFailureCooldownMs: COMMAND_CONFIG_ENRICHMENT_PROVIDER_FAILURE_COOLDOWN_MS,
 });

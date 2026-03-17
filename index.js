@@ -31,6 +31,7 @@ import { startStickerPackScoreSnapshotRuntime, stopStickerPackScoreSnapshotRunti
 import { startStickerDomainEventConsumer, stopStickerDomainEventConsumer } from './app/modules/stickerPackModule/stickerDomainEventConsumerRuntime.js';
 import { startAiLearningWorker, stopAiLearningWorker } from './app/workers/aiLearningWorker.js';
 import { startCommandConfigEnrichmentWorker, stopCommandConfigEnrichmentWorker } from './app/workers/commandConfigEnrichmentWorker.js';
+import { startAiHelperContinuousLearningWorker, stopAiHelperContinuousLearningWorker } from './app/workers/aiHelperContinuousLearningWorker.js';
 import { formatCommandConfigValidationReport, validateAllCommandConfigs } from './app/services/ai/commandConfigValidationService.js';
 
 /**
@@ -224,6 +225,7 @@ async function startApp() {
     startStickerDomainEventConsumer();
     startAiLearningWorker();
     startCommandConfigEnrichmentWorker();
+    startAiHelperContinuousLearningWorker();
 
     // Backfill é opcional, rodando em background.
     const shouldBackfill = process.env.LID_BACKFILL_ON_START !== 'false';
@@ -400,6 +402,14 @@ async function shutdown(signal, error) {
     } catch (commandConfigWorkerError) {
       logger.warn('Falha ao encerrar worker de enriquecimento de commandConfig.', {
         error: commandConfigWorkerError?.message,
+      });
+    }
+
+    try {
+      stopAiHelperContinuousLearningWorker();
+    } catch (continuousLearningWorkerError) {
+      logger.warn('Falha ao encerrar worker de aprendizado contínuo de IA.', {
+        error: continuousLearningWorkerError?.message,
       });
     }
 
