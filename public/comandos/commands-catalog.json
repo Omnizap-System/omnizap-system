@@ -1,6 +1,6 @@
 {
   "schema_version": "3.0.0",
-  "generated_at": "2026-03-16T05:08:42.798Z",
+  "generated_at": "2026-03-17T03:02:22.604Z",
   "totals": {
     "modules": 14,
     "categories": 10,
@@ -3450,8 +3450,8 @@
             "media": false,
             "reply": false
           },
-          "premium": false,
-          "allowed_plans": ["comum", "premium"],
+          "premium": true,
+          "allowed_plans": ["premium"],
           "rate_limit": null,
           "local_de_uso": ["privado", "grupo"],
           "subcomandos": [],
