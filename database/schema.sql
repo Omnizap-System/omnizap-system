@@ -144,9 +144,17 @@ CREATE TABLE IF NOT EXISTS `groups_metadata` (
   `description` text DEFAULT NULL,
   `owner_jid` varchar(255) DEFAULT NULL,
   `creation` bigint(20) DEFAULT NULL,
+  `linked_parent_jid` varchar(255) DEFAULT NULL,
+  `is_community` tinyint(1) DEFAULT NULL,
+  `is_community_announce` tinyint(1) DEFAULT NULL,
+  `member_add_mode` tinyint(1) DEFAULT NULL,
+  `join_approval_mode` tinyint(1) DEFAULT NULL,
+  `addressing_mode` varchar(8) DEFAULT NULL,
   `participants` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`participants`)),
   `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  KEY `idx_groups_metadata_linked_parent_jid` (`linked_parent_jid`),
+  KEY `idx_groups_metadata_is_community_parent` (`is_community`,`linked_parent_jid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `lid_map` (

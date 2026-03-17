@@ -2,7 +2,20 @@ import logger from '#logger';
 import { findById, upsert } from '../../../database/index.js';
 import { extractUserIdInfo, resolveUserIdCached, isLidUserId, isWhatsAppUserId } from '../../config/index.js';
 
-const GROUP_METADATA_FIELDS = ['id', 'subject', 'description', 'owner_jid', 'creation', 'participants'];
+const GROUP_METADATA_FIELDS = [
+  'id',
+  'subject',
+  'description',
+  'owner_jid',
+  'creation',
+  'participants',
+  'linked_parent_jid',
+  'is_community',
+  'is_community_announce',
+  'member_add_mode',
+  'join_approval_mode',
+  'addressing_mode',
+];
 
 const PARTICIPANT_ACTIONS = new Set(['add', 'remove', 'promote', 'demote', 'modify']);
 
@@ -285,6 +298,17 @@ export const buildGroupMetadataFromUpdate = (event, existing) => {
   const currentParticipants = parseParticipantsFromDb(existing?.participants);
   const participants = event.participants || currentParticipants;
   const normalizedParticipants = normalizeParticipantsList(participants);
+  const resolveExistingValue = (snakeKey, camelKey) => existing?.[snakeKey] ?? existing?.[camelKey];
+  const resolveBoolean = (eventValue, snakeKey, camelKey) => {
+    if (eventValue !== undefined) return Boolean(eventValue);
+    const existingValue = resolveExistingValue(snakeKey, camelKey);
+    return existingValue === undefined || existingValue === null ? null : Boolean(existingValue);
+  };
+
+  const linkedParentRaw = event.linkedParent ?? resolveExistingValue('linked_parent_jid', 'linkedParent');
+  const linkedParent = typeof linkedParentRaw === 'string' ? linkedParentRaw.trim() || null : linkedParentRaw || null;
+  const addressingModeRaw = event.addressingMode ?? resolveExistingValue('addressing_mode', 'addressingMode');
+  const addressingMode = typeof addressingModeRaw === 'string' ? addressingModeRaw.trim() || null : addressingModeRaw || null;
 
   return {
     id: event.id,
@@ -293,6 +317,12 @@ export const buildGroupMetadataFromUpdate = (event, existing) => {
     owner_jid: event.owner ?? existing?.owner_jid,
     creation: event.creation ?? existing?.creation,
     participants: normalizedParticipants,
+    linked_parent_jid: linkedParent,
+    is_community: resolveBoolean(event.isCommunity, 'is_community', 'isCommunity'),
+    is_community_announce: resolveBoolean(event.isCommunityAnnounce, 'is_community_announce', 'isCommunityAnnounce'),
+    member_add_mode: resolveBoolean(event.memberAddMode, 'member_add_mode', 'memberAddMode'),
+    join_approval_mode: resolveBoolean(event.joinApprovalMode, 'join_approval_mode', 'joinApprovalMode'),
+    addressing_mode: addressingMode,
   };
 };
 
@@ -308,4 +338,10 @@ export const buildGroupMetadataFromGroup = (group) => ({
   owner_jid: group.owner,
   creation: group.creation,
   participants: normalizeParticipantsList(group.participants || []),
+  linked_parent_jid: typeof group.linkedParent === 'string' ? group.linkedParent.trim() || null : group.linkedParent || null,
+  is_community: group.isCommunity === undefined ? null : Boolean(group.isCommunity),
+  is_community_announce: group.isCommunityAnnounce === undefined ? null : Boolean(group.isCommunityAnnounce),
+  member_add_mode: group.memberAddMode === undefined ? null : Boolean(group.memberAddMode),
+  join_approval_mode: group.joinApprovalMode === undefined ? null : Boolean(group.joinApprovalMode),
+  addressing_mode: typeof group.addressingMode === 'string' ? group.addressingMode.trim() || null : group.addressingMode || null,
 });

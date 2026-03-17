@@ -288,6 +288,7 @@ export async function getGroupInfoAsync(groupId) {
     const participants = parseParticipantsFromDb(data.participants || data.participants_json || null);
     const creation = _normalizeNumberOrNull(data.creation);
     const ephemeralDuration = _normalizeNumberOrNull(data.ephemeral_duration ?? data.ephemeralDuration);
+    const linkedParent = _normalizeGroupId(data.linked_parent_jid || data.linkedParent) || null;
 
     const group = {
       id: _normalizeGroupId(data.id) || normalizedGroupId,
@@ -299,6 +300,10 @@ export async function getGroupInfoAsync(groupId) {
       restrict: Boolean(data.restrict),
       announce: Boolean(data.announce),
       isCommunity: Boolean(data.is_community ?? data.isCommunity),
+      isCommunityAnnounce: Boolean(data.is_community_announce ?? data.isCommunityAnnounce),
+      linkedParent,
+      memberAddMode: data.member_add_mode === null || data.member_add_mode === undefined ? null : Boolean(data.member_add_mode),
+      joinApprovalMode: data.join_approval_mode === null || data.join_approval_mode === undefined ? null : Boolean(data.join_approval_mode),
       addressingMode: data.addressing_mode || data.addressingMode || null,
       ephemeralDuration,
     };
