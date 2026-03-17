@@ -35,14 +35,18 @@ const DEFAULT_COMMAND_PREFIX = process.env.COMMAND_PREFIX || '/';
 const OWNER_JID = getAdminJid();
 
 const SESSION_TTL_SECONDS = Number.parseInt(process.env.OPENAI_SESSION_TTL_SECONDS || '21600', 10);
+const ADMIN_ALERT_DEDUPE_WINDOW_MS_RAW = Number.parseInt(process.env.AI_ADMIN_ALERT_DEDUPE_WINDOW_MS || '120000', 10);
 const sessionCache = new NodeCache({
   stdTTL: SESSION_TTL_SECONDS,
   checkperiod: Math.max(60, Math.floor(SESSION_TTL_SECONDS / 4)),
 });
+const ADMIN_ALERT_DEDUPE_WINDOW_MS = Number.isFinite(ADMIN_ALERT_DEDUPE_WINDOW_MS_RAW) && ADMIN_ALERT_DEDUPE_WINDOW_MS_RAW > 0 ? ADMIN_ALERT_DEDUPE_WINDOW_MS_RAW : 120000;
+const adminAlertDedupCache = new Map();
 let cachedClient = null;
 
 const AUDIO_FLAG_ALIASES = new Set(['--audio', '--voz', '--voice', '--tts', '-a']);
 const TEXT_FLAG_ALIASES = new Set(['--texto', '--text', '--txt']);
+const CATPROMPT_RESET_ALIASES = new Set(['reset', 'default', 'padrao', 'padrão']);
 const IMAGE_DETAIL_ALIASES = new Map([
   ['low', 'low'],
   ['high', 'high'],
@@ -152,6 +156,10 @@ const resolveAiMessages = (commandName) => {
   const mergeMessage = (key, fallback) => String(commandMessages?.[key] || '').trim() || String(fallback || '').trim();
 
   return {
+    usageHeader: mergeMessage('usage_header', '🤖 *Comando*'),
+    textResponsePrefix: mergeMessage('resposta_prefixo_texto', ''),
+    imageTextResponsePrefix: mergeMessage('resposta_prefixo_texto_imagem', '🖼️ '),
+    imageSuccessCaption: mergeMessage('imagem_caption_sucesso', '🖼️ Imagem gerada.'),
     premiumOnly: mergeMessage('premium_only', ['⭐ *Comando Premium*', '', 'Este comando é exclusivo para usuários premium.', 'Fale com o administrador para liberar o acesso.'].join('\n')),
     openAiNotConfigured: mergeMessage('openai_nao_configurada', ['⚠️ *OpenAI não configurada*', '', `Defina a variável *OPENAI_API_KEY* no \`.env\` para usar o comando *${commandName}*.`].join('\n')),
     imageTooLarge: mergeMessage('imagem_muito_grande', '⚠️ A imagem enviada ultrapassa o limite de {{limite_mb}} MB. Envie uma imagem menor.'),
@@ -232,6 +240,11 @@ const resolveCatPromptMaxChars = () => {
   return value;
 };
 
+const resolveCatPromptResetAliases = () => {
+  const config = getAiCommandOptionConfig('catprompt');
+  return toSet(config?.parse?.reset_aliases, [...CATPROMPT_RESET_ALIASES]);
+};
+
 const getClient = () => {
   if (cachedClient) return cachedClient;
   cachedClient = new OpenAI({
@@ -310,12 +323,13 @@ const callOpenAI = async (operationFactory, label, timeoutMs) => {
 };
 
 const sendUsage = async (sock, remoteJid, messageInfo, expirationMessage, commandPrefix = DEFAULT_COMMAND_PREFIX) => {
+  const commandMessages = resolveAiMessages('cat');
   const usageText =
     getAiUsageText('cat', {
       commandPrefix,
-      header: '🤖 *Comando CAT*',
+      header: commandMessages.usageHeader,
       variant: 'default',
-    }) || ['🤖 *Comando CAT*', '', 'Use assim:', `*${commandPrefix}cat* [--audio] sua pergunta`, `*${commandPrefix}cat* (responda ou envie uma imagem com legenda)`, '', 'Opções:', '--audio | --texto', '--detail low | high | auto', '', 'Exemplo:', `*${commandPrefix}cat* Explique como funciona a fotossíntese.`, `*${commandPrefix}cat* --audio Resuma a imagem.`].join('\n');
+    }) || `${commandMessages.usageHeader}\n*${commandPrefix}cat*`;
 
   await sendAndStore(sock, remoteJid, { text: usageText }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
 };
@@ -364,24 +378,85 @@ const sendPremiumOnly = async (sock, remoteJid, messageInfo, expirationMessage, 
   await sendAndStore(sock, remoteJid, { text: messages.premiumOnly }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
 };
 
+const shouldSendAdminAlert = ({ commandName = '', stage = '', remoteJid = '', senderJid = '', errorMessage = '' } = {}) => {
+  const dedupeKey = `${normalizeText(commandName)}|${normalizeText(stage)}|${normalizeText(remoteJid)}|${normalizeText(senderJid)}|${normalizeText(errorMessage)}`;
+  const nowMs = __timeNowMs();
+  const lastSentAt = adminAlertDedupCache.get(dedupeKey);
+  if (Number.isFinite(lastSentAt) && nowMs - lastSentAt < ADMIN_ALERT_DEDUPE_WINDOW_MS) {
+    return false;
+  }
+
+  adminAlertDedupCache.set(dedupeKey, nowMs);
+  for (const [key, ts] of adminAlertDedupCache.entries()) {
+    if (!Number.isFinite(ts) || nowMs - ts > ADMIN_ALERT_DEDUPE_WINDOW_MS) {
+      adminAlertDedupCache.delete(key);
+    }
+  }
+  return true;
+};
+
+const notifyAdminAiError = async (
+  sock,
+  {
+    commandName = 'cat',
+    stage = 'unknown',
+    remoteJid = '',
+    senderJid = '',
+    messageInfo = null,
+    error = null,
+  } = {},
+) => {
+  try {
+    const adminJid = normalizeJid((await resolveAdminJid().catch(() => null)) || OWNER_JID || '');
+    if (!adminJid) return;
+
+    const normalizedRemote = normalizeJid(remoteJid || '') || String(remoteJid || '').trim() || 'desconhecido';
+    const normalizedSender = normalizeJid(senderJid || '') || String(senderJid || '').trim() || 'desconhecido';
+    const errorMessage = String(error?.message || error || 'erro desconhecido').trim() || 'erro desconhecido';
+    const errorStatus = error?.status || error?.statusCode || error?.response?.status || null;
+    const messageId = messageInfo?.key?.id || 'sem_id';
+    const shouldSend = shouldSendAdminAlert({
+      commandName,
+      stage,
+      remoteJid: normalizedRemote,
+      senderJid: normalizedSender,
+      errorMessage,
+    });
+    if (!shouldSend) return;
+
+    const statusLine = errorStatus ? `\n- Status: ${errorStatus}` : '';
+    await sendAndStore(sock, adminJid, {
+      text: `🚨 *Alerta IA*\n\n- Comando: ${commandName}\n- Etapa: ${stage}\n- Chat: ${normalizedRemote}\n- Usuário: ${normalizedSender}\n- MsgID: ${messageId}${statusLine}\n- Erro: ${errorMessage}\n- Horário (UTC): ${__timeNowIso()}`,
+    });
+  } catch (notifyError) {
+    logger.warn('notifyAdminAiError: falha ao notificar admin no privado.', {
+      error: notifyError?.message || String(notifyError),
+      commandName,
+      stage,
+    });
+  }
+};
+
 const sendPromptUsage = async (sock, remoteJid, messageInfo, expirationMessage, commandPrefix = DEFAULT_COMMAND_PREFIX) => {
+  const commandMessages = resolveAiMessages('catprompt');
   const usageText =
     getAiUsageText('catprompt', {
       commandPrefix,
-      header: '🧠 *Prompt da IA*',
+      header: commandMessages.usageHeader,
       variant: 'default',
-    }) || ['🧠 *Prompt da IA*', '', 'Use assim:', `*${commandPrefix}catprompt* seu novo prompt`, '', 'Para voltar ao padrão:', `*${commandPrefix}catprompt reset*`].join('\n');
+    }) || `${commandMessages.usageHeader}\n*${commandPrefix}catprompt*`;
 
   await sendAndStore(sock, remoteJid, { text: usageText }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
 };
 
 const sendImageUsage = async (sock, remoteJid, messageInfo, expirationMessage, commandPrefix = DEFAULT_COMMAND_PREFIX) => {
+  const commandMessages = resolveAiMessages('catimg');
   const usageText =
     getAiUsageText('catimg', {
       commandPrefix,
-      header: '🖼️ *Imagem IA*',
+      header: commandMessages.usageHeader,
       variant: 'default',
-    }) || ['🖼️ *Imagem IA*', '', 'Use assim:', `*${commandPrefix}catimg* seu prompt`, `*${commandPrefix}catimg* (responda uma imagem com legenda para editar)`, '', 'Opções:', '--size 1024x1024 | 1024x1536 | 1536x1024 | auto', '--quality low | medium | high | auto', '--format png | jpeg | webp', '--background transparent | opaque | auto', '--compression 0-100', '', 'Exemplo:', `*${commandPrefix}catimg* --size 1536x1024 Um gato astronauta em aquarela.`].join('\n');
+    }) || `${commandMessages.usageHeader}\n*${commandPrefix}catimg*`;
 
   await sendAndStore(sock, remoteJid, { text: usageText }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
 };
@@ -665,20 +740,28 @@ export async function handleCatCommand({ sock, remoteJid, messageInfo, expiratio
   const commandMessages = resolveAiMessages(commandName);
   const { prompt: rawPrompt, wantsAudio, imageDetail } = parseCatOptions(text || '', resolveCatParseOptions());
 
-  if (!process.env.OPENAI_API_KEY) {
-    logger.warn('handleCatCommand: OPENAI_API_KEY não configurada.');
-    await sendAndStore(sock, remoteJid, { text: commandMessages.openAiNotConfigured }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
-    return;
-  }
-
-  await reactToMessage(sock, remoteJid, messageInfo);
-
   if (isAiCommandPremiumOnly(commandName)) {
     if (!(await isPremiumAllowed(senderJid))) {
       await sendPremiumOnly(sock, remoteJid, messageInfo, expirationMessage, { commandName });
       return;
     }
   }
+
+  if (!process.env.OPENAI_API_KEY) {
+    logger.warn('handleCatCommand: OPENAI_API_KEY não configurada.');
+    await sendAndStore(sock, remoteJid, { text: commandMessages.openAiNotConfigured }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
+    await notifyAdminAiError(sock, {
+      commandName,
+      stage: 'openai_api_key_missing',
+      remoteJid,
+      senderJid,
+      messageInfo,
+      error: new Error('OPENAI_API_KEY não configurada para comando cat'),
+    });
+    return;
+  }
+
+  await reactToMessage(sock, remoteJid, messageInfo);
 
   const imageMedia = findImageMedia(messageInfo);
   const imageResult = await buildImageDataUrl(imageMedia, senderJid);
@@ -782,11 +865,20 @@ export async function handleCatCommand({ sock, remoteJid, messageInfo, expiratio
         } catch (audioError) {
           logger.error('handleCatCommand: erro ao gerar audio.', audioError);
           await sendAndStore(sock, remoteJid, { text: commandMessages.audioFailedFallback }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
+          await notifyAdminAiError(sock, {
+            commandName,
+            stage: 'audio_speech_create',
+            remoteJid,
+            senderJid,
+            messageInfo,
+            error: audioError,
+          });
         }
       }
     }
 
-    await sendAndStore(sock, remoteJid, { text: `🐈‍⬛ ${outputText}` }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
+    const responsePrefix = commandMessages.textResponsePrefix;
+    await sendAndStore(sock, remoteJid, { text: `${responsePrefix}${outputText}` }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
   } catch (error) {
     logger.error('handleCatCommand: erro ao chamar OpenAI.', error);
     await sendAndStore(
@@ -797,6 +889,14 @@ export async function handleCatCommand({ sock, remoteJid, messageInfo, expiratio
       },
       { quoted: messageInfo, ephemeralExpiration: expirationMessage },
     );
+    await notifyAdminAiError(sock, {
+      commandName,
+      stage: 'responses_create',
+      remoteJid,
+      senderJid,
+      messageInfo,
+      error,
+    });
   }
 }
 
@@ -805,20 +905,28 @@ export async function handleCatImageCommand({ sock, remoteJid, messageInfo, expi
   const commandMessages = resolveAiMessages(commandName);
   const { prompt, toolOptions, errors } = parseImageGenOptions(text || '', resolveCatImageGenerationOptions());
 
-  if (!process.env.OPENAI_API_KEY) {
-    logger.warn('handleCatImageCommand: OPENAI_API_KEY não configurada.');
-    await sendAndStore(sock, remoteJid, { text: commandMessages.openAiNotConfigured }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
-    return;
-  }
-
-  await reactToMessage(sock, remoteJid, messageInfo);
-
   if (isAiCommandPremiumOnly(commandName)) {
     if (!(await isPremiumAllowed(senderJid))) {
       await sendPremiumOnly(sock, remoteJid, messageInfo, expirationMessage, { commandName });
       return;
     }
   }
+
+  if (!process.env.OPENAI_API_KEY) {
+    logger.warn('handleCatImageCommand: OPENAI_API_KEY não configurada.');
+    await sendAndStore(sock, remoteJid, { text: commandMessages.openAiNotConfigured }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
+    await notifyAdminAiError(sock, {
+      commandName,
+      stage: 'openai_api_key_missing',
+      remoteJid,
+      senderJid,
+      messageInfo,
+      error: new Error('OPENAI_API_KEY não configurada para comando catimg'),
+    });
+    return;
+  }
+
+  await reactToMessage(sock, remoteJid, messageInfo);
 
   const imageMedia = findImageMedia(messageInfo);
   const imageResult = await buildImageDataUrl(imageMedia, senderJid);
@@ -902,7 +1010,7 @@ export async function handleCatImageCommand({ sock, remoteJid, messageInfo, expi
 
     if (!imageBase64) {
       if (outputText) {
-        await sendAndStore(sock, remoteJid, { text: `🖼️ ${outputText}` }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
+        await sendAndStore(sock, remoteJid, { text: `${commandMessages.imageTextResponsePrefix}${outputText}` }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
         return;
       }
 
@@ -918,7 +1026,7 @@ export async function handleCatImageCommand({ sock, remoteJid, messageInfo, expi
     };
     const mimetype = mimeByFormat[outputFormat] || 'image/png';
     const imageBuffer = Buffer.from(imageBase64, 'base64');
-    const caption = outputText ? `🖼️ ${outputText}` : '🖼️ Imagem gerada.';
+    const caption = outputText ? `${commandMessages.imageTextResponsePrefix}${outputText}` : commandMessages.imageSuccessCaption;
 
     await sendAndStore(sock, remoteJid, { image: imageBuffer, caption, mimetype }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
   } catch (error) {
@@ -931,6 +1039,14 @@ export async function handleCatImageCommand({ sock, remoteJid, messageInfo, expi
       },
       { quoted: messageInfo, ephemeralExpiration: expirationMessage },
     );
+    await notifyAdminAiError(sock, {
+      commandName,
+      stage: 'responses_create_image',
+      remoteJid,
+      senderJid,
+      messageInfo,
+      error,
+    });
   }
 }
 
@@ -938,6 +1054,7 @@ export async function handleCatPromptCommand({ sock, remoteJid, messageInfo, exp
   const commandName = 'catprompt';
   const commandMessages = resolveAiMessages(commandName);
   const promptMaxChars = resolveCatPromptMaxChars();
+  const promptResetAliases = resolveCatPromptResetAliases();
   const promptText = text?.trim();
   if (!promptText) {
     await sendPromptUsage(sock, remoteJid, messageInfo, expirationMessage, commandPrefix);
@@ -951,8 +1068,8 @@ export async function handleCatPromptCommand({ sock, remoteJid, messageInfo, exp
     }
   }
 
-  const lower = promptText.toLowerCase();
-  if (lower === 'reset' || lower === 'default' || lower === 'padrao' || lower === 'padrão') {
+  const lower = normalizeText(promptText);
+  if (promptResetAliases.has(lower)) {
     await aiPromptStore.clearPrompt(senderJid);
     await sendAndStore(sock, remoteJid, { text: commandMessages.promptResetSuccess }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
     return;

@@ -114,6 +114,7 @@ export const getAiCommandOptionConfig = (command) => {
     parse: {
       audio_flags: Array.isArray(parse.audio_flags) ? parse.audio_flags.map((item) => String(item || '')).filter(Boolean) : [],
       text_flags: Array.isArray(parse.text_flags) ? parse.text_flags.map((item) => String(item || '')).filter(Boolean) : [],
+      reset_aliases: Array.isArray(parse.reset_aliases) ? parse.reset_aliases.map((item) => String(item || '')).filter(Boolean) : [],
       image_detail_aliases: normalizeMapKeys(parse.image_detail_aliases || {}),
     },
     geracao_imagem: {
