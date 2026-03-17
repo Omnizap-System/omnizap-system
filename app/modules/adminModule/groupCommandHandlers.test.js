@@ -56,6 +56,7 @@ const normalizeSql = (sql) =>
 const createDbHarness = () => {
   const groupConfigRows = new Map();
   const groupMetadataRows = new Map();
+  const premiumUserRows = new Set();
 
   const execute = async (sql, params = []) => {
     const normalized = normalizeSql(sql);
@@ -73,6 +74,24 @@ const createDbHarness = () => {
     if (normalized.startsWith('insert into `group_configs`')) {
       const [id, config] = params;
       groupConfigRows.set(id, { id, config: String(config) });
+      return [{ affectedRows: 1 }, []];
+    }
+
+    if (normalized.startsWith('select id from `system_premium_users`')) {
+      const rows = Array.from(premiumUserRows.values())
+        .sort((left, right) => String(left).localeCompare(String(right)))
+        .map((id) => ({ id }));
+      return [rows, []];
+    }
+
+    if (normalized.startsWith('delete from `system_premium_users`')) {
+      premiumUserRows.clear();
+      return [{ affectedRows: 1 }, []];
+    }
+
+    if (normalized.startsWith('insert into `system_premium_users`')) {
+      const [id] = params;
+      premiumUserRows.add(String(id || ''));
       return [{ affectedRows: 1 }, []];
     }
 
@@ -102,11 +121,19 @@ const createDbHarness = () => {
     return row ? JSON.parse(row.config) : {};
   };
 
+  const setPremiumUsers = (premiumUsers) => {
+    premiumUserRows.clear();
+    for (const premiumUser of premiumUsers || []) {
+      premiumUserRows.add(String(premiumUser || ''));
+    }
+  };
+
   return {
     execute,
     setGroupParticipants,
     setGroupConfig,
     getGroupConfig,
+    setPremiumUsers,
   };
 };
 
@@ -306,7 +333,7 @@ test('premium exige admin principal e lista usuários quando autorizado', async 
   assert.equal(denied.messages.length, 1);
   assert.equal(denied.messages[0].content.text, texts.owner_only_command_message);
 
-  dbHarness.setGroupConfig('system:premium_users', { premiumUsers: [TARGET_JID] });
+  dbHarness.setPremiumUsers([TARGET_JID]);
   const allowed = createSockStub();
 
   await runAdminCommand({

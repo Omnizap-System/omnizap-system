@@ -1,5 +1,30 @@
 import logger from '#logger';
+import { isGroupJid, normalizeJid } from '../config/index.js';
 import { findById, upsert } from '../../database/index.js';
+
+const SYSTEM_CONFIG_PREFIX = 'system:';
+
+const normalizeGroupConfigId = (groupId) => {
+  const raw = String(groupId || '').trim();
+  if (!raw) return '';
+  return normalizeJid(raw) || raw;
+};
+
+const isReservedSystemConfigId = (groupId) => groupId.startsWith(SYSTEM_CONFIG_PREFIX);
+
+const assertWritableGroupConfigId = (groupId) => {
+  if (!groupId) {
+    throw new Error('O identificador do grupo é obrigatório para persistir configurações.');
+  }
+
+  if (isReservedSystemConfigId(groupId)) {
+    throw new Error(`O id ${groupId} é reservado para configurações de sistema e não pode ser salvo em group_configs.`);
+  }
+
+  if (!isGroupJid(groupId)) {
+    throw new Error(`O id ${groupId} não representa um grupo válido para group_configs.`);
+  }
+};
 
 const groupConfigStore = {
   /**
@@ -8,8 +33,17 @@ const groupConfigStore = {
    * @returns {object} A configuracao do grupo, ou um objeto vazio se nao encontrado.
    */
   getGroupConfig: async function (groupId) {
+    const normalizedGroupId = normalizeGroupConfigId(groupId);
+    if (!normalizedGroupId || !isGroupJid(normalizedGroupId)) {
+      return {};
+    }
+    if (isReservedSystemConfigId(normalizedGroupId)) {
+      logger.warn('Tentativa bloqueada de leitura de configuração reservada em group_configs.', { groupId: normalizedGroupId });
+      return {};
+    }
+
     try {
-      const record = await findById('group_configs', groupId);
+      const record = await findById('group_configs', normalizedGroupId);
       if (!record || record.config === null || record.config === undefined) {
         return {};
       }
@@ -23,7 +57,7 @@ const groupConfigStore = {
     } catch (error) {
       logger.error('Error loading group configuration from DB:', {
         error: error.message,
-        groupId,
+        groupId: normalizedGroupId,
       });
       return {};
     }
@@ -37,18 +71,20 @@ const groupConfigStore = {
    * @param {string} [newConfig.farewellMedia] - Caminho opcional para midia de despedida.
    */
   updateGroupConfig: async function (groupId, newConfig) {
-    const currentConfig = await this.getGroupConfig(groupId);
+    const normalizedGroupId = normalizeGroupConfigId(groupId);
+    assertWritableGroupConfigId(normalizedGroupId);
+    const currentConfig = await this.getGroupConfig(normalizedGroupId);
     const updatedConfig = { ...currentConfig, ...newConfig };
     try {
       await upsert('group_configs', {
-        id: groupId,
+        id: normalizedGroupId,
         config: JSON.stringify(updatedConfig),
       });
       return updatedConfig;
     } catch (error) {
       logger.error('Error updating group configuration in DB:', {
         error: error.message,
-        groupId,
+        groupId: normalizedGroupId,
       });
       throw error;
     }

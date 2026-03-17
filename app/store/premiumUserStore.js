@@ -1,7 +1,10 @@
-import groupConfigStore from './groupConfigStore.js';
+import { TABLES, executeQuery, withTransaction } from '../../database/index.js';
 import { isSameJidUser, normalizeJid } from '../config/index.js';
 
-const PREMIUM_CONFIG_ID = 'system:premium_users';
+const PREMIUM_USERS_TABLE = TABLES.SYSTEM_PREMIUM_USERS;
+const SELECT_PREMIUM_USERS_SQL = `SELECT id FROM \`${PREMIUM_USERS_TABLE}\` ORDER BY id ASC`;
+const DELETE_ALL_PREMIUM_USERS_SQL = `DELETE FROM \`${PREMIUM_USERS_TABLE}\``;
+const INSERT_PREMIUM_USER_SQL = `INSERT INTO \`${PREMIUM_USERS_TABLE}\` (id) VALUES (?)`;
 
 const normalizePremiumEntry = (value) => {
   const raw = String(value || '').trim();
@@ -23,22 +26,33 @@ const normalizeList = (list) => {
   return normalizedList;
 };
 
+const loadPremiumUsersFromDb = async () => {
+  const rows = await executeQuery(SELECT_PREMIUM_USERS_SQL);
+  return normalizeList(rows.map((row) => row.id));
+};
+
 const premiumUserStore = {
   getPremiumUsers: async function () {
-    const config = await groupConfigStore.getGroupConfig(PREMIUM_CONFIG_ID);
-    return normalizeList(config.premiumUsers);
+    return loadPremiumUsersFromDb();
   },
 
   setPremiumUsers: async function (premiumUsers) {
     const normalized = normalizeList(premiumUsers);
-    await groupConfigStore.updateGroupConfig(PREMIUM_CONFIG_ID, { premiumUsers: normalized });
+
+    await withTransaction(async (connection) => {
+      await executeQuery(DELETE_ALL_PREMIUM_USERS_SQL, [], connection);
+      for (const premiumJid of normalized) {
+        await executeQuery(INSERT_PREMIUM_USER_SQL, [premiumJid], connection);
+      }
+    });
+
     return normalized;
   },
 
   addPremiumUsers: async function (usersToAdd) {
     const current = await this.getPremiumUsers();
     const updated = normalizeList([...current, ...usersToAdd]);
-    await groupConfigStore.updateGroupConfig(PREMIUM_CONFIG_ID, { premiumUsers: updated });
+    await this.setPremiumUsers(updated);
     return updated;
   },
 
@@ -46,7 +60,7 @@ const premiumUserStore = {
     const current = await this.getPremiumUsers();
     const normalizedTargets = normalizeList(usersToRemove);
     const updated = current.filter((jid) => !normalizedTargets.some((target) => target === jid || isSameJidUser(target, jid)));
-    await groupConfigStore.updateGroupConfig(PREMIUM_CONFIG_ID, { premiumUsers: updated });
+    await this.setPremiumUsers(updated);
     return updated;
   },
 };

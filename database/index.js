@@ -105,6 +105,8 @@ export const TABLES = {
   CHATS: 'chats',
   GROUPS_METADATA: 'groups_metadata',
   GROUP_CONFIGS: 'group_configs',
+  SYSTEM_PREMIUM_USERS: 'system_premium_users',
+  SYSTEM_AI_PROMPTS: 'system_ai_prompts',
   LID_MAP: 'lid_map',
   STICKER_PACK: 'sticker_pack',
   STICKER_ASSET: 'sticker_asset',
