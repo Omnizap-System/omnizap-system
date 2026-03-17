@@ -5,7 +5,7 @@ import { isUserAdmin, createGroup, acceptGroupInvite, getGroupInfo, getGroupRequ
 import groupConfigStore from '../../store/groupConfigStore.js';
 import premiumUserStore from '../../store/premiumUserStore.js';
 import logger from '#logger';
-import { KNOWN_NETWORKS } from '../../utils/antiLink/antiLinkModule.js';
+import { KNOWN_NETWORKS, purgeRecentMessagesForSenderCandidates } from '../../utils/antiLink/antiLinkModule.js';
 import { getNewsStatusForGroup, startNewsBroadcastForGroup, stopNewsBroadcastForGroup } from '../../services/messaging/newsBroadcastService.js';
 import { sendAndStore } from '../../services/messaging/messagePersistenceService.js';
 import { clearCaptchasForGroup } from '../../services/messaging/captchaService.js';
@@ -766,7 +766,33 @@ export async function handleAdminCommand({ command, args, text, sock, messageInf
       }
       try {
         await updateGroupParticipants(sock, remoteJid, participants, 'remove');
-        await sendAndStore(sock, remoteJid, { text: 'Participantes removidos com sucesso.' }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
+
+        let deletedRecentMessages = 0;
+        let failedRecentDeletes = 0;
+        let requestedRecentDeletes = 0;
+        for (const participant of participants) {
+          const cleanupResult = await purgeRecentMessagesForSenderCandidates({
+            sock,
+            remoteJid,
+            senderCandidates: [participant],
+          });
+          deletedRecentMessages += Number(cleanupResult?.deleted || 0);
+          failedRecentDeletes += Number(cleanupResult?.failed || 0);
+          requestedRecentDeletes += Number(cleanupResult?.requested || 0);
+        }
+
+        const successText = deletedRecentMessages > 0 ? `Participantes removidos com sucesso.\n🧹 ${deletedRecentMessages} mensagem(ns) recentes apagadas.` : 'Participantes removidos com sucesso.';
+        await sendAndStore(sock, remoteJid, { text: successText }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
+
+        logger.info('Comando ban executado com limpeza de mensagens recentes.', {
+          action: 'admin_ban_with_recent_cleanup',
+          groupId: remoteJid,
+          participants,
+          deletedRecentMessages,
+          failedRecentDeletes,
+          requestedRecentDeletes,
+        });
+
         const repliedTo = messageInfo.message?.extendedTextMessage?.contextInfo;
         if (repliedTo && containsParticipantJid(participants, repliedTo.participant)) {
           await sendAndStore(sock, remoteJid, {
