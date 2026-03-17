@@ -124,7 +124,10 @@ const ANY_TLD_SUFFIXES = new Set([...STRICT_TLD_SUFFIXES, ...EXTRA_TLD_SUFFIXES]
 const ANTILINK_DELETE_WINDOW_MS = parseEnvInt(process.env.ANTILINK_DELETE_WINDOW_MS, 5 * 60 * 1000, 60 * 1000, 30 * 60 * 1000);
 const ANTILINK_DELETE_MAX_MESSAGES = parseEnvInt(process.env.ANTILINK_DELETE_MAX_MESSAGES, 40, 1, 300);
 const ANTILINK_QUERY_MAX_CANDIDATES = 20;
+const ANTILINK_DELETE_REVALIDATION_ATTEMPTS = parseEnvInt(process.env.ANTILINK_DELETE_REVALIDATION_ATTEMPTS, 3, 1, 8);
+const ANTILINK_DELETE_REVALIDATION_DELAY_MS = parseEnvInt(process.env.ANTILINK_DELETE_REVALIDATION_DELAY_MS, 450, 100, 5000);
 const ANTILINK_DELETE_WINDOW_MINUTES = Math.max(1, Math.round(ANTILINK_DELETE_WINDOW_MS / (60 * 1000)));
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
 
 /**
  * Tokeniza texto por espaço/quebra de linha sem regex.
@@ -826,38 +829,66 @@ const collectRecentDeleteKeysForSender = async ({ messageInfo, remoteJid, sender
 };
 
 const purgeRecentMessagesFromRemovedSender = async ({ sock, messageInfo, remoteJid, senderCandidates = [] }) => {
-  const deleteKeys = await collectRecentDeleteKeysForSender({
-    messageInfo,
-    remoteJid,
-    senderCandidates,
-  });
+  const totalRounds = Math.max(1, ANTILINK_DELETE_REVALIDATION_ATTEMPTS);
+  const seenMessageIds = new Set();
+  const deletedMessageIds = new Set();
+  let failedAttempts = 0;
+  let roundsWithDeletes = 0;
 
-  if (!deleteKeys.length) {
-    return { requested: 0, deleted: 0, failed: 0 };
-  }
+  for (let round = 1; round <= totalRounds; round += 1) {
+    const deleteKeys = await collectRecentDeleteKeysForSender({
+      messageInfo,
+      remoteJid,
+      senderCandidates,
+    });
 
-  let deleted = 0;
-  let failed = 0;
-  for (const deleteKey of deleteKeys) {
-    try {
-      await sendDeleteWithFallback(sock, remoteJid, deleteKey);
-      deleted += 1;
-    } catch (error) {
-      failed += 1;
-      logger.debug('Falha ao apagar mensagem durante limpeza do antilink.', {
-        action: 'antilink_delete_message_failed',
-        groupId: remoteJid,
-        messageId: deleteKey?.id,
-        participant: deleteKey?.participant || null,
-        error: error?.message,
-      });
+    const pendingKeys = [];
+    for (const deleteKey of deleteKeys) {
+      const messageId = normalizeMessageId(deleteKey?.id);
+      if (!messageId) continue;
+      seenMessageIds.add(messageId);
+      if (deletedMessageIds.has(messageId)) continue;
+      pendingKeys.push(deleteKey);
+    }
+
+    let deletedInRound = 0;
+    for (const deleteKey of pendingKeys) {
+      try {
+        await sendDeleteWithFallback(sock, remoteJid, deleteKey);
+        const messageId = normalizeMessageId(deleteKey?.id);
+        if (messageId) {
+          deletedMessageIds.add(messageId);
+          deletedInRound += 1;
+        }
+      } catch (error) {
+        failedAttempts += 1;
+        logger.debug('Falha ao apagar mensagem durante limpeza do antilink.', {
+          action: 'antilink_delete_message_failed',
+          groupId: remoteJid,
+          messageId: deleteKey?.id,
+          participant: deleteKey?.participant || null,
+          round,
+          totalRounds,
+          error: error?.message,
+        });
+      }
+    }
+
+    if (deletedInRound > 0) {
+      roundsWithDeletes += 1;
+    }
+
+    if (round < totalRounds) {
+      await wait(ANTILINK_DELETE_REVALIDATION_DELAY_MS);
     }
   }
 
   return {
-    requested: deleteKeys.length,
-    deleted,
-    failed,
+    requested: seenMessageIds.size,
+    deleted: deletedMessageIds.size,
+    failed: failedAttempts,
+    rounds: totalRounds,
+    roundsWithDeletes,
   };
 };
 
@@ -964,6 +995,8 @@ export const handleAntiLink = async ({ sock, messageInfo, extractedText, remoteJ
         deletedRecentMessages: purgeResult.deleted,
         failedRecentMessageDeletes: purgeResult.failed,
         requestedRecentMessageDeletes: purgeResult.requested,
+        deleteRevalidationRounds: purgeResult.rounds,
+        deleteRevalidationRoundsWithDeletes: purgeResult.roundsWithDeletes,
       });
 
       return true;
