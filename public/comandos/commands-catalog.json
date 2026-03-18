@@ -1,10 +1,10 @@
 {
   "schema_version": "3.0.0",
-  "generated_at": "2026-03-18T03:37:14.058Z",
+  "generated_at": "2026-03-18T04:33:16.273Z",
   "totals": {
     "modules": 14,
     "categories": 10,
-    "commands": 58
+    "commands": 62
   },
   "modules": [
     {
@@ -12,7 +12,7 @@
       "label": "adminModule",
       "source_file": "app/modules/adminModule/commandConfig.json",
       "enabled": true,
-      "command_count": 35
+      "command_count": 39
     },
     {
       "key": "stickerModule",
@@ -111,7 +111,7 @@
       "key": "admin",
       "label": "Moderação e Admin",
       "icon": "🛡️",
-      "command_count": 35,
+      "command_count": 39,
       "modules": ["adminModule"],
       "commands": [
         {
@@ -1085,6 +1085,119 @@
             "keywords": ["captcha", "admin", "grupo"],
             "user_phrasings": ["quero usar captcha", "me ajuda com captcha", "ativa/desativa captcha para novos"],
             "priority": 100
+          }
+        },
+        {
+          "key": "adminModule:clearwarn",
+          "name": "clearwarn",
+          "id": "admin.clearwarn",
+          "aliases": ["limparwarn", "resetwarn"],
+          "module": "adminModule",
+          "module_label": "adminModule",
+          "category": "admin",
+          "category_label": "Moderação e Admin",
+          "descricao": "Remove advertências de um participante no grupo (todas ou quantidade).",
+          "requirements": {
+            "group": true,
+            "admin": true,
+            "owner": false,
+            "google_login": true,
+            "nsfw": false,
+            "media": false,
+            "reply": false
+          },
+          "premium": false,
+          "allowed_plans": ["comum", "premium"],
+          "rate_limit": null,
+          "local_de_uso": ["grupo"],
+          "subcomandos": [],
+          "metodos_de_uso": ["/clearwarn @usuario", "/clearwarn @usuario all", "/clearwarn @usuario <qtd>"],
+          "mensagens_uso": {
+            "missing_targets": ["/clearwarn @usuario [all|qtd]", "Também é possível responder a mensagem do usuário alvo."],
+            "invalid_amount": ["/clearwarn @usuario all", "/clearwarn @usuario <qtd> (qtd precisa ser número positivo)"]
+          },
+          "resumo_usuario": "Remove advertências de um participante no grupo (todas ou quantidade).",
+          "quando_usar": ["Use quando você precisa desta ação: Remove advertências de um participante no grupo (todas ou quantidade).", "Funciona dentro de grupos.", "Você precisa ser admin para executar.", "É necessário estar logado no sistema para usar."],
+          "exemplos_reais": [
+            {
+              "situacao": "Cenário comum: Remove advertências de um participante no grupo (todas ou quantidade).",
+              "comando": "/clearwarn @usuario",
+              "resposta_esperada": "Comando executado com sucesso.",
+              "variacao": "Formato de uso inválido. Consulte metodos_de_uso."
+            },
+            {
+              "situacao": "Variação 2 de uso do comando no mesmo contexto.",
+              "comando": "/clearwarn @usuario all",
+              "resposta_esperada": "Comando executado com sucesso.",
+              "variacao": "Formato de uso inválido. Consulte metodos_de_uso."
+            },
+            {
+              "situacao": "Variação 3 de uso do comando no mesmo contexto.",
+              "comando": "/clearwarn @usuario <qtd>",
+              "resposta_esperada": "Comando executado com sucesso.",
+              "variacao": "Formato de uso inválido. Consulte metodos_de_uso."
+            }
+          ],
+          "resposta_esperada": ["Sucesso: Comando executado com sucesso.", "Uso incorreto: Formato de uso inválido. Consulte metodos_de_uso.", "Permissão: Permissão insuficiente para executar este comando."],
+          "erros_comuns_usuario": ["Digitar o comando fora do formato esperado.", "Tentar executar fora de um grupo.", "Tentar executar sem ser admin.", "Tentar usar sem estar logado no sistema."],
+          "passos_se_der_erro": ["Copie e teste um exemplo pronto desta página.", "Confira se você está no local certo (grupo/privado) e com a permissão necessária.", "Se ainda falhar, fale com o admin do sistema no privado."],
+          "resumo_usuario_origem": "auto_ia_assistida",
+          "resumo_usuario_revisao_pendente": true,
+          "arguments": [
+            {
+              "name": "participante",
+              "type": "string",
+              "required": true,
+              "description": "menção, resposta ou JID válido",
+              "default": null,
+              "validation": "menção, resposta ou JID válido"
+            },
+            {
+              "name": "escopo",
+              "type": "string",
+              "required": false,
+              "description": "all para limpar tudo ou número para remover parcialmente",
+              "default": "1",
+              "validation": "all|qtd positiva"
+            }
+          ],
+          "responses": {
+            "success": "Comando executado com sucesso.",
+            "usage_error": "Formato de uso inválido. Consulte metodos_de_uso.",
+            "permission_error": "Permissão insuficiente para executar este comando."
+          },
+          "technical": {
+            "collected_data": ["chat_identifier", "sender_identifier", "command_content", "target_identifier", "moderation_reason", "identificador do chat (remoteJid)", "identificador do remetente (senderJid)", "texto do comando e argumentos", "contexto da mensagem (citacao e mencoes, quando existir)", "identificador do participante alvo", "motivo e contagem de advertencias por participante no grupo"],
+            "dependencies": ["API do WhatsApp (ações de grupo)", "stores/configuração interna", "banco relacional (group_user_warnings)"],
+            "side_effects": ["consulta e altera histórico de advertências no grupo", "envia mensagens administrativas"],
+            "behavior": {
+              "type": "action_target",
+              "target_type": "participant",
+              "action": "clearwarn",
+              "requires_targets": true
+            },
+            "handler": {
+              "file": "groupCommandHandlers.js",
+              "method": "handleAdminCommand",
+              "command_case": "clearwarn"
+            },
+            "risk_level": "medium",
+            "stability": "stable",
+            "version": "1.0.0"
+          },
+          "observability": {
+            "event_name": "command.executed",
+            "analytics_event": null,
+            "tags": ["whatsapp", "command", "adminModule", "moderation"]
+          },
+          "privacy": {
+            "retention": "standard_app_logs",
+            "legal_basis": "service_execution_and_legitimate_interest"
+          },
+          "discovery": {
+            "keywords": [],
+            "user_phrasings": ["quero advertir um usuario", "listar warnings de um usuario", "limpar warnings do usuario"],
+            "priority": 120
           }
         },
         {
@@ -3758,6 +3871,313 @@
             "keywords": ["temporarias", "admin", "grupo"],
             "user_phrasings": ["quero usar temporarias", "me ajuda com temporarias", "define tempo de mensagens"],
             "priority": 100
+          }
+        },
+        {
+          "key": "adminModule:warn",
+          "name": "warn",
+          "id": "admin.warn",
+          "aliases": ["advertir"],
+          "module": "adminModule",
+          "module_label": "adminModule",
+          "category": "admin",
+          "category_label": "Moderação e Admin",
+          "descricao": "Registra uma advertência para um participante no grupo.",
+          "requirements": {
+            "group": true,
+            "admin": true,
+            "owner": false,
+            "google_login": true,
+            "nsfw": false,
+            "media": false,
+            "reply": false
+          },
+          "premium": false,
+          "allowed_plans": ["comum", "premium"],
+          "rate_limit": null,
+          "local_de_uso": ["grupo"],
+          "subcomandos": [],
+          "metodos_de_uso": ["/warn @usuario [motivo]", "/warn 5511999999999@s.whatsapp.net [motivo]"],
+          "mensagens_uso": {
+            "missing_targets": ["/warn @usuario [motivo]", "Também é possível responder a mensagem do usuário alvo."]
+          },
+          "resumo_usuario": "Registra uma advertência para um participante no grupo.",
+          "quando_usar": ["Use quando você precisa desta ação: Registra uma advertência para um participante no grupo.", "Funciona dentro de grupos.", "Você precisa ser admin para executar.", "É necessário estar logado no sistema para usar."],
+          "exemplos_reais": [
+            {
+              "situacao": "Cenário comum: Registra uma advertência para um participante no grupo.",
+              "comando": "/warn @usuario [motivo]",
+              "resposta_esperada": "Comando executado com sucesso.",
+              "variacao": "Formato de uso inválido. Consulte metodos_de_uso."
+            },
+            {
+              "situacao": "Variação 2 de uso do comando no mesmo contexto.",
+              "comando": "/warn 5511999999999@s.whatsapp.net [motivo]",
+              "resposta_esperada": "Comando executado com sucesso.",
+              "variacao": "Formato de uso inválido. Consulte metodos_de_uso."
+            }
+          ],
+          "resposta_esperada": ["Sucesso: Comando executado com sucesso.", "Uso incorreto: Formato de uso inválido. Consulte metodos_de_uso.", "Permissão: Permissão insuficiente para executar este comando."],
+          "erros_comuns_usuario": ["Digitar o comando fora do formato esperado.", "Tentar executar fora de um grupo.", "Tentar executar sem ser admin.", "Tentar usar sem estar logado no sistema."],
+          "passos_se_der_erro": ["Copie e teste um exemplo pronto desta página.", "Confira se você está no local certo (grupo/privado) e com a permissão necessária.", "Se ainda falhar, fale com o admin do sistema no privado."],
+          "resumo_usuario_origem": "auto_ia_assistida",
+          "resumo_usuario_revisao_pendente": true,
+          "arguments": [
+            {
+              "name": "participante",
+              "type": "string",
+              "required": true,
+              "description": "menção, resposta ou JID válido",
+              "default": null,
+              "validation": "menção, resposta ou JID válido"
+            },
+            {
+              "name": "motivo",
+              "type": "string",
+              "required": false,
+              "description": "texto do motivo da advertência",
+              "default": null,
+              "validation": "texto livre (até 500 chars)"
+            }
+          ],
+          "responses": {
+            "success": "Comando executado com sucesso.",
+            "usage_error": "Formato de uso inválido. Consulte metodos_de_uso.",
+            "permission_error": "Permissão insuficiente para executar este comando."
+          },
+          "technical": {
+            "collected_data": ["chat_identifier", "sender_identifier", "command_content", "target_identifier", "moderation_reason", "identificador do chat (remoteJid)", "identificador do remetente (senderJid)", "texto do comando e argumentos", "contexto da mensagem (citacao e mencoes, quando existir)", "identificador do participante alvo", "motivo e contagem de advertencias por participante no grupo"],
+            "dependencies": ["API do WhatsApp (ações de grupo)", "stores/configuração interna", "banco relacional (group_user_warnings)"],
+            "side_effects": ["consulta e altera histórico de advertências no grupo", "envia mensagens administrativas"],
+            "behavior": {
+              "type": "action_target",
+              "target_type": "participant",
+              "action": "warn",
+              "requires_targets": true
+            },
+            "handler": {
+              "file": "groupCommandHandlers.js",
+              "method": "handleAdminCommand",
+              "command_case": "warn"
+            },
+            "risk_level": "medium",
+            "stability": "stable",
+            "version": "1.0.0"
+          },
+          "observability": {
+            "event_name": "command.executed",
+            "analytics_event": null,
+            "tags": ["whatsapp", "command", "adminModule", "moderation"]
+          },
+          "privacy": {
+            "retention": "standard_app_logs",
+            "legal_basis": "service_execution_and_legitimate_interest"
+          },
+          "discovery": {
+            "keywords": [],
+            "user_phrasings": ["quero advertir um usuario", "listar warnings de um usuario", "limpar warnings do usuario"],
+            "priority": 120
+          }
+        },
+        {
+          "key": "adminModule:warnings",
+          "name": "warnings",
+          "id": "admin.warnings",
+          "aliases": ["advertencias", "warnlist"],
+          "module": "adminModule",
+          "module_label": "adminModule",
+          "category": "admin",
+          "category_label": "Moderação e Admin",
+          "descricao": "Mostra o histórico de advertências de um participante no grupo.",
+          "requirements": {
+            "group": true,
+            "admin": true,
+            "owner": false,
+            "google_login": true,
+            "nsfw": false,
+            "media": false,
+            "reply": false
+          },
+          "premium": false,
+          "allowed_plans": ["comum", "premium"],
+          "rate_limit": null,
+          "local_de_uso": ["grupo"],
+          "subcomandos": [],
+          "metodos_de_uso": ["/warnings @usuario", "/warnings 5511999999999@s.whatsapp.net"],
+          "mensagens_uso": {
+            "missing_targets": ["/warnings @usuario", "Também é possível responder a mensagem do usuário alvo."]
+          },
+          "resumo_usuario": "Mostra o histórico de advertências de um participante no grupo.",
+          "quando_usar": ["Use quando você precisa desta ação: Mostra o histórico de advertências de um participante no grupo.", "Funciona dentro de grupos.", "Você precisa ser admin para executar.", "É necessário estar logado no sistema para usar."],
+          "exemplos_reais": [
+            {
+              "situacao": "Cenário comum: Mostra o histórico de advertências de um participante no grupo.",
+              "comando": "/warnings @usuario",
+              "resposta_esperada": "Comando executado com sucesso.",
+              "variacao": "Formato de uso inválido. Consulte metodos_de_uso."
+            },
+            {
+              "situacao": "Variação 2 de uso do comando no mesmo contexto.",
+              "comando": "/warnings 5511999999999@s.whatsapp.net",
+              "resposta_esperada": "Comando executado com sucesso.",
+              "variacao": "Formato de uso inválido. Consulte metodos_de_uso."
+            }
+          ],
+          "resposta_esperada": ["Sucesso: Comando executado com sucesso.", "Uso incorreto: Formato de uso inválido. Consulte metodos_de_uso.", "Permissão: Permissão insuficiente para executar este comando."],
+          "erros_comuns_usuario": ["Digitar o comando fora do formato esperado.", "Tentar executar fora de um grupo.", "Tentar executar sem ser admin.", "Tentar usar sem estar logado no sistema."],
+          "passos_se_der_erro": ["Copie e teste um exemplo pronto desta página.", "Confira se você está no local certo (grupo/privado) e com a permissão necessária.", "Se ainda falhar, fale com o admin do sistema no privado."],
+          "resumo_usuario_origem": "auto_ia_assistida",
+          "resumo_usuario_revisao_pendente": true,
+          "arguments": [
+            {
+              "name": "participante",
+              "type": "string",
+              "required": true,
+              "description": "menção, resposta ou JID válido",
+              "default": null,
+              "validation": "menção, resposta ou JID válido"
+            }
+          ],
+          "responses": {
+            "success": "Comando executado com sucesso.",
+            "usage_error": "Formato de uso inválido. Consulte metodos_de_uso.",
+            "permission_error": "Permissão insuficiente para executar este comando."
+          },
+          "technical": {
+            "collected_data": ["chat_identifier", "sender_identifier", "command_content", "target_identifier", "moderation_reason", "identificador do chat (remoteJid)", "identificador do remetente (senderJid)", "texto do comando e argumentos", "contexto da mensagem (citacao e mencoes, quando existir)", "identificador do participante alvo", "motivo e contagem de advertencias por participante no grupo"],
+            "dependencies": ["API do WhatsApp (ações de grupo)", "stores/configuração interna", "banco relacional (group_user_warnings)"],
+            "side_effects": ["consulta e altera histórico de advertências no grupo", "envia mensagens administrativas"],
+            "behavior": {
+              "type": "query_target",
+              "target_type": "participant",
+              "action": "warnings",
+              "requires_targets": true
+            },
+            "handler": {
+              "file": "groupCommandHandlers.js",
+              "method": "handleAdminCommand",
+              "command_case": "warnings"
+            },
+            "risk_level": "medium",
+            "stability": "stable",
+            "version": "1.0.0"
+          },
+          "observability": {
+            "event_name": "command.executed",
+            "analytics_event": null,
+            "tags": ["whatsapp", "command", "adminModule", "moderation"]
+          },
+          "privacy": {
+            "retention": "standard_app_logs",
+            "legal_basis": "service_execution_and_legitimate_interest"
+          },
+          "discovery": {
+            "keywords": [],
+            "user_phrasings": ["quero advertir um usuario", "listar warnings de um usuario", "limpar warnings do usuario"],
+            "priority": 120
+          }
+        },
+        {
+          "key": "adminModule:warnlimit",
+          "name": "warnlimit",
+          "id": "admin.warnlimit",
+          "aliases": ["limitewarn", "warnban"],
+          "module": "adminModule",
+          "module_label": "adminModule",
+          "category": "admin",
+          "category_label": "Moderação e Admin",
+          "descricao": "Configura o limite de advertências para auto-ban no grupo (padrão 3).",
+          "requirements": {
+            "group": true,
+            "admin": true,
+            "owner": false,
+            "google_login": true,
+            "nsfw": false,
+            "media": false,
+            "reply": false
+          },
+          "premium": false,
+          "allowed_plans": ["comum", "premium"],
+          "rate_limit": null,
+          "local_de_uso": ["grupo"],
+          "subcomandos": [],
+          "metodos_de_uso": ["/warnlimit status", "/warnlimit <qtd>", "/warnlimit reset"],
+          "mensagens_uso": {
+            "invalid_value": ["/warnlimit <qtd> (qtd precisa ser número inteiro positivo)", "/warnlimit status", "/warnlimit reset"]
+          },
+          "resumo_usuario": "Configura o limite de advertências para auto-ban no grupo (padrão 3).",
+          "quando_usar": ["Use quando você precisa desta ação: Configura o limite de advertências para auto-ban no grupo (padrão 3).", "Funciona dentro de grupos.", "Você precisa ser admin para executar.", "É necessário estar logado no sistema para usar."],
+          "exemplos_reais": [
+            {
+              "situacao": "Cenário comum: Configura o limite de advertências para auto-ban no grupo (padrão 3).",
+              "comando": "/warnlimit status",
+              "resposta_esperada": "Comando executado com sucesso.",
+              "variacao": "Formato de uso inválido. Consulte metodos_de_uso."
+            },
+            {
+              "situacao": "Variação 2 de uso do comando no mesmo contexto.",
+              "comando": "/warnlimit <qtd>",
+              "resposta_esperada": "Comando executado com sucesso.",
+              "variacao": "Formato de uso inválido. Consulte metodos_de_uso."
+            },
+            {
+              "situacao": "Variação 3 de uso do comando no mesmo contexto.",
+              "comando": "/warnlimit reset",
+              "resposta_esperada": "Comando executado com sucesso.",
+              "variacao": "Formato de uso inválido. Consulte metodos_de_uso."
+            }
+          ],
+          "resposta_esperada": ["Sucesso: Comando executado com sucesso.", "Uso incorreto: Formato de uso inválido. Consulte metodos_de_uso.", "Permissão: Permissão insuficiente para executar este comando."],
+          "erros_comuns_usuario": ["Digitar o comando fora do formato esperado.", "Tentar executar fora de um grupo.", "Tentar executar sem ser admin.", "Tentar usar sem estar logado no sistema."],
+          "passos_se_der_erro": ["Copie e teste um exemplo pronto desta página.", "Confira se você está no local certo (grupo/privado) e com a permissão necessária.", "Se ainda falhar, fale com o admin do sistema no privado."],
+          "resumo_usuario_origem": "auto_ia_assistida",
+          "resumo_usuario_revisao_pendente": true,
+          "arguments": [
+            {
+              "name": "valor",
+              "type": "string",
+              "required": false,
+              "description": "status|reset|qtd positiva",
+              "default": "status",
+              "validation": "status|reset|qtd positiva"
+            }
+          ],
+          "responses": {
+            "success": "Comando executado com sucesso.",
+            "usage_error": "Formato de uso inválido. Consulte metodos_de_uso.",
+            "permission_error": "Permissão insuficiente para executar este comando."
+          },
+          "technical": {
+            "collected_data": ["chat_identifier", "sender_identifier", "command_content", "identificador do chat (remoteJid)", "identificador do remetente (senderJid)", "texto do comando e argumentos", "configuração atual de warnAutoBanThreshold no grupo"],
+            "dependencies": ["API do WhatsApp (ações de grupo)", "stores/configuração interna"],
+            "side_effects": ["altera configuração de auto-ban por advertências do grupo", "envia mensagens administrativas"],
+            "behavior": {
+              "type": "set_status_reset",
+              "action_argument": "valor",
+              "allowed_actions": ["status", "reset"]
+            },
+            "handler": {
+              "file": "groupCommandHandlers.js",
+              "method": "handleAdminCommand",
+              "command_case": "warnlimit"
+            },
+            "risk_level": "medium",
+            "stability": "stable",
+            "version": "1.0.0"
+          },
+          "observability": {
+            "event_name": "command.executed",
+            "analytics_event": null,
+            "tags": ["whatsapp", "command", "adminModule", "moderation"]
+          },
+          "privacy": {
+            "retention": "standard_app_logs",
+            "legal_basis": "service_execution_and_legitimate_interest"
+          },
+          "discovery": {
+            "keywords": [],
+            "user_phrasings": ["quero mudar o limite de warn", "ajustar auto ban de advertencia", "ver limite de warns"],
+            "priority": 120
           }
         }
       ]
