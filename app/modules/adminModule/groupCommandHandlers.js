@@ -14,6 +14,7 @@ import { extractUserIdInfo, resolveUserId } from '../../config/index.js';
 import { DEFAULT_STICKER_FOCUS_CHAT_WINDOW_MINUTES, DEFAULT_STICKER_FOCUS_MESSAGE_ALLOWANCE, DEFAULT_STICKER_FOCUS_MESSAGE_COOLDOWN_MINUTES, MAX_STICKER_FOCUS_CHAT_WINDOW_MINUTES, MAX_STICKER_FOCUS_MESSAGE_ALLOWANCE, MAX_STICKER_FOCUS_MESSAGE_COOLDOWN_MINUTES, MIN_STICKER_FOCUS_CHAT_WINDOW_MINUTES, MIN_STICKER_FOCUS_MESSAGE_ALLOWANCE, MIN_STICKER_FOCUS_MESSAGE_COOLDOWN_MINUTES, clampStickerFocusChatWindowMinutes, clampStickerFocusMessageAllowance, clampStickerFocusMessageCooldownMinutes, resolveStickerFocusState } from '../../services/sticker/stickerFocusService.js';
 import { getAdminTextConfig, getAdminUsageText, isAdminCommandName, resolveAdminCommandName } from './adminConfigRuntime.js';
 import { explicarComando, gerarFaqAutomatica, responderPergunta, startAdminAiHelpScheduler } from './adminAiHelpService.js';
+import { addGroupWarning, clearGroupWarnings, countGroupWarnings, listGroupWarnings } from './groupWarningRepository.js';
 const OWNER_JID = getAdminJid();
 const DEFAULT_COMMAND_PREFIX = process.env.COMMAND_PREFIX || '/';
 const ADMIN_TEXTS = getAdminTextConfig();
@@ -21,6 +22,11 @@ const GROUP_ONLY_COMMAND_MESSAGE = ADMIN_TEXTS.group_only_command_message;
 const NO_PERMISSION_COMMAND_MESSAGE = ADMIN_TEXTS.no_permission_command_message;
 const OWNER_ONLY_COMMAND_MESSAGE = ADMIN_TEXTS.owner_only_command_message;
 const USER_JID_SERVERS = new Set([...WHATSAPP_USER_JID_SERVERS, ...LID_USER_JID_SERVERS]);
+const MAX_WARN_REASON_CHARS = 500;
+const WARNINGS_LIST_PREVIEW_LIMIT = 8;
+const DEFAULT_WARN_AUTO_BAN_THRESHOLD = 3;
+const MIN_WARN_AUTO_BAN_THRESHOLD = 1;
+const MAX_WARN_AUTO_BAN_THRESHOLD = 50;
 const normalizePhoneDigits = (value) => String(value || '').replace(/\D+/g, '');
 
 const LEGACY_ADMIN_ROUTE_BY_CANONICAL = {
@@ -106,6 +112,94 @@ const getParticipantJids = (messageInfo, args) => {
   return dedupeParticipantJids(args);
 };
 
+const normalizeWarnReason = (value) =>
+  String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, MAX_WARN_REASON_CHARS);
+
+const formatUserMentionToken = (jid) => {
+  const userPart = String(jid || '')
+    .split('@')[0]
+    .trim();
+  return userPart ? `@${userPart}` : '@usuario';
+};
+
+const formatWarnTimestamp = (value) => {
+  if (!value) return 'data desconhecida';
+  const parsed = Date.parse(String(value));
+  if (!Number.isFinite(parsed)) return String(value);
+  return new Date(parsed).toLocaleString('pt-BR');
+};
+
+const resolveSingleTargetFromMessage = (messageInfo, args = []) => {
+  const safeArgs = Array.isArray(args) ? args.map((value) => String(value || '').trim()).filter(Boolean) : [];
+  const contextInfo = messageInfo?.message?.extendedTextMessage?.contextInfo || {};
+  const mentionedJids = dedupeParticipantJids(contextInfo?.mentionedJid || []);
+
+  if (mentionedJids.length > 1) {
+    return {
+      targetJid: '',
+      remainingArgs: safeArgs,
+      multipleTargets: true,
+    };
+  }
+
+  if (mentionedJids.length === 1) {
+    const targetJid = mentionedJids[0];
+    const remainingArgs = [...safeArgs];
+
+    while (remainingArgs.length > 0) {
+      const token = String(remainingArgs[0] || '').trim();
+      if (!token) {
+        remainingArgs.shift();
+        continue;
+      }
+
+      const normalizedToken = normalizeParticipantJid(token);
+      if (normalizedToken && (normalizedToken === targetJid || isSameJidUser(normalizedToken, targetJid))) {
+        remainingArgs.shift();
+        continue;
+      }
+      if (token.startsWith('@')) {
+        remainingArgs.shift();
+        continue;
+      }
+      break;
+    }
+
+    return {
+      targetJid,
+      remainingArgs,
+      multipleTargets: false,
+    };
+  }
+
+  const firstArgTarget = normalizeParticipantJid(safeArgs[0] || '');
+  if (firstArgTarget) {
+    return {
+      targetJid: firstArgTarget,
+      remainingArgs: safeArgs.slice(1),
+      multipleTargets: false,
+    };
+  }
+
+  const repliedTo = dedupeParticipantJids([contextInfo?.participant || '']);
+  if (repliedTo.length === 1) {
+    return {
+      targetJid: repliedTo[0],
+      remainingArgs: safeArgs,
+      multipleTargets: false,
+    };
+  }
+
+  return {
+    targetJid: '',
+    remainingArgs: safeArgs,
+    multipleTargets: false,
+  };
+};
+
 const resolvePremiumTargetJid = async (targetJid) => {
   const normalizedTarget = normalizeParticipantJid(targetJid);
   if (!normalizedTarget) return '';
@@ -147,6 +241,12 @@ const parsePositiveInteger = (value) => {
   const normalized = Math.floor(numeric);
   if (normalized <= 0) return null;
   return normalized;
+};
+
+const clampWarnAutoBanThreshold = (value) => {
+  const parsed = parsePositiveInteger(value);
+  if (!parsed) return DEFAULT_WARN_AUTO_BAN_THRESHOLD;
+  return Math.max(MIN_WARN_AUTO_BAN_THRESHOLD, Math.min(MAX_WARN_AUTO_BAN_THRESHOLD, parsed));
 };
 
 const formatStickerFocusRule = ({ messageAllowanceCount, messageCooldownMinutes }) => {
@@ -977,6 +1077,329 @@ export async function handleAdminCommand({ command, args, text, sock, messageInf
       } catch (error) {
         await sendAndStore(sock, remoteJid, { text: `Não foi possível remover participantes. Detalhes: ${error.message}` }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
       }
+      break;
+    }
+
+    case 'warn': {
+      if (!isGroupMessage) {
+        await sendAndStore(sock, remoteJid, { text: GROUP_ONLY_COMMAND_MESSAGE }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
+        break;
+      }
+      if (!(await isUserAdmin(remoteJid, senderIdentity))) {
+        await sendAndStore(sock, remoteJid, { text: NO_PERMISSION_COMMAND_MESSAGE }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
+        break;
+      }
+
+      const { targetJid, remainingArgs, multipleTargets } = resolveSingleTargetFromMessage(messageInfo, args);
+      if (multipleTargets || !targetJid) {
+        await sendAndStore(
+          sock,
+          remoteJid,
+          {
+            text: getAdminUsageText('warn', { commandPrefix, variant: 'missing_targets' }),
+          },
+          { quoted: messageInfo, ephemeralExpiration: expirationMessage },
+        );
+        break;
+      }
+
+      const reason = normalizeWarnReason(remainingArgs.join(' '));
+      const targetMention = formatUserMentionToken(targetJid);
+
+      try {
+        await addGroupWarning({
+          groupId: remoteJid,
+          participantJid: targetJid,
+          warnedByJid: senderJid,
+          reason: reason || null,
+        });
+
+        const totalWarnings = await countGroupWarnings({
+          groupId: remoteJid,
+          participantJid: targetJid,
+        });
+
+        const groupConfig = await groupConfigStore.getGroupConfig(remoteJid);
+        const warnAutoBanThreshold = clampWarnAutoBanThreshold(groupConfig?.warnAutoBanThreshold);
+        const shouldAutoBan = totalWarnings >= warnAutoBanThreshold && !containsParticipantJid([targetJid], botJid);
+        let autoBanSucceeded = false;
+        let autoBanError = '';
+
+        if (shouldAutoBan) {
+          try {
+            await updateGroupParticipants(sock, remoteJid, [targetJid], 'remove');
+            autoBanSucceeded = true;
+          } catch (error) {
+            autoBanError = error?.message || 'falha desconhecida';
+            logger.warn('Falha ao aplicar auto-ban por limite de advertências.', {
+              action: 'admin_warn_auto_ban_failed',
+              groupId: remoteJid,
+              targetJid,
+              warnAutoBanThreshold,
+              totalWarnings,
+              error: autoBanError,
+            });
+          }
+        }
+
+        const replyLines = [`⚠️ Advertência registrada para ${targetMention}.`, `Motivo: ${reason || 'não informado'}`, `Total de advertências neste grupo: *${totalWarnings}*.`, `Auto-ban configurado para: *${warnAutoBanThreshold}* advertência(s).`];
+        if (autoBanSucceeded) {
+          replyLines.push(`🚫 Limite atingido: ${targetMention} foi removido(a) automaticamente do grupo.`);
+        } else if (autoBanError) {
+          replyLines.push(`⚠️ Limite atingido, mas não consegui remover automaticamente: ${autoBanError}`);
+        }
+
+        await sendAndStore(
+          sock,
+          remoteJid,
+          {
+            text: replyLines.join('\n'),
+            mentions: [targetJid],
+          },
+          { quoted: messageInfo, ephemeralExpiration: expirationMessage },
+        );
+      } catch (error) {
+        logger.warn('Falha ao registrar advertência no grupo.', {
+          action: 'admin_warn_failed',
+          groupId: remoteJid,
+          senderJid,
+          targetJid,
+          error: error?.message,
+        });
+        await sendAndStore(sock, remoteJid, { text: `Não foi possível registrar a advertência. Detalhes: ${error.message}` }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
+      }
+      break;
+    }
+
+    case 'warnings': {
+      if (!isGroupMessage) {
+        await sendAndStore(sock, remoteJid, { text: GROUP_ONLY_COMMAND_MESSAGE }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
+        break;
+      }
+      if (!(await isUserAdmin(remoteJid, senderIdentity))) {
+        await sendAndStore(sock, remoteJid, { text: NO_PERMISSION_COMMAND_MESSAGE }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
+        break;
+      }
+
+      const { targetJid, multipleTargets } = resolveSingleTargetFromMessage(messageInfo, args);
+      if (multipleTargets || !targetJid) {
+        await sendAndStore(
+          sock,
+          remoteJid,
+          {
+            text: getAdminUsageText('warnings', { commandPrefix, variant: 'missing_targets' }),
+          },
+          { quoted: messageInfo, ephemeralExpiration: expirationMessage },
+        );
+        break;
+      }
+
+      const targetMention = formatUserMentionToken(targetJid);
+
+      try {
+        const [totalWarnings, warningRows] = await Promise.all([
+          countGroupWarnings({
+            groupId: remoteJid,
+            participantJid: targetJid,
+          }),
+          listGroupWarnings({
+            groupId: remoteJid,
+            participantJid: targetJid,
+            limit: WARNINGS_LIST_PREVIEW_LIMIT,
+          }),
+        ]);
+
+        if (totalWarnings <= 0) {
+          await sendAndStore(
+            sock,
+            remoteJid,
+            {
+              text: `✅ ${targetMention} não possui advertências registradas neste grupo.`,
+              mentions: [targetJid],
+            },
+            { quoted: messageInfo, ephemeralExpiration: expirationMessage },
+          );
+          break;
+        }
+
+        const historyLines = (warningRows || []).map((warningRow, index) => `${index + 1}. ${formatWarnTimestamp(warningRow?.createdAt)} - ${warningRow?.reason || 'Sem motivo informado'}`);
+        if (totalWarnings > historyLines.length) {
+          historyLines.push(`... e mais ${totalWarnings - historyLines.length} advertência(s).`);
+        }
+
+        await sendAndStore(
+          sock,
+          remoteJid,
+          {
+            text: [`📋 Histórico de advertências de ${targetMention}`, `Total neste grupo: *${totalWarnings}*`, '', ...historyLines].join('\n'),
+            mentions: [targetJid],
+          },
+          { quoted: messageInfo, ephemeralExpiration: expirationMessage },
+        );
+      } catch (error) {
+        logger.warn('Falha ao consultar histórico de advertências no grupo.', {
+          action: 'admin_warnings_failed',
+          groupId: remoteJid,
+          senderJid,
+          targetJid,
+          error: error?.message,
+        });
+        await sendAndStore(sock, remoteJid, { text: `Não foi possível consultar as advertências. Detalhes: ${error.message}` }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
+      }
+      break;
+    }
+
+    case 'clearwarn': {
+      if (!isGroupMessage) {
+        await sendAndStore(sock, remoteJid, { text: GROUP_ONLY_COMMAND_MESSAGE }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
+        break;
+      }
+      if (!(await isUserAdmin(remoteJid, senderIdentity))) {
+        await sendAndStore(sock, remoteJid, { text: NO_PERMISSION_COMMAND_MESSAGE }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
+        break;
+      }
+
+      const { targetJid, remainingArgs, multipleTargets } = resolveSingleTargetFromMessage(messageInfo, args);
+      if (multipleTargets || !targetJid) {
+        await sendAndStore(
+          sock,
+          remoteJid,
+          {
+            text: getAdminUsageText('clearwarn', { commandPrefix, variant: 'missing_targets' }),
+          },
+          { quoted: messageInfo, ephemeralExpiration: expirationMessage },
+        );
+        break;
+      }
+
+      const rawScope = String(remainingArgs?.[0] || '')
+        .trim()
+        .toLowerCase();
+      const clearAll = rawScope === 'all';
+      const amountToClear = !rawScope || clearAll ? 1 : parsePositiveInteger(rawScope);
+
+      if (!clearAll && rawScope && !amountToClear) {
+        await sendAndStore(
+          sock,
+          remoteJid,
+          {
+            text: getAdminUsageText('clearwarn', { commandPrefix, variant: 'invalid_amount' }),
+          },
+          { quoted: messageInfo, ephemeralExpiration: expirationMessage },
+        );
+        break;
+      }
+
+      try {
+        const clearResult = await clearGroupWarnings({
+          groupId: remoteJid,
+          participantJid: targetJid,
+          clearAll,
+          limit: amountToClear || 1,
+        });
+
+        const targetMention = formatUserMentionToken(targetJid);
+        if (clearResult.removedCount <= 0) {
+          await sendAndStore(
+            sock,
+            remoteJid,
+            {
+              text: `ℹ️ ${targetMention} não possui advertências para remover neste grupo.`,
+              mentions: [targetJid],
+            },
+            { quoted: messageInfo, ephemeralExpiration: expirationMessage },
+          );
+          break;
+        }
+
+        const removedLabel = clearAll ? `todas as advertências (${clearResult.removedCount})` : `${clearResult.removedCount} advertência(s)`;
+        await sendAndStore(
+          sock,
+          remoteJid,
+          {
+            text: `🧹 Limpeza concluída para ${targetMention}: removi *${removedLabel}*.\nAdvertências restantes neste grupo: *${clearResult.remainingCount}*.`,
+            mentions: [targetJid],
+          },
+          { quoted: messageInfo, ephemeralExpiration: expirationMessage },
+        );
+      } catch (error) {
+        logger.warn('Falha ao limpar advertências no grupo.', {
+          action: 'admin_clearwarn_failed',
+          groupId: remoteJid,
+          senderJid,
+          targetJid,
+          clearAll,
+          error: error?.message,
+        });
+        await sendAndStore(sock, remoteJid, { text: `Não foi possível limpar advertências. Detalhes: ${error.message}` }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
+      }
+      break;
+    }
+
+    case 'warnlimit': {
+      if (!isGroupMessage) {
+        await sendAndStore(sock, remoteJid, { text: GROUP_ONLY_COMMAND_MESSAGE }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
+        break;
+      }
+      if (!(await isUserAdmin(remoteJid, senderIdentity))) {
+        await sendAndStore(sock, remoteJid, { text: NO_PERMISSION_COMMAND_MESSAGE }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
+        break;
+      }
+
+      const action = String(args?.[0] || '')
+        .trim()
+        .toLowerCase();
+      const groupConfig = await groupConfigStore.getGroupConfig(remoteJid);
+      const currentThreshold = clampWarnAutoBanThreshold(groupConfig?.warnAutoBanThreshold);
+
+      if (!action || action === 'status') {
+        await sendAndStore(
+          sock,
+          remoteJid,
+          {
+            text: `⚖️ Limite atual de auto-ban por advertências: *${currentThreshold}*.\nUse ${commandPrefix}warnlimit <qtd> para atualizar ou ${commandPrefix}warnlimit reset para voltar ao padrão.`,
+          },
+          { quoted: messageInfo, ephemeralExpiration: expirationMessage },
+        );
+        break;
+      }
+
+      if (action === 'reset') {
+        await groupConfigStore.updateGroupConfig(remoteJid, { warnAutoBanThreshold: null });
+        await sendAndStore(
+          sock,
+          remoteJid,
+          {
+            text: `✅ Limite de auto-ban resetado para o padrão: *${DEFAULT_WARN_AUTO_BAN_THRESHOLD}* advertência(s).`,
+          },
+          { quoted: messageInfo, ephemeralExpiration: expirationMessage },
+        );
+        break;
+      }
+
+      const parsedThreshold = parsePositiveInteger(action);
+      if (!parsedThreshold) {
+        await sendAndStore(
+          sock,
+          remoteJid,
+          {
+            text: getAdminUsageText('warnlimit', { commandPrefix, variant: 'invalid_value' }),
+          },
+          { quoted: messageInfo, ephemeralExpiration: expirationMessage },
+        );
+        break;
+      }
+
+      const nextThreshold = Math.max(MIN_WARN_AUTO_BAN_THRESHOLD, Math.min(MAX_WARN_AUTO_BAN_THRESHOLD, parsedThreshold));
+      await groupConfigStore.updateGroupConfig(remoteJid, { warnAutoBanThreshold: nextThreshold });
+      await sendAndStore(
+        sock,
+        remoteJid,
+        {
+          text: `✅ Limite de auto-ban atualizado para *${nextThreshold}* advertência(s).`,
+        },
+        { quoted: messageInfo, ephemeralExpiration: expirationMessage },
+      );
       break;
     }
 

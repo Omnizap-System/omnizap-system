@@ -105,6 +105,7 @@ export const TABLES = {
   CHATS: 'chats',
   GROUPS_METADATA: 'groups_metadata',
   GROUP_CONFIGS: 'group_configs',
+  GROUP_USER_WARNINGS: 'group_user_warnings',
   SYSTEM_PREMIUM_USERS: 'system_premium_users',
   SYSTEM_AI_PROMPTS: 'system_ai_prompts',
   LID_MAP: 'lid_map',

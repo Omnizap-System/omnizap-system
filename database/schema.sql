@@ -138,6 +138,18 @@ CREATE TABLE IF NOT EXISTS `group_configs` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS `group_user_warnings` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `group_id` varchar(255) NOT NULL,
+  `participant_jid` varchar(255) NOT NULL,
+  `warned_by_jid` varchar(255) DEFAULT NULL,
+  `reason` text DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_group_user_warnings_lookup` (`group_id`,`participant_jid`,`created_at`),
+  KEY `idx_group_user_warnings_prune` (`group_id`,`participant_jid`,`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `system_premium_users` (
   `id` varchar(255) NOT NULL,
   `created_at` timestamp NULL DEFAULT current_timestamp(),

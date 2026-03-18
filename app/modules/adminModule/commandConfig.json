@@ -2622,6 +2622,660 @@
       }
     },
     {
+      "name": "warn",
+      "aliases": ["advertir"],
+      "descricao": "Registra uma advertência para um participante no grupo.",
+      "metodos_de_uso": ["<prefix>warn @usuario [motivo]", "<prefix>warn 5511999999999@s.whatsapp.net [motivo]"],
+      "permissao_necessaria": "admin do grupo",
+      "limite_de_uso": "sem limite especifico",
+      "local_de_uso": ["grupo"],
+      "informacoes_coletadas": ["identificador do chat (remoteJid)", "identificador do remetente (senderJid)", "texto do comando e argumentos", "contexto da mensagem (citacao e mencoes, quando existir)", "identificador do participante alvo", "motivo e contagem de advertencias por participante no grupo"],
+      "categoria": "admin",
+      "enabled": true,
+      "argumentos": [
+        {
+          "nome": "participante",
+          "tipo": "string",
+          "obrigatorio": true,
+          "validacao": "menção, resposta ou JID válido",
+          "default": null
+        },
+        {
+          "nome": "motivo",
+          "tipo": "string",
+          "obrigatorio": false,
+          "validacao": "texto livre (até 500 chars)",
+          "default": null
+        }
+      ],
+      "pre_condicoes": {
+        "requer_grupo": true,
+        "requer_admin": true,
+        "requer_admin_principal": false,
+        "requer_google_login": true,
+        "requer_nsfw": false,
+        "requer_midia": false,
+        "requer_mensagem_respondida": false
+      },
+      "mensagens_uso": {
+        "missing_targets": ["<prefix>warn @usuario [motivo]", "Também é possível responder a mensagem do usuário alvo."]
+      },
+      "id": "admin.warn",
+      "description": "Registra uma advertência para um participante no grupo.",
+      "usage": ["<prefix>warn @usuario [motivo]", "<prefix>warn 5511999999999@s.whatsapp.net [motivo]"],
+      "permission": "admin do grupo",
+      "contexts": ["grupo"],
+      "collected_data": ["identificador do chat (remoteJid)", "identificador do remetente (senderJid)", "texto do comando e argumentos", "contexto da mensagem (citacao e mencoes, quando existir)", "identificador do participante alvo", "motivo e contagem de advertencias por participante no grupo"],
+      "requirements": {
+        "require_group": true,
+        "require_group_admin": true,
+        "require_bot_owner": false,
+        "require_google_login": true,
+        "require_nsfw_enabled": false,
+        "require_media": false,
+        "require_reply_message": false,
+        "legacy": {
+          "requer_grupo": true,
+          "requer_admin": true,
+          "requer_admin_principal": false,
+          "requer_google_login": true,
+          "requer_nsfw": false,
+          "requer_midia": false,
+          "requer_mensagem_respondida": false
+        }
+      },
+      "arguments": [
+        {
+          "name": "participante",
+          "type": "string",
+          "required": true,
+          "default": null,
+          "enum": null,
+          "description": "menção, resposta ou JID válido",
+          "position": 0,
+          "accepts_mentions": true,
+          "accepts_reply_target": true,
+          "greedy": false,
+          "validation": "menção, resposta ou JID válido"
+        },
+        {
+          "name": "motivo",
+          "type": "string",
+          "required": false,
+          "default": null,
+          "enum": null,
+          "description": "texto do motivo da advertência",
+          "position": 1,
+          "accepts_mentions": false,
+          "accepts_reply_target": false,
+          "greedy": true,
+          "validation": "texto livre (até 500 chars)"
+        }
+      ],
+      "dependencies": ["API do WhatsApp (ações de grupo)", "banco relacional (group_user_warnings)"],
+      "side_effects": ["consulta e altera histórico de advertências no grupo", "envia mensagens administrativas"],
+      "docs": {
+        "summary": "Registra uma advertência para um participante no grupo.",
+        "usage_examples": ["<prefix>warn @usuario [motivo]", "<prefix>warn 5511999999999@s.whatsapp.net [motivo]"],
+        "usage_variants": {
+          "missing_targets": ["<prefix>warn @usuario [motivo]", "Também é possível responder a mensagem do usuário alvo."]
+        }
+      },
+      "behavior": {
+        "type": "action_target",
+        "target_type": "participant",
+        "action": "warn",
+        "requires_targets": true
+      },
+      "limits": {
+        "usage_description": "sem limite especifico",
+        "rate_limit": {
+          "max": null,
+          "janela_ms": null,
+          "escopo": "sem_rate_limit_explicito"
+        },
+        "access": {
+          "somente_premium": false,
+          "planos_permitidos": ["comum", "premium"]
+        },
+        "plan_limits": {
+          "comum": {
+            "max": 25,
+            "janela_ms": 60000,
+            "escopo": "usuario"
+          },
+          "premium": {
+            "max": 120,
+            "janela_ms": 60000,
+            "escopo": "usuario"
+          }
+        }
+      },
+      "observability": {
+        "event_name": "command.executed",
+        "analytics_event": null,
+        "tags": ["whatsapp", "command", "adminModule", "moderation"]
+      },
+      "privacy": {
+        "data_categories": ["chat_identifier", "sender_identifier", "target_identifier", "moderation_reason"],
+        "retention_policy": "standard_app_logs",
+        "legal_basis": "service_execution_and_legitimate_interest"
+      },
+      "discovery": {
+        "capability_keywords": ["admin", "moderacao", "advertencia"],
+        "faq_patterns": ["como usar advertencia", "como ver warnings", "como limpar warning"],
+        "user_phrasings": ["quero advertir um usuario", "listar warnings de um usuario", "limpar warnings do usuario"],
+        "suggestion_priority": 120
+      },
+      "access": {
+        "premium_only": false,
+        "allowed_plans": ["comum", "premium"]
+      },
+      "plan_limits": {
+        "comum": {
+          "max": 25,
+          "janela_ms": 60000,
+          "escopo": "usuario"
+        },
+        "premium": {
+          "max": 120,
+          "janela_ms": 60000,
+          "escopo": "usuario"
+        }
+      },
+      "version": "1.0.0",
+      "stability": "stable",
+      "deprecated": false,
+      "replaced_by": null,
+      "risk_level": "medium",
+      "handler": {
+        "file": "groupCommandHandlers.js",
+        "method": "handleAdminCommand",
+        "command_case": "warn"
+      }
+    },
+    {
+      "name": "warnings",
+      "aliases": ["advertencias", "warnlist"],
+      "descricao": "Mostra o histórico de advertências de um participante no grupo.",
+      "metodos_de_uso": ["<prefix>warnings @usuario", "<prefix>warnings 5511999999999@s.whatsapp.net"],
+      "permissao_necessaria": "admin do grupo",
+      "limite_de_uso": "sem limite especifico",
+      "local_de_uso": ["grupo"],
+      "informacoes_coletadas": ["identificador do chat (remoteJid)", "identificador do remetente (senderJid)", "texto do comando e argumentos", "contexto da mensagem (citacao e mencoes, quando existir)", "identificador do participante alvo", "motivo e contagem de advertencias por participante no grupo"],
+      "categoria": "admin",
+      "enabled": true,
+      "argumentos": [
+        {
+          "nome": "participante",
+          "tipo": "string",
+          "obrigatorio": true,
+          "validacao": "menção, resposta ou JID válido",
+          "default": null
+        }
+      ],
+      "pre_condicoes": {
+        "requer_grupo": true,
+        "requer_admin": true,
+        "requer_admin_principal": false,
+        "requer_google_login": true,
+        "requer_nsfw": false,
+        "requer_midia": false,
+        "requer_mensagem_respondida": false
+      },
+      "mensagens_uso": {
+        "missing_targets": ["<prefix>warnings @usuario", "Também é possível responder a mensagem do usuário alvo."]
+      },
+      "id": "admin.warnings",
+      "description": "Mostra o histórico de advertências de um participante no grupo.",
+      "usage": ["<prefix>warnings @usuario", "<prefix>warnings 5511999999999@s.whatsapp.net"],
+      "permission": "admin do grupo",
+      "contexts": ["grupo"],
+      "collected_data": ["identificador do chat (remoteJid)", "identificador do remetente (senderJid)", "texto do comando e argumentos", "contexto da mensagem (citacao e mencoes, quando existir)", "identificador do participante alvo", "motivo e contagem de advertencias por participante no grupo"],
+      "requirements": {
+        "require_group": true,
+        "require_group_admin": true,
+        "require_bot_owner": false,
+        "require_google_login": true,
+        "require_nsfw_enabled": false,
+        "require_media": false,
+        "require_reply_message": false,
+        "legacy": {
+          "requer_grupo": true,
+          "requer_admin": true,
+          "requer_admin_principal": false,
+          "requer_google_login": true,
+          "requer_nsfw": false,
+          "requer_midia": false,
+          "requer_mensagem_respondida": false
+        }
+      },
+      "arguments": [
+        {
+          "name": "participante",
+          "type": "string",
+          "required": true,
+          "default": null,
+          "enum": null,
+          "description": "menção, resposta ou JID válido",
+          "position": 0,
+          "accepts_mentions": true,
+          "accepts_reply_target": true,
+          "greedy": false,
+          "validation": "menção, resposta ou JID válido"
+        }
+      ],
+      "dependencies": ["API do WhatsApp (ações de grupo)", "banco relacional (group_user_warnings)"],
+      "side_effects": ["consulta e altera histórico de advertências no grupo", "envia mensagens administrativas"],
+      "docs": {
+        "summary": "Mostra o histórico de advertências de um participante no grupo.",
+        "usage_examples": ["<prefix>warnings @usuario", "<prefix>warnings 5511999999999@s.whatsapp.net"],
+        "usage_variants": {
+          "missing_targets": ["<prefix>warnings @usuario", "Também é possível responder a mensagem do usuário alvo."]
+        }
+      },
+      "behavior": {
+        "type": "query_target",
+        "target_type": "participant",
+        "action": "warnings",
+        "requires_targets": true
+      },
+      "limits": {
+        "usage_description": "sem limite especifico",
+        "rate_limit": {
+          "max": null,
+          "janela_ms": null,
+          "escopo": "sem_rate_limit_explicito"
+        },
+        "access": {
+          "somente_premium": false,
+          "planos_permitidos": ["comum", "premium"]
+        },
+        "plan_limits": {
+          "comum": {
+            "max": 25,
+            "janela_ms": 60000,
+            "escopo": "usuario"
+          },
+          "premium": {
+            "max": 120,
+            "janela_ms": 60000,
+            "escopo": "usuario"
+          }
+        }
+      },
+      "observability": {
+        "event_name": "command.executed",
+        "analytics_event": null,
+        "tags": ["whatsapp", "command", "adminModule", "moderation"]
+      },
+      "privacy": {
+        "data_categories": ["chat_identifier", "sender_identifier", "target_identifier", "moderation_reason"],
+        "retention_policy": "standard_app_logs",
+        "legal_basis": "service_execution_and_legitimate_interest"
+      },
+      "discovery": {
+        "capability_keywords": ["admin", "moderacao", "advertencia"],
+        "faq_patterns": ["como usar advertencia", "como ver warnings", "como limpar warning"],
+        "user_phrasings": ["quero advertir um usuario", "listar warnings de um usuario", "limpar warnings do usuario"],
+        "suggestion_priority": 120
+      },
+      "access": {
+        "premium_only": false,
+        "allowed_plans": ["comum", "premium"]
+      },
+      "plan_limits": {
+        "comum": {
+          "max": 25,
+          "janela_ms": 60000,
+          "escopo": "usuario"
+        },
+        "premium": {
+          "max": 120,
+          "janela_ms": 60000,
+          "escopo": "usuario"
+        }
+      },
+      "version": "1.0.0",
+      "stability": "stable",
+      "deprecated": false,
+      "replaced_by": null,
+      "risk_level": "medium",
+      "handler": {
+        "file": "groupCommandHandlers.js",
+        "method": "handleAdminCommand",
+        "command_case": "warnings"
+      }
+    },
+    {
+      "name": "clearwarn",
+      "aliases": ["limparwarn", "resetwarn"],
+      "descricao": "Remove advertências de um participante no grupo (todas ou quantidade).",
+      "metodos_de_uso": ["<prefix>clearwarn @usuario", "<prefix>clearwarn @usuario all", "<prefix>clearwarn @usuario <qtd>"],
+      "permissao_necessaria": "admin do grupo",
+      "limite_de_uso": "sem limite especifico",
+      "local_de_uso": ["grupo"],
+      "informacoes_coletadas": ["identificador do chat (remoteJid)", "identificador do remetente (senderJid)", "texto do comando e argumentos", "contexto da mensagem (citacao e mencoes, quando existir)", "identificador do participante alvo", "motivo e contagem de advertencias por participante no grupo"],
+      "categoria": "admin",
+      "enabled": true,
+      "argumentos": [
+        {
+          "nome": "participante",
+          "tipo": "string",
+          "obrigatorio": true,
+          "validacao": "menção, resposta ou JID válido",
+          "default": null
+        },
+        {
+          "nome": "escopo",
+          "tipo": "string",
+          "obrigatorio": false,
+          "validacao": "all|qtd positiva",
+          "default": "1"
+        }
+      ],
+      "pre_condicoes": {
+        "requer_grupo": true,
+        "requer_admin": true,
+        "requer_admin_principal": false,
+        "requer_google_login": true,
+        "requer_nsfw": false,
+        "requer_midia": false,
+        "requer_mensagem_respondida": false
+      },
+      "mensagens_uso": {
+        "missing_targets": ["<prefix>clearwarn @usuario [all|qtd]", "Também é possível responder a mensagem do usuário alvo."],
+        "invalid_amount": ["<prefix>clearwarn @usuario all", "<prefix>clearwarn @usuario <qtd> (qtd precisa ser número positivo)"]
+      },
+      "id": "admin.clearwarn",
+      "description": "Remove advertências de um participante no grupo (todas ou quantidade).",
+      "usage": ["<prefix>clearwarn @usuario", "<prefix>clearwarn @usuario all", "<prefix>clearwarn @usuario <qtd>"],
+      "permission": "admin do grupo",
+      "contexts": ["grupo"],
+      "collected_data": ["identificador do chat (remoteJid)", "identificador do remetente (senderJid)", "texto do comando e argumentos", "contexto da mensagem (citacao e mencoes, quando existir)", "identificador do participante alvo", "motivo e contagem de advertencias por participante no grupo"],
+      "requirements": {
+        "require_group": true,
+        "require_group_admin": true,
+        "require_bot_owner": false,
+        "require_google_login": true,
+        "require_nsfw_enabled": false,
+        "require_media": false,
+        "require_reply_message": false,
+        "legacy": {
+          "requer_grupo": true,
+          "requer_admin": true,
+          "requer_admin_principal": false,
+          "requer_google_login": true,
+          "requer_nsfw": false,
+          "requer_midia": false,
+          "requer_mensagem_respondida": false
+        }
+      },
+      "arguments": [
+        {
+          "name": "participante",
+          "type": "string",
+          "required": true,
+          "default": null,
+          "enum": null,
+          "description": "menção, resposta ou JID válido",
+          "position": 0,
+          "accepts_mentions": true,
+          "accepts_reply_target": true,
+          "greedy": false,
+          "validation": "menção, resposta ou JID válido"
+        },
+        {
+          "name": "escopo",
+          "type": "string",
+          "required": false,
+          "default": "1",
+          "enum": null,
+          "description": "all para limpar tudo ou número para remover parcialmente",
+          "position": 1,
+          "accepts_mentions": false,
+          "accepts_reply_target": false,
+          "greedy": false,
+          "validation": "all|qtd positiva"
+        }
+      ],
+      "dependencies": ["API do WhatsApp (ações de grupo)", "banco relacional (group_user_warnings)"],
+      "side_effects": ["consulta e altera histórico de advertências no grupo", "envia mensagens administrativas"],
+      "docs": {
+        "summary": "Remove advertências de um participante no grupo (todas ou quantidade).",
+        "usage_examples": ["<prefix>clearwarn @usuario", "<prefix>clearwarn @usuario all", "<prefix>clearwarn @usuario <qtd>"],
+        "usage_variants": {
+          "missing_targets": ["<prefix>clearwarn @usuario [all|qtd]", "Também é possível responder a mensagem do usuário alvo."],
+          "invalid_amount": ["<prefix>clearwarn @usuario all", "<prefix>clearwarn @usuario <qtd> (qtd precisa ser número positivo)"]
+        }
+      },
+      "behavior": {
+        "type": "action_target",
+        "target_type": "participant",
+        "action": "clearwarn",
+        "requires_targets": true
+      },
+      "limits": {
+        "usage_description": "sem limite especifico",
+        "rate_limit": {
+          "max": null,
+          "janela_ms": null,
+          "escopo": "sem_rate_limit_explicito"
+        },
+        "access": {
+          "somente_premium": false,
+          "planos_permitidos": ["comum", "premium"]
+        },
+        "plan_limits": {
+          "comum": {
+            "max": 25,
+            "janela_ms": 60000,
+            "escopo": "usuario"
+          },
+          "premium": {
+            "max": 120,
+            "janela_ms": 60000,
+            "escopo": "usuario"
+          }
+        }
+      },
+      "observability": {
+        "event_name": "command.executed",
+        "analytics_event": null,
+        "tags": ["whatsapp", "command", "adminModule", "moderation"]
+      },
+      "privacy": {
+        "data_categories": ["chat_identifier", "sender_identifier", "target_identifier", "moderation_reason"],
+        "retention_policy": "standard_app_logs",
+        "legal_basis": "service_execution_and_legitimate_interest"
+      },
+      "discovery": {
+        "capability_keywords": ["admin", "moderacao", "advertencia"],
+        "faq_patterns": ["como usar advertencia", "como ver warnings", "como limpar warning"],
+        "user_phrasings": ["quero advertir um usuario", "listar warnings de um usuario", "limpar warnings do usuario"],
+        "suggestion_priority": 120
+      },
+      "access": {
+        "premium_only": false,
+        "allowed_plans": ["comum", "premium"]
+      },
+      "plan_limits": {
+        "comum": {
+          "max": 25,
+          "janela_ms": 60000,
+          "escopo": "usuario"
+        },
+        "premium": {
+          "max": 120,
+          "janela_ms": 60000,
+          "escopo": "usuario"
+        }
+      },
+      "version": "1.0.0",
+      "stability": "stable",
+      "deprecated": false,
+      "replaced_by": null,
+      "risk_level": "medium",
+      "handler": {
+        "file": "groupCommandHandlers.js",
+        "method": "handleAdminCommand",
+        "command_case": "clearwarn"
+      }
+    },
+    {
+      "name": "warnlimit",
+      "aliases": ["limitewarn", "warnban"],
+      "descricao": "Configura o limite de advertências para auto-ban no grupo (padrão 3).",
+      "metodos_de_uso": ["<prefix>warnlimit status", "<prefix>warnlimit <qtd>", "<prefix>warnlimit reset"],
+      "permissao_necessaria": "admin do grupo",
+      "limite_de_uso": "sem limite especifico",
+      "local_de_uso": ["grupo"],
+      "informacoes_coletadas": ["identificador do chat (remoteJid)", "identificador do remetente (senderJid)", "texto do comando e argumentos", "configuração atual de warnAutoBanThreshold no grupo"],
+      "categoria": "admin",
+      "enabled": true,
+      "argumentos": [
+        {
+          "nome": "valor",
+          "tipo": "string",
+          "obrigatorio": false,
+          "validacao": "status|reset|qtd positiva",
+          "default": "status"
+        }
+      ],
+      "pre_condicoes": {
+        "requer_grupo": true,
+        "requer_admin": true,
+        "requer_admin_principal": false,
+        "requer_google_login": true,
+        "requer_nsfw": false,
+        "requer_midia": false,
+        "requer_mensagem_respondida": false
+      },
+      "mensagens_uso": {
+        "default": ["<prefix>warnlimit status", "<prefix>warnlimit <qtd>", "<prefix>warnlimit reset"],
+        "invalid_value": ["<prefix>warnlimit <qtd> (qtd precisa ser número inteiro positivo)", "<prefix>warnlimit status", "<prefix>warnlimit reset"]
+      },
+      "id": "admin.warnlimit",
+      "description": "Configura o limite de advertências para auto-ban no grupo (padrão 3).",
+      "usage": ["<prefix>warnlimit status", "<prefix>warnlimit <qtd>", "<prefix>warnlimit reset"],
+      "permission": "admin do grupo",
+      "contexts": ["grupo"],
+      "collected_data": ["identificador do chat (remoteJid)", "identificador do remetente (senderJid)", "texto do comando e argumentos", "configuração atual de warnAutoBanThreshold no grupo"],
+      "requirements": {
+        "require_group": true,
+        "require_group_admin": true,
+        "require_bot_owner": false,
+        "require_google_login": true,
+        "require_nsfw_enabled": false,
+        "require_media": false,
+        "require_reply_message": false,
+        "legacy": {
+          "requer_grupo": true,
+          "requer_admin": true,
+          "requer_admin_principal": false,
+          "requer_google_login": true,
+          "requer_nsfw": false,
+          "requer_midia": false,
+          "requer_mensagem_respondida": false
+        }
+      },
+      "arguments": [
+        {
+          "name": "valor",
+          "type": "string",
+          "required": false,
+          "default": "status",
+          "enum": null,
+          "description": "status|reset|qtd positiva",
+          "position": 0,
+          "accepts_mentions": false,
+          "accepts_reply_target": false,
+          "greedy": false,
+          "validation": "status|reset|qtd positiva"
+        }
+      ],
+      "dependencies": ["API do WhatsApp (ações de grupo)", "stores/configuração interna"],
+      "side_effects": ["altera configuração de auto-ban por advertências do grupo", "envia mensagens administrativas"],
+      "docs": {
+        "summary": "Configura o limite de advertências para auto-ban no grupo (padrão 3).",
+        "usage_examples": ["<prefix>warnlimit status", "<prefix>warnlimit <qtd>", "<prefix>warnlimit reset"],
+        "usage_variants": {
+          "invalid_value": ["<prefix>warnlimit <qtd> (qtd precisa ser número inteiro positivo)", "<prefix>warnlimit status", "<prefix>warnlimit reset"]
+        }
+      },
+      "behavior": {
+        "type": "set_status_reset",
+        "action_argument": "valor",
+        "allowed_actions": ["status", "reset"]
+      },
+      "limits": {
+        "usage_description": "sem limite especifico",
+        "rate_limit": {
+          "max": null,
+          "janela_ms": null,
+          "escopo": "sem_rate_limit_explicito"
+        },
+        "access": {
+          "somente_premium": false,
+          "planos_permitidos": ["comum", "premium"]
+        },
+        "plan_limits": {
+          "comum": {
+            "max": 25,
+            "janela_ms": 60000,
+            "escopo": "usuario"
+          },
+          "premium": {
+            "max": 120,
+            "janela_ms": 60000,
+            "escopo": "usuario"
+          }
+        }
+      },
+      "observability": {
+        "event_name": "command.executed",
+        "analytics_event": null,
+        "tags": ["whatsapp", "command", "adminModule", "moderation"]
+      },
+      "privacy": {
+        "data_categories": ["chat_identifier", "sender_identifier", "command_content"],
+        "retention_policy": "standard_app_logs",
+        "legal_basis": "service_execution_and_legitimate_interest"
+      },
+      "discovery": {
+        "capability_keywords": ["warnlimit", "advertencia", "admin", "grupo"],
+        "faq_patterns": ["como mudar limite de warn", "como configurar auto ban por warn", "comando warnlimit"],
+        "user_phrasings": ["quero mudar o limite de warn", "ajustar auto ban de advertencia", "ver limite de warns"],
+        "suggestion_priority": 120
+      },
+      "access": {
+        "premium_only": false,
+        "allowed_plans": ["comum", "premium"]
+      },
+      "plan_limits": {
+        "comum": {
+          "max": 25,
+          "janela_ms": 60000,
+          "escopo": "usuario"
+        },
+        "premium": {
+          "max": 120,
+          "janela_ms": 60000,
+          "escopo": "usuario"
+        }
+      },
+      "version": "1.0.0",
+      "stability": "stable",
+      "deprecated": false,
+      "replaced_by": null,
+      "risk_level": "medium",
+      "handler": {
+        "file": "groupCommandHandlers.js",
+        "method": "handleAdminCommand",
+        "command_case": "warnlimit"
+      }
+    },
+    {
       "name": "promover",
       "aliases": ["up"],
       "descricao": "Promove participantes a administradores do grupo.",

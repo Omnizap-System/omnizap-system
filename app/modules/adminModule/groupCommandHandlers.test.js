@@ -57,45 +57,112 @@ const createDbHarness = () => {
   const groupConfigRows = new Map();
   const groupMetadataRows = new Map();
   const premiumUserRows = new Set();
+  const groupUserWarningsRows = [];
+  let warningAutoIncrement = 1;
 
   const execute = async (sql, params = []) => {
     const normalized = normalizeSql(sql);
+    const normalizedNoTicks = normalized.replaceAll('`', '');
 
-    if (normalized.startsWith('select * from `groups_metadata` where id = ?')) {
+    if (normalizedNoTicks.startsWith('select * from groups_metadata where id = ?')) {
       const row = groupMetadataRows.get(params[0]);
       return [[row].filter(Boolean), []];
     }
 
-    if (normalized.startsWith('select * from `group_configs` where id = ?')) {
+    if (normalizedNoTicks.startsWith('select * from group_configs where id = ?')) {
       const row = groupConfigRows.get(params[0]);
       return [[row].filter(Boolean), []];
     }
 
-    if (normalized.startsWith('insert into `group_configs`')) {
+    if (normalizedNoTicks.startsWith('insert into group_configs')) {
       const [id, config] = params;
       groupConfigRows.set(id, { id, config: String(config) });
       return [{ affectedRows: 1 }, []];
     }
 
-    if (normalized.startsWith('select id from `system_premium_users`')) {
+    if (normalizedNoTicks.startsWith('select id from system_premium_users')) {
       const rows = Array.from(premiumUserRows.values())
         .sort((left, right) => String(left).localeCompare(String(right)))
         .map((id) => ({ id }));
       return [rows, []];
     }
 
-    if (normalized.startsWith('delete from `system_premium_users`')) {
+    if (normalizedNoTicks.startsWith('delete from system_premium_users')) {
       premiumUserRows.clear();
       return [{ affectedRows: 1 }, []];
     }
 
-    if (normalized.startsWith('insert into `system_premium_users`')) {
+    if (normalizedNoTicks.startsWith('insert into system_premium_users')) {
       const [id] = params;
       premiumUserRows.add(String(id || ''));
       return [{ affectedRows: 1 }, []];
     }
 
-    if (normalized.includes('from lid_map') || normalized.includes('from `lid_map`') || normalized.includes('into `lid_map`') || normalized.startsWith('update `messages`')) {
+    if (normalizedNoTicks.startsWith('insert into group_user_warnings')) {
+      const [groupId, participantJid, warnedByJid, reason] = params;
+      groupUserWarningsRows.push({
+        id: warningAutoIncrement++,
+        group_id: String(groupId || ''),
+        participant_jid: String(participantJid || '').toLowerCase(),
+        warned_by_jid: warnedByJid ? String(warnedByJid).toLowerCase() : null,
+        reason: reason ? String(reason) : null,
+        created_at: new Date(__timeNowMs()).toISOString(),
+      });
+      return [{ affectedRows: 1 }, []];
+    }
+
+    if (normalizedNoTicks.startsWith('select count(*) as total from group_user_warnings')) {
+      const [groupId, participantJid] = params;
+      const filtered = groupUserWarningsRows.filter((row) => row.group_id === String(groupId || '') && row.participant_jid === String(participantJid || '').toLowerCase());
+      return [[{ total: filtered.length }], []];
+    }
+
+    if (normalizedNoTicks.startsWith('select id, group_id, participant_jid, warned_by_jid, reason, created_at from group_user_warnings')) {
+      const [groupId, participantJid, limit] = params;
+      const safeLimit = Number.parseInt(String(limit || 0), 10);
+      const filtered = groupUserWarningsRows
+        .filter((row) => row.group_id === String(groupId || '') && row.participant_jid === String(participantJid || '').toLowerCase())
+        .sort((left, right) => right.id - left.id)
+        .slice(0, Number.isFinite(safeLimit) && safeLimit > 0 ? safeLimit : 20)
+        .map((row) => ({ ...row }));
+      return [filtered, []];
+    }
+
+    if (normalizedNoTicks.startsWith('delete from group_user_warnings') && normalizedNoTicks.includes('order by id desc limit ?')) {
+      const [groupId, participantJid, limit] = params;
+      const safeGroupId = String(groupId || '');
+      const safeParticipantJid = String(participantJid || '').toLowerCase();
+      const safeLimit = Number.parseInt(String(limit || 0), 10);
+      const rowsToDelete = groupUserWarningsRows
+        .filter((row) => row.group_id === safeGroupId && row.participant_jid === safeParticipantJid)
+        .sort((left, right) => right.id - left.id)
+        .slice(0, Number.isFinite(safeLimit) && safeLimit > 0 ? safeLimit : 1)
+        .map((row) => row.id);
+
+      if (rowsToDelete.length > 0) {
+        for (let index = groupUserWarningsRows.length - 1; index >= 0; index -= 1) {
+          if (!rowsToDelete.includes(groupUserWarningsRows[index].id)) continue;
+          groupUserWarningsRows.splice(index, 1);
+        }
+      }
+
+      return [{ affectedRows: rowsToDelete.length }, []];
+    }
+
+    if (normalizedNoTicks.startsWith('delete from group_user_warnings')) {
+      const [groupId, participantJid] = params;
+      const safeGroupId = String(groupId || '');
+      const safeParticipantJid = String(participantJid || '').toLowerCase();
+      let removed = 0;
+      for (let index = groupUserWarningsRows.length - 1; index >= 0; index -= 1) {
+        if (groupUserWarningsRows[index].group_id !== safeGroupId || groupUserWarningsRows[index].participant_jid !== safeParticipantJid) continue;
+        groupUserWarningsRows.splice(index, 1);
+        removed += 1;
+      }
+      return [{ affectedRows: removed }, []];
+    }
+
+    if (normalizedNoTicks.includes('from lid_map') || normalizedNoTicks.includes('into lid_map') || normalizedNoTicks.startsWith('update messages')) {
       return [[], []];
     }
 
@@ -162,10 +229,26 @@ const createSockStub = () => {
   };
 };
 
-const buildMessageInfo = (participant = OWNER_JID) => ({
-  key: { participant },
-  message: {},
-});
+const buildMessageInfo = (participant = OWNER_JID, { mentionedJid = [], replyParticipant = '' } = {}) => {
+  const contextInfo = {};
+  if (Array.isArray(mentionedJid) && mentionedJid.length > 0) {
+    contextInfo.mentionedJid = mentionedJid;
+  }
+  if (replyParticipant) {
+    contextInfo.participant = replyParticipant;
+  }
+
+  return {
+    key: { participant },
+    message: Object.keys(contextInfo).length
+      ? {
+          extendedTextMessage: {
+            contextInfo,
+          },
+        }
+      : {},
+  };
+};
 
 const runAdminCommand = async ({ command, args = [], text = args.join(' '), sock, senderJid = OWNER_JID, remoteJid = GROUP_JID, isGroupMessage = true, messageInfo, botJid = BOT_JID }) =>
   handleAdminCommand({
@@ -209,6 +292,10 @@ after(() => {
 test('isAdminCommand reconhece comandos válidos', () => {
   assert.equal(isAdminCommand('nsfw'), true);
   assert.equal(isAdminCommand('banir'), true);
+  assert.equal(isAdminCommand('warn'), true);
+  assert.equal(isAdminCommand('warnings'), true);
+  assert.equal(isAdminCommand('clearwarn'), true);
+  assert.equal(isAdminCommand('warnlimit'), true);
   assert.equal(isAdminCommand('stickerallowance'), true);
   assert.equal(isAdminCommand('noticiasfiltro'), true);
   assert.equal(isAdminCommand('grupoaudit'), true);
@@ -317,6 +404,167 @@ test('ban bloqueia tentativa de remover o próprio bot', async () => {
   assert.equal(participantUpdates.length, 0);
   assert.equal(messages.length, 1);
   assert.equal(messages[0].content.text, 'Operação cancelada: o bot não pode remover a própria conta.');
+});
+
+test('warn registra advertência e warnings lista histórico', async () => {
+  const { sock, messages } = createSockStub();
+  dbHarness.setGroupParticipants(GROUP_JID, [{ id: OWNER_JID, admin: 'admin' }]);
+
+  await runAdminCommand({
+    command: 'warn',
+    args: ['@alvo', 'spam', 'repetitivo'],
+    sock,
+    messageInfo: buildMessageInfo(OWNER_JID, { mentionedJid: [TARGET_JID] }),
+  });
+
+  assert.match(messages[messages.length - 1].content.text, /Advertência registrada/i);
+  assert.match(messages[messages.length - 1].content.text, /spam repetitivo/i);
+
+  await runAdminCommand({
+    command: 'warnings',
+    args: [],
+    sock,
+    messageInfo: buildMessageInfo(OWNER_JID, { replyParticipant: TARGET_JID }),
+  });
+
+  assert.match(messages[messages.length - 1].content.text, /Histórico de advertências/i);
+  assert.match(messages[messages.length - 1].content.text, /Total neste grupo: \*1\*/i);
+  assert.match(messages[messages.length - 1].content.text, /spam repetitivo/i);
+});
+
+test('warn aplica auto-ban no limite padrão de 3 advertências', async () => {
+  const { sock, messages, participantUpdates } = createSockStub();
+  dbHarness.setGroupParticipants(GROUP_JID, [{ id: OWNER_JID, admin: 'admin' }]);
+
+  await runAdminCommand({
+    command: 'warn',
+    args: [TARGET_JID, 'motivo-1'],
+    sock,
+  });
+  await runAdminCommand({
+    command: 'warn',
+    args: [TARGET_JID, 'motivo-2'],
+    sock,
+  });
+  await runAdminCommand({
+    command: 'warn',
+    args: [TARGET_JID, 'motivo-3'],
+    sock,
+  });
+
+  assert.equal(participantUpdates.length, 1);
+  assert.deepEqual(participantUpdates[0], {
+    groupId: GROUP_JID,
+    participants: [TARGET_JID],
+    action: 'remove',
+  });
+  assert.match(messages[messages.length - 1].content.text, /Auto-ban configurado para: \*3\*/i);
+  assert.match(messages[messages.length - 1].content.text, /Limite atingido/i);
+});
+
+test('warnlimit permite ajustar limite por grupo e resetar para padrão', async () => {
+  const { sock, messages, participantUpdates } = createSockStub();
+  dbHarness.setGroupParticipants(GROUP_JID, [{ id: OWNER_JID, admin: 'admin' }]);
+
+  await runAdminCommand({
+    command: 'warnlimit',
+    args: ['2'],
+    sock,
+  });
+  assert.equal(dbHarness.getGroupConfig(GROUP_JID).warnAutoBanThreshold, 2);
+
+  await runAdminCommand({
+    command: 'warn',
+    args: [TARGET_JID, 'motivo-1'],
+    sock,
+  });
+  await runAdminCommand({
+    command: 'warn',
+    args: [TARGET_JID, 'motivo-2'],
+    sock,
+  });
+
+  assert.equal(participantUpdates.length, 1);
+  assert.deepEqual(participantUpdates[0], {
+    groupId: GROUP_JID,
+    participants: [TARGET_JID],
+    action: 'remove',
+  });
+
+  await runAdminCommand({
+    command: 'warnlimit',
+    args: ['status'],
+    sock,
+  });
+  assert.match(messages[messages.length - 1].content.text, /Limite atual de auto-ban/i);
+  assert.match(messages[messages.length - 1].content.text, /\*2\*/);
+
+  await runAdminCommand({
+    command: 'warnlimit',
+    args: ['reset'],
+    sock,
+  });
+  assert.equal(dbHarness.getGroupConfig(GROUP_JID).warnAutoBanThreshold, null);
+  assert.match(messages[messages.length - 1].content.text, /padrão: \*3\*/i);
+});
+
+test('clearwarn remove parcialmente e depois remove todas as advertências', async () => {
+  const { sock, messages } = createSockStub();
+  dbHarness.setGroupParticipants(GROUP_JID, [{ id: OWNER_JID, admin: 'admin' }]);
+
+  await runAdminCommand({
+    command: 'warn',
+    args: [TARGET_JID, 'motivo-1'],
+    sock,
+  });
+  await runAdminCommand({
+    command: 'warn',
+    args: [TARGET_JID, 'motivo-2'],
+    sock,
+  });
+  await runAdminCommand({
+    command: 'warn',
+    args: [TARGET_JID, 'motivo-3'],
+    sock,
+  });
+
+  await runAdminCommand({
+    command: 'clearwarn',
+    args: [TARGET_JID, '2'],
+    sock,
+  });
+  assert.match(messages[messages.length - 1].content.text, /removi \*2 advertência\(s\)\*/i);
+  assert.match(messages[messages.length - 1].content.text, /Advertências restantes neste grupo: \*1\*/i);
+
+  await runAdminCommand({
+    command: 'clearwarn',
+    args: [TARGET_JID, 'all'],
+    sock,
+  });
+  assert.match(messages[messages.length - 1].content.text, /todas as advertências \(1\)/i);
+  assert.match(messages[messages.length - 1].content.text, /Advertências restantes neste grupo: \*0\*/i);
+
+  await runAdminCommand({
+    command: 'warnings',
+    args: [TARGET_JID],
+    sock,
+  });
+  assert.match(messages[messages.length - 1].content.text, /não possui advertências/i);
+});
+
+test('clearwarn retorna uso ao receber quantidade inválida', async () => {
+  const { sock, messages } = createSockStub();
+  dbHarness.setGroupParticipants(GROUP_JID, [{ id: OWNER_JID, admin: 'admin' }]);
+
+  await runAdminCommand({
+    command: 'clearwarn',
+    args: [TARGET_JID, 'zero'],
+    sock,
+  });
+
+  assert.equal(messages.length, 1);
+  assert.match(messages[0].content.text, /Formato de uso/i);
+  assert.match(messages[0].content.text, /clearwarn/i);
 });
 
 test('premium exige admin principal e lista usuários quando autorizado', async () => {
