@@ -6,7 +6,7 @@ import test from 'node:test';
 
 import { initAuthCreds, proto } from '@whiskeysockets/baileys';
 
-const PINNED_BAILEYS_REF = 'github:jlucaso1/Baileys#be89465e07afa871cf3f0e19cabfec9780db6be7';
+const PINNED_BAILEYS_REF = 'github:jlucaso1/Baileys#feat-add-stickerpack-support';
 
 const require = createRequire(import.meta.url);
 const baileysPackageJsonPath = require.resolve('@whiskeysockets/baileys/package.json');

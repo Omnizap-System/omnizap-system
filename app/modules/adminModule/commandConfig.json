@@ -24,7 +24,7 @@
     "command": {
       "enabled": true,
       "category": "admin",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "stability": "stable",
       "deprecated": false,
       "replaced_by": null,
@@ -36,8 +36,8 @@
       "require_bot_owner": false,
       "require_google_login": true,
       "require_nsfw_enabled": false,
-      "require_media": false,
-      "require_reply_message": false
+      "require_media": true,
+      "require_reply_message": true
     },
     "pre_condicoes": {
       "requer_grupo": true,
@@ -45,8 +45,8 @@
       "requer_admin_principal": false,
       "requer_google_login": true,
       "requer_nsfw": false,
-      "requer_midia": false,
-      "requer_mensagem_respondida": false
+      "requer_midia": true,
+      "requer_mensagem_respondida": true
     },
     "rate_limit": {
       "max": null,

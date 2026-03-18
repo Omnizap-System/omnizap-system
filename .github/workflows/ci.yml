@@ -57,6 +57,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: DB bootstrap smoke test
+        run: npm run db:init
+
       - name: Check formatting
         run: npm run format:check
 
@@ -68,6 +71,3 @@ jobs:
 
       - name: Build
         run: npm run build
-
-      - name: DB bootstrap smoke test
-        run: npm run db:init
