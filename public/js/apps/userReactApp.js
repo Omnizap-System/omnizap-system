@@ -8,6 +8,7 @@ const html = htm.bind(React.createElement);
 
 const DEFAULT_API_BASE_PATH = '/api';
 const DEFAULT_LOGIN_PATH = '/login';
+const DEFAULT_PASSWORD_RESET_WEB_PATH = '/user/password-reset';
 const DEFAULT_FALLBACK_AVATAR = '/assets/images/brand-logo-128.webp';
 
 const TABS = [
@@ -23,6 +24,14 @@ const shortNum = (value) =>
     maximumFractionDigits: 1,
   }).format(Math.max(0, Number(value) || 0));
 
+const normalizeRoutePath = (value, fallback) => {
+  const raw = String(value || '').trim();
+  if (!raw) return fallback;
+  if (!raw.startsWith('/')) return fallback;
+  if (/^\/\//.test(raw)) return fallback;
+  return raw;
+};
+
 const UserApp = ({ config }) => {
   const [activeTab, setActiveTab] = useState('summary');
   const [isLoading, setLoading] = useState(true);
@@ -30,6 +39,9 @@ const UserApp = ({ config }) => {
   const [session, setSession] = useState(null);
   const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [passwordResetBusy, setPasswordResetBusy] = useState(false);
+  const [passwordResetError, setPasswordResetError] = useState('');
+  const [passwordResetInfo, setPasswordResetInfo] = useState('');
 
   // Lock scroll when mobile menu is open
   useEffect(() => {
@@ -122,6 +134,54 @@ const UserApp = ({ config }) => {
     }
   };
 
+  const startPasswordResetFlow = async () => {
+    if (passwordResetBusy) return;
+    setPasswordResetError('');
+    setPasswordResetInfo('');
+    setPasswordResetBusy(true);
+
+    try {
+      const response = await fetch(`${config.apiBasePath}/auth/password/recovery/session`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+        },
+        body: JSON.stringify({}),
+      });
+
+      let payload = null;
+      try {
+        payload = await response.json();
+      } catch {
+        payload = null;
+      }
+
+      if (!response.ok) {
+        throw new Error(payload?.error || `Falha HTTP ${response.status}`);
+      }
+
+      const data = payload?.data || {};
+      const sessionToken = String(data?.session_token || '')
+        .trim()
+        .slice(0, 4096);
+      const sessionPath = normalizeRoutePath(data?.session_path, config.passwordResetWebPath || DEFAULT_PASSWORD_RESET_WEB_PATH);
+      const targetUrl = new URL(sessionPath, window.location.origin);
+      if (sessionToken) {
+        targetUrl.searchParams.set('session_token', sessionToken);
+      }
+
+      setPasswordResetInfo('Sessão de redefinição criada. Redirecionando...');
+      window.setTimeout(() => {
+        window.location.assign(`${targetUrl.pathname}${targetUrl.search}`);
+      }, 120);
+    } catch (error) {
+      setPasswordResetError(error?.message || 'Não foi possível iniciar a redefinição de senha.');
+    } finally {
+      setPasswordResetBusy(false);
+    }
+  };
+
   return html`
     <style>
       .sidebar-transition {
@@ -130,7 +190,7 @@ const UserApp = ({ config }) => {
           transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
       }
       .content-transition {
-        transition: padding-left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        transition: margin-left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
       }
     </style>
 
@@ -145,7 +205,7 @@ const UserApp = ({ config }) => {
       <div onClick=${() => setMobileMenuOpen(false)} className=${`fixed inset-0 z-[50] bg-[#020617]/80 lg:hidden transition-opacity duration-300 ${isMobileMenuOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}></div>
 
       <!-- Navbar -->
-      <header className="sticky top-0 z-[40] border-b border-white/5 bg-[#020617]/80 backdrop-blur-xl">
+      <header className="fixed inset-x-0 top-0 z-[40] border-b border-white/5 bg-[#020617]/80 backdrop-blur-xl">
         <div className="px-4 lg:px-8">
           <div className="flex h-16 items-center justify-between gap-4">
             <div className="flex items-center gap-4">
@@ -171,9 +231,9 @@ const UserApp = ({ config }) => {
         </div>
       </header>
 
-      <div className="flex relative">
+      <div className="flex relative pt-16">
         <!-- Sidebar -->
-        <aside className=${`fixed lg:sticky top-0 lg:top-[65px] h-full lg:h-[calc(100vh-65px)] z-[60] lg:z-30 bg-[#020617] border-r border-white/5 sidebar-transition overflow-y-auto no-scrollbar ${isMobileMenuOpen ? 'translate-x-0 w-[280px]' : '-translate-x-full lg:translate-x-0'} ${isSidebarCollapsed ? 'lg:w-[85px]' : 'lg:w-[280px]'}`}>
+        <aside className=${`fixed lg:fixed top-0 lg:top-[65px] lg:left-0 h-full lg:h-[calc(100vh-65px)] z-[60] lg:z-30 bg-[#020617] border-r border-white/5 sidebar-transition overflow-y-auto no-scrollbar ${isMobileMenuOpen ? 'translate-x-0 w-[280px]' : '-translate-x-full lg:translate-x-0'} ${isSidebarCollapsed ? 'lg:w-[85px]' : 'lg:w-[280px]'}`}>
           <div className="p-4 flex flex-col h-full">
             <!-- Mobile Header inside Sidebar -->
             <div className="lg:hidden flex items-center justify-between mb-6 px-2">
@@ -240,7 +300,7 @@ const UserApp = ({ config }) => {
         </aside>
 
         <!-- Main Content -->
-        <main className=${`flex-1 min-w-0 content-transition px-4 lg:px-10 py-8 lg:py-12`}>
+        <main className=${`flex-1 min-w-0 content-transition px-4 lg:px-10 py-8 lg:py-12 ${isSidebarCollapsed ? 'lg:ml-[85px]' : 'lg:ml-[280px]'}`}>
           <div className="max-w-5xl mx-auto space-y-10">
             <div data-reveal="fade-up" className="flex flex-col md:flex-row md:items-end justify-between gap-6">
               <div className="space-y-2">
@@ -361,37 +421,6 @@ const UserApp = ({ config }) => {
                               </div>
                             </div>
 
-                            <!-- Activity Chart Section -->
-                            ${usageInfo.activity_chart && usageInfo.activity_chart.length > 0
-                              ? html`
-                                  <div className="p-8 lg:p-10 rounded-[3.5rem] bg-white/[0.02] border border-white/5 space-y-8 relative overflow-hidden">
-                                    <div className="flex items-center justify-between">
-                                      <h3 className="font-black text-xl flex items-center gap-3">
-                                        <span className="w-2 h-2 rounded-full bg-primary shadow-[0_0_10px_rgba(34,197,94,0.5)]"></span>
-                                        Fluxo de Atividade (7 dias)
-                                      </h3>
-                                      <span className="text-[9px] font-black uppercase text-white/20 tracking-widest">Update Realtime</span>
-                                    </div>
-                                    <div className="flex items-end justify-between gap-2 h-48 pt-4 px-2">
-                                      ${usageInfo.activity_chart.map((data) => {
-                                        const maxCount = Math.max(...usageInfo.activity_chart.map((d) => d.count), 1);
-                                        const heightPercent = Math.max((data.count / maxCount) * 100, 5);
-                                        return html`
-                                          <div key=${data.day} className="flex flex-col items-center gap-3 flex-1 group min-w-0">
-                                            <div className="w-full relative flex justify-center h-full items-end">
-                                              <div className="w-full max-w-[2.5rem] bg-primary/10 hover:bg-primary transition-all rounded-t-xl group-hover:shadow-[0_0_30px_rgba(34,197,94,0.3)] relative" style=${{ height: heightPercent + '%' }}>
-                                                <div className="absolute -top-10 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all bg-white text-[#020617] text-[10px] font-black px-2.5 py-1.5 rounded-xl pointer-events-none whitespace-nowrap z-20 shadow-xl translate-y-2 group-hover:translate-y-0">${data.count} msgs</div>
-                                              </div>
-                                            </div>
-                                            <span className="text-[8px] font-black text-white/20 uppercase tracking-tighter truncate w-full text-center">${data.day.split('-').reverse().slice(0, 2).join('/')}</span>
-                                          </div>
-                                        `;
-                                      })}
-                                    </div>
-                                  </div>
-                                `
-                              : null}
-
                             <!-- Details Card -->
                             <div className="p-8 lg:p-12 rounded-[3.5rem] bg-white/[0.03] border border-white/5 relative overflow-hidden">
                               <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 blur-[80px] rounded-full -translate-y-1/2 translate-x-1/2"></div>
@@ -407,7 +436,7 @@ const UserApp = ({ config }) => {
                                 </div>
                                 <div className="space-y-1.5">
                                   <p className="text-[10px] font-black uppercase text-white/20 tracking-widest">WhatsApp Vinculado</p>
-                                  <p className="text-lg font-bold text-primary">${summary?.owner_phone ? `+${formatPhone(summary.owner_phone)}` : 'Vincular Conta'}</p>
+                                  <p className="text-lg font-bold text-primary">${summary?.owner_phone ? formatPhone(summary.owner_phone) : 'Vincular Conta'}</p>
                                 </div>
                                 <div className="space-y-1.5">
                                   <p className="text-[10px] font-black uppercase text-white/20 tracking-widest">Última Conexão</p>
@@ -518,16 +547,13 @@ const UserApp = ({ config }) => {
                               </div>
                               <div className="p-8 rounded-[3rem] bg-white/[0.03] border border-white/5 space-y-8">
                                 <div className="space-y-4">
-                                  <div className="space-y-2">
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-white/30 ml-4">Alterar Senha</label>
-                                    <input type="password" placeholder="Sua nova senha forte" className="w-full h-14 bg-[#020617] border border-white/10 rounded-2xl px-6 focus:border-primary outline-none transition-all font-mono text-sm" />
-                                  </div>
-                                  <div className="space-y-2">
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-white/30 ml-4">Confirmar Senha</label>
-                                    <input type="password" placeholder="Repita a nova senha" className="w-full h-14 bg-[#020617] border border-white/10 rounded-2xl px-6 focus:border-primary outline-none transition-all font-mono text-sm" />
-                                  </div>
+                                  <p className="text-sm text-white/60 leading-relaxed">Para alterar sua senha com segurança, o OmniZap envia um código de verificação para o e-mail vinculado à sua conta.</p>
+                                  <div className="rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3 text-xs text-white/50">Fluxo: criar sessão de redefinição → receber código por e-mail → confirmar nova senha.</div>
                                 </div>
-                                <button className="btn btn-primary btn-block h-14 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl shadow-primary/20">Atualizar Credenciais</button>
+
+                                <button type="button" className="btn btn-primary btn-block h-14 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl shadow-primary/20" disabled=${passwordResetBusy} onClick=${startPasswordResetFlow}>${passwordResetBusy ? 'Preparando redefinição...' : 'Alterar Senha com Verificação'}</button>
+
+                                ${passwordResetInfo ? html` <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-xs font-semibold text-emerald-300">${passwordResetInfo}</div> ` : null} ${passwordResetError ? html` <div className="rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-xs font-semibold text-red-300">${passwordResetError}</div> ` : null}
                               </div>
                             </div>
                           </div>
@@ -567,6 +593,7 @@ if (rootElement) {
   const config = {
     apiBasePath: rootElement.dataset.apiBasePath || DEFAULT_API_BASE_PATH,
     loginPath: rootElement.dataset.loginPath || DEFAULT_LOGIN_PATH,
+    passwordResetWebPath: normalizeRoutePath(rootElement.dataset.passwordResetWebPath, DEFAULT_PASSWORD_RESET_WEB_PATH),
     fallbackAvatar: DEFAULT_FALLBACK_AVATAR,
   };
   createRoot(rootElement).render(html`<${UserApp} config=${config} />`);

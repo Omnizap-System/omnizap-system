@@ -24,6 +24,7 @@ export default defineConfig({
       input: {
         'home-react': path.join(projectRoot, 'public', 'js', 'apps', 'homeReactApp.js'),
         'login-react': path.join(projectRoot, 'public', 'js', 'apps', 'loginReactApp.js'),
+        'user-password-reset-react': path.join(projectRoot, 'public', 'js', 'apps', 'userPasswordResetReactApp.js'),
         'user-react': path.join(projectRoot, 'public', 'js', 'apps', 'userReactApp.js'),
         'commands-react': path.join(projectRoot, 'public', 'js', 'apps', 'commandsReactApp.js'),
         'terms-react': path.join(projectRoot, 'public', 'js', 'apps', 'termsReactApp.js'),

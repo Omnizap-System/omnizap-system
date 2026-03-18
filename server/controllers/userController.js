@@ -52,6 +52,7 @@ const renderUserDashboardHtml = async ({ passwordReset = false } = {}) => {
   const dataAttributes = {
     'data-api-base-path': USER_API_BASE_PATH,
     'data-login-path': STICKER_LOGIN_WEB_PATH,
+    'data-panel-path': USER_PROFILE_WEB_PATH,
     'data-password-reset-web-path': USER_PASSWORD_RESET_WEB_PATH,
   };
 
