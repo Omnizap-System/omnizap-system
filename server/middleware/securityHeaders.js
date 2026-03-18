@@ -10,10 +10,39 @@ const parseEnvBool = (value, fallback = false) => {
   return fallback;
 };
 
+const parseEnvList = (value) =>
+  String(value || '')
+    .split(',')
+    .map((item) => String(item || '').trim())
+    .filter(Boolean);
+
+const toHttpOrigin = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  try {
+    const parsed = new URL(raw);
+    if (!['http:', 'https:'].includes(parsed.protocol)) return '';
+    return parsed.origin;
+  } catch {
+    return '';
+  }
+};
+
 const HELMET_CSP_ENFORCE = parseEnvBool(process.env.HELMET_CONTENT_SECURITY_POLICY_ENABLED, true);
 const BACKEND_BUILD_ID = String(process.env.OMNIZAP_BUILD_ID || '')
   .trim()
   .slice(0, 80);
+const FRAME_SRC_EXTRA = Array.from(
+  new Set(
+    [
+      ...parseEnvList(process.env.HELMET_CSP_FRAME_SRC_EXTRA),
+      process.env.SYSTEM_ADMIN_GRAFANA_URL,
+      process.env.GRAFANA_PUBLIC_URL,
+    ]
+      .map((item) => toHttpOrigin(item))
+      .filter(Boolean),
+  ),
+);
 
 const HELMET_CSP_DIRECTIVES = {
   defaultSrc: ["'self'"],
@@ -26,7 +55,7 @@ const HELMET_CSP_DIRECTIVES = {
   imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
   fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com', 'https://cdnjs.cloudflare.com'],
   connectSrc: ["'self'", 'https://accounts.google.com', 'https://oauth2.googleapis.com', 'https://api.github.com'],
-  frameSrc: ["'self'", 'https://accounts.google.com'],
+  frameSrc: ["'self'", 'https://accounts.google.com', ...FRAME_SRC_EXTRA],
   workerSrc: ["'self'", 'blob:'],
   manifestSrc: ["'self'"],
 };

@@ -22,8 +22,10 @@ services:
     environment:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_SECURITY_ALLOW_EMBEDDING=${GRAFANA_ALLOW_EMBEDDING:-true}
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_SERVER_ROOT_URL=${GRAFANA_ROOT_URL:-%(protocol)s://%(domain)s:%(http_port)s/}
+      - GF_SERVER_SERVE_FROM_SUB_PATH=${GRAFANA_SERVE_FROM_SUB_PATH:-true}
       # Opcional: se quiser setar timezone do Grafana
       - GF_DATE_FORMATS_DEFAULT_TIMEZONE=${GRAFANA_TIMEZONE:-America/Boa_Vista}
     volumes:

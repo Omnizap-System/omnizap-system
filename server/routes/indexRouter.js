@@ -9,6 +9,7 @@ import { getStickerSiteRouterConfig, maybeHandleStickerSiteRequest, shouldHandle
 import { getStickerDataRouterConfig, maybeHandleStickerDataRequest, shouldHandleStickerDataPath } from './sticker/stickerDataRouter.js';
 import { getStickerApiRouterConfig, maybeHandleStickerApiRequest, shouldHandleStickerApiPath } from './sticker/stickerApiRouter.js';
 import { maybeHandleStaticPageRequest, shouldHandleStaticPagePath } from './static/staticPageRouter.js';
+import { getGrafanaProxyRouterConfig, maybeHandleGrafanaProxyRequest, shouldHandleGrafanaProxyPath } from './observability/grafanaProxyRouter.js';
 
 const startsWithPath = (pathname, prefix) => {
   if (!pathname || !prefix) return false;
@@ -112,12 +113,27 @@ const loadStickerApiConfigSafe = async () => {
   }
 };
 
+const loadGrafanaProxyConfigSafe = async () => {
+  try {
+    return getGrafanaProxyRouterConfig();
+  } catch {
+    return {
+      enabled: false,
+      basePath: '/api/grafana',
+      legacyBasePath: '/grafana',
+      timeoutMs: 15000,
+      target: null,
+    };
+  }
+};
+
 export const getIndexRouteConfigs = async () => {
   if (!indexRouteConfigsPromise) {
-    indexRouteConfigsPromise = Promise.all([loadUserConfigSafe(), loadSystemAdminConfigSafe(), loadEmailAutomationConfigSafe(), loadStickerSiteConfigSafe(), loadStickerDataConfigSafe(), loadStickerApiConfigSafe()]).then(([userConfig, systemAdminConfig, emailAutomationConfig, stickerSiteConfig, stickerDataConfig, stickerApiConfig]) => ({
+    indexRouteConfigsPromise = Promise.all([loadUserConfigSafe(), loadSystemAdminConfigSafe(), loadEmailAutomationConfigSafe(), loadStickerSiteConfigSafe(), loadStickerDataConfigSafe(), loadStickerApiConfigSafe(), loadGrafanaProxyConfigSafe()]).then(([userConfig, systemAdminConfig, emailAutomationConfig, stickerSiteConfig, stickerDataConfig, stickerApiConfig, grafanaProxyConfig]) => ({
       userConfig,
       systemAdminConfig,
       emailAutomationConfig,
+      grafanaProxyConfig,
       stickerConfig: {
         ...stickerSiteConfig,
         ...stickerDataConfig,
@@ -140,6 +156,7 @@ export const routeRequest = async (req, res, { pathname, url, metricsPath = '/me
   const userConfig = resolvedConfigs?.userConfig || null;
   const systemAdminConfig = resolvedConfigs?.systemAdminConfig || null;
   const emailAutomationConfig = resolvedConfigs?.emailAutomationConfig || null;
+  const grafanaProxyConfig = resolvedConfigs?.grafanaProxyConfig || null;
   const stickerConfig = resolvedConfigs?.stickerConfig || null;
 
   // 1) Metrics
@@ -163,7 +180,14 @@ export const routeRequest = async (req, res, { pathname, url, metricsPath = '/me
     return sendNotFound(req, res);
   }
 
-  // 4) User
+  // 4) Grafana proxy (/api/grafana e alias /grafana)
+  if (shouldHandleGrafanaProxyPath(pathname, grafanaProxyConfig)) {
+    const handled = await maybeHandleGrafanaProxyRequest(req, res, { pathname, url, config: grafanaProxyConfig });
+    if (handled) return true;
+    return sendNotFound(req, res);
+  }
+
+  // 5) User
   const systemAdminCandidate = shouldHandleSystemAdminStep(pathname, systemAdminConfig);
   if (shouldHandleUserStep(pathname, userConfig)) {
     const handled = await maybeHandleUserRequest(req, res, { pathname, url });
@@ -173,14 +197,14 @@ export const routeRequest = async (req, res, { pathname, url, metricsPath = '/me
     if (!systemAdminCandidate) return sendNotFound(req, res);
   }
 
-  // 5) System admin + legacy /stickers/admin
+  // 6) System admin + legacy /stickers/admin
   if (systemAdminCandidate) {
     const handled = await maybeHandleSystemAdminRequest(req, res, { pathname, url });
     if (handled) return true;
     return sendNotFound(req, res);
   }
 
-  // 6) Sticker catalog apenas nos prefixes permitidos
+  // 7) Sticker catalog apenas nos prefixes permitidos
   if (shouldHandleStickerSitePath(pathname, stickerConfig)) {
     const handled = await maybeHandleStickerSiteRequest(req, res, { pathname, url });
     if (handled) return true;
@@ -212,14 +236,14 @@ export const routeRequest = async (req, res, { pathname, url, metricsPath = '/me
     return sendNotFound(req, res);
   }
 
-  // 7) Paginas estaticas (templates em public/pages)
+  // 8) Paginas estaticas (templates em public/pages)
   if (shouldHandleStaticPagePath(pathname)) {
     const handled = await maybeHandleStaticPageRequest(req, res, { pathname });
     if (handled) return true;
     return sendNotFound(req, res);
   }
 
-  // 8) 404 global
+  // 9) 404 global
   return sendNotFound(req, res);
 };
 

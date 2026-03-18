@@ -70,22 +70,6 @@ const formatDateTime = (value) => {
   }).format(new Date(ms));
 };
 
-const formatRelativeTime = (value) => {
-  const ms = Date.parse(String(value || ''));
-  if (!Number.isFinite(ms)) return 'n/d';
-  const deltaMs = Date.now() - ms;
-  const absMs = Math.abs(deltaMs);
-  const suffix = deltaMs >= 0 ? 'atrás' : 'à frente';
-  if (absMs < 1000) return 'agora';
-  const seconds = Math.round(absMs / 1000);
-  if (seconds < 60) return `${seconds}s ${suffix}`;
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes}m ${suffix}`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours}h ${suffix}`;
-  return `${Math.round(hours / 24)}d ${suffix}`;
-};
-
 const formatPercent = (value) => {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return 'n/d';
@@ -345,7 +329,6 @@ const UserSystemAdmReactApp = ({ config }) => {
   const [busy, setBusy] = useState(false);
   const [unlockPassword, setUnlockPassword] = useState('');
   const [adminError, setAdminError] = useState('');
-  const [opsMessage, setOpsMessage] = useState('Ações operacionais disponíveis.');
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResult, setSearchResult] = useState(null);
@@ -378,7 +361,6 @@ const UserSystemAdmReactApp = ({ config }) => {
   const adminSession = adminStatusPayload?.session || null;
   const adminAuthenticated = Boolean(adminSession?.authenticated);
   const adminEligible = Boolean(adminStatusPayload?.eligible_google_login || adminAuthenticated);
-  const adminRole = normalizeString(adminSession?.role || adminStatusPayload?.eligible_role).toLowerCase();
 
   const overview = adminOverviewPayload || {};
   const previousOverview = previousAdminOverviewPayload || null;
@@ -392,6 +374,7 @@ const UserSystemAdmReactApp = ({ config }) => {
   const auditLog = Array.isArray(overview?.audit_log) ? overview.audit_log : [];
   const featureFlags = Array.isArray(overview?.feature_flags) ? overview.feature_flags : [];
   const alerts = Array.isArray(overview?.alerts) ? overview.alerts : [];
+  const grafanaDashboards = Array.isArray(overview?.observability_links?.grafana?.dashboards) ? overview.observability_links.grafana.dashboards : [];
   const operationalShortcuts =
     Array.isArray(overview?.operational_shortcuts) && overview.operational_shortcuts.length
       ? overview.operational_shortcuts
@@ -406,44 +389,6 @@ const UserSystemAdmReactApp = ({ config }) => {
   const profileUser = adminSession?.user || adminStatusPayload?.google?.user || googleSession?.user || null;
   const profileName = normalizeString(profileUser?.name) || 'Admin';
   const profilePicture = normalizeString(profileUser?.picture) || FALLBACK_AVATAR;
-
-  const securityPills = useMemo(() => {
-    const roleLabel = adminRole === 'owner' ? 'Owner' : adminRole === 'moderator' ? 'Moderador' : 'Sem sessão';
-    return [`Sessão ${adminAuthenticated ? 'ativa' : 'bloqueada'}`, 'Criptografia ativa', `Role: ${roleLabel}`, `Expira: ${formatDateTime(adminSession?.expires_at)}`];
-  }, [adminAuthenticated, adminRole, adminSession?.expires_at]);
-
-  const riskPills = useMemo(() => {
-    const cpu = Number(systemHealth?.cpu_percent || 0);
-    const spam = Number(dashboardQuick?.spam_blocked_today || 0);
-    const bans = Number(counters?.active_bans || 0);
-    const errors = Number(dashboardQuick?.errors_5xx || 0);
-
-    const resolveCpu = () => {
-      if (cpu >= 88) return { text: `CPU alta: ${cpu.toFixed(1)}%`, tone: 'danger' };
-      if (cpu >= 75) return { text: `CPU atenção: ${cpu.toFixed(1)}%`, tone: 'warn' };
-      return { text: 'CPU normal', tone: 'normal' };
-    };
-
-    const resolveSpam = () => {
-      if (spam >= 220) return { text: `Spam elevado: ${formatNumber(spam)}`, tone: 'danger' };
-      if (spam >= 90) return { text: `Spam em atenção: ${formatNumber(spam)}`, tone: 'warn' };
-      return { text: 'Spam sob controle', tone: 'normal' };
-    };
-
-    const resolveBans = () => {
-      if (bans >= 30) return { text: `Bans críticos: ${formatNumber(bans)}`, tone: 'danger' };
-      if (bans >= 10) return { text: `Bans em alta: ${formatNumber(bans)}`, tone: 'warn' };
-      return { text: 'Bans estáveis', tone: 'normal' };
-    };
-
-    const resolveErrors = () => {
-      if (errors >= 30) return { text: `Erros críticos: ${formatNumber(errors)}`, tone: 'danger' };
-      if (errors >= 10) return { text: `Erros em atenção: ${formatNumber(errors)}`, tone: 'warn' };
-      return { text: 'Erros baixos', tone: 'normal' };
-    };
-
-    return [resolveCpu(), resolveSpam(), resolveBans(), resolveErrors()];
-  }, [counters?.active_bans, dashboardQuick?.errors_5xx, dashboardQuick?.spam_blocked_today, systemHealth?.cpu_percent]);
 
   const deltaLabel = useCallback((current, previous, { percent = true, suffix = '' } = {}) => {
     const curr = Number(current);
@@ -461,12 +406,6 @@ const UserSystemAdmReactApp = ({ config }) => {
     const ratio = (delta / Math.abs(prev)) * 100;
     return `${ratio >= 0 ? '+' : ''}${ratio.toFixed(1)}%`;
   }, []);
-
-  const overviewUpdatedAtLabel = useMemo(() => {
-    const value = overview?.updated_at;
-    if (!value) return 'n/d';
-    return `${formatDateTime(value)} (${formatRelativeTime(value)})`;
-  }, [overview?.updated_at]);
 
   const navigateToPage = useCallback((targetPage) => {
     const safePage = NAV_ITEMS.some((item) => item.id === targetPage) ? targetPage : 'overview';
@@ -603,7 +542,6 @@ const UserSystemAdmReactApp = ({ config }) => {
     try {
       await api.logoutAdmin();
       setSearchResult(null);
-      setOpsMessage('Ações operacionais disponíveis.');
       pushToast({ kind: 'success', title: 'Admin', message: 'Sessão administrativa encerrada.' });
       refreshPanel();
     } catch (error) {
@@ -624,7 +562,6 @@ const UserSystemAdmReactApp = ({ config }) => {
     try {
       const payload = await api.runOp(action);
       const message = normalizeString(payload?.data?.message) || `Ação ${action} executada.`;
-      setOpsMessage(message);
       pushToast({ kind: 'success', title: 'Ops', message });
       refreshPanel();
     } catch (error) {
@@ -649,7 +586,6 @@ const UserSystemAdmReactApp = ({ config }) => {
     try {
       const payload = await api.search(query, 12);
       setSearchResult(payload?.data || null);
-      setOpsMessage(`Busca concluída para "${query}".`);
       pushToast({ kind: 'success', title: 'Busca', message: `Busca concluída para "${query}".` });
     } catch (error) {
       setAdminError(error?.message || 'Falha ao buscar dados.');
@@ -899,7 +835,9 @@ const UserSystemAdmReactApp = ({ config }) => {
 
         <div className="viewport">
           <section className="section admin-panel">
-            <p className="admin-note">${adminAuthenticated ? `Sessão admin ativa como ${adminRole === 'owner' ? 'dono' : adminRole === 'moderator' ? 'moderador' : 'admin'}.` : adminEligible ? 'Conta elegível para admin. Informe a senha para liberar os dados sensíveis.' : 'Conta atual sem permissão para o painel admin.'}</p>
+            ${!adminAuthenticated
+              ? html`<p className="admin-note">${adminEligible ? 'Conta elegível para admin. Informe a senha para liberar os dados sensíveis.' : 'Conta atual sem permissão para o painel admin.'}</p>`
+              : null}
 
             ${adminError ? html` <p className="admin-error">${adminError}</p> ` : null}
             ${!adminEligible
@@ -926,23 +864,6 @@ const UserSystemAdmReactApp = ({ config }) => {
               : null}
             ${adminAuthenticated
               ? html`
-                  <div className="admin-toolbar">
-                    <div className="admin-toolbar-meta">
-                      <p className="admin-item-meta">Última atualização: ${overviewUpdatedAtLabel}</p>
-                    </div>
-
-                    <form className="admin-inline-form" onSubmit=${handleSearchSubmit}>
-                      <input className="admin-input" type="text" placeholder="Buscar por usuário, grupo, pack ou sessão" value=${searchQuery} onInput=${(event) => setSearchQuery(event.target.value)} disabled=${busy} />
-                      <button type="submit" className="btn" disabled=${busy}>Buscar</button>
-                    </form>
-
-                    <div className="security-strip">${securityPills.map((pill) => html`<span key=${pill} className="security-pill">${pill}</span>`)}</div>
-
-                    <div className="risk-strip">${riskPills.map((pill, index) => html`<span key=${`risk-${index}`} className=${`risk-pill ${pill.tone === 'warn' ? 'warn' : pill.tone === 'danger' ? 'danger' : ''}`}>${pill.text}</span>`)}</div>
-
-                    <p className="admin-item-meta">${opsMessage}</p>
-                  </div>
-
                   <div className="admin-layout admin-layout--enterprise is-subpage">
                     <section id="overview" className="section section-kpis span-12" hidden=${activePage !== 'overview'}>
                       <div className="section-head">
@@ -1094,6 +1015,45 @@ const UserSystemAdmReactApp = ({ config }) => {
                           <p className="health-meta">SLA alvo: 99.95%</p>
                         </article>
                       </div>
+
+                      <div className="section" style=${{ marginTop: '16px' }}>
+                        <div className="section-head">
+                          <div>
+                            <h4 className="panel-title">Dashboards Grafana</h4>
+                            <p className="panel-subtitle">Visualização incorporada dos dashboards de observabilidade.</p>
+                          </div>
+                        </div>
+
+                        ${grafanaDashboards.length
+                          ? html`
+                              <div className="admin-list">
+                                ${grafanaDashboards.map((dashboard, index) => {
+                                  const uid = normalizeString(dashboard?.uid) || `dashboard-${index + 1}`;
+                                  const title = normalizeString(dashboard?.title) || uid;
+                                  const viewUrl = normalizeString(dashboard?.view_url);
+                                  const embedUrl = normalizeString(dashboard?.embed_url || viewUrl);
+                                  if (!embedUrl) return null;
+                                  return html`
+                                    <article key=${uid} className="admin-item">
+                                      <h5 className="admin-item-title">${title}</h5>
+                                      <p className="admin-item-meta">UID: ${uid}</p>
+                                      ${viewUrl
+                                        ? html`
+                                            <div className="admin-item-actions">
+                                              <a className="admin-mini-btn" href=${viewUrl} target="_blank" rel="noreferrer noopener">Abrir no Grafana</a>
+                                            </div>
+                                          `
+                                        : null}
+                                      <div style=${{ marginTop: '10px', borderRadius: '12px', overflow: 'hidden', border: '1px solid rgba(148, 163, 184, 0.25)', background: '#020617' }}>
+                                        <iframe title=${`grafana-${uid}`} src=${embedUrl} loading="lazy" referrerPolicy="no-referrer" style=${{ inlineSize: '100%', blockSize: '420px', border: '0', background: '#020617' }}></iframe>
+                                      </div>
+                                    </article>
+                                  `;
+                                })}
+                              </div>
+                            `
+                          : html`<p className="admin-item-meta">Sem dashboards configurados. Defina SYSTEM_ADMIN_GRAFANA_URL e SYSTEM_ADMIN_GRAFANA_DASHBOARDS no ambiente.</p>`}
+                      </div>
                     </section>
 
                     <section id="moderacao" className="section section-security span-12" hidden=${activePage !== 'moderacao'}>
@@ -1227,6 +1187,10 @@ const UserSystemAdmReactApp = ({ config }) => {
                             <p className="panel-subtitle">Resultados consolidados por usuário, grupo, pack e sessão.</p>
                           </div>
                         </div>
+                        <form className="admin-inline-form" onSubmit=${handleSearchSubmit} style=${{ marginBottom: '12px' }}>
+                          <input className="admin-input" type="text" placeholder="Buscar por usuário, grupo, pack ou sessão" value=${searchQuery} onInput=${(event) => setSearchQuery(event.target.value)} disabled=${busy} />
+                          <button type="submit" className="btn" disabled=${busy}>Buscar</button>
+                        </form>
                         <div className="admin-list">
                           ${searchResult
                             ? (() => {

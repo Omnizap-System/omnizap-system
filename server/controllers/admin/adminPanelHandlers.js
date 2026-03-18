@@ -1,7 +1,8 @@
 import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import { randomUUID, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
-import { URLSearchParams } from 'node:url';
+import { URL, URLSearchParams } from 'node:url';
 
+import { setAdminOverviewSnapshot } from '../../../app/observability/metrics.js';
 import { parseAdminModeratorUpsertPayload, parseAdminSessionPasswordPayload } from '../../auth/validation/authSchemas.js';
 
 export const createStickerCatalogAdminHandlers = ({ executeQuery, tables, logger, sendJson, readJsonBody, parseCookies, getCookieValuesFromRequest, appendSetCookie, buildCookieString, sanitizeText, normalizeGoogleSubject, normalizeEmail, normalizeJid, toIsoOrNull, toWhatsAppPhoneDigits, mapGoogleSessionResponseData, resolveGoogleWebSessionFromRequest, revokeGoogleWebSessionsByIdentity, getMarketplaceGlobalStatsCached, getSystemSummaryCached, getFeatureFlagsSnapshot, refreshFeatureFlags, listAdminBans, createAdminBanRecord, revokeAdminBanRecord, normalizeVisitPath, stickerWebPath, findStickerPackByPackKey, stickerPackService, buildManagedPackResponseData, sendManagedMutationStatus, sendManagedPackMutationStatus, deleteManagedPackWithCleanup, mapStickerPackWebManageError, cleanupOrphanStickerAssets, invalidateStickerCatalogDerivedCaches }) => {
@@ -16,6 +17,110 @@ export const createStickerCatalogAdminHandlers = ({ executeQuery, tables, logger
   const ADMIN_PANEL_SESSION_TTL_MS = Math.max(10 * 60 * 1000, Number(process.env.ADM_PANEL_SESSION_TTL_MS) || 12 * 60 * 60 * 1000);
   const ADMIN_MODERATOR_PASSWORD_MIN_LENGTH = Math.max(6, Number(process.env.ADM_MODERATOR_PASSWORD_MIN_LENGTH) || 8);
   const ADMIN_PANEL_SESSION_COOKIE_NAME = 'omnizap_admin_panel_session';
+  const SYSTEM_ADMIN_GRAFANA_TIME_FROM = sanitizeText(process.env.SYSTEM_ADMIN_GRAFANA_TIME_FROM || 'now-6h', 40, { allowEmpty: true }) || 'now-6h';
+  const SYSTEM_ADMIN_GRAFANA_TIME_TO = sanitizeText(process.env.SYSTEM_ADMIN_GRAFANA_TIME_TO || 'now', 40, { allowEmpty: true }) || 'now';
+  const SYSTEM_ADMIN_GRAFANA_REFRESH = sanitizeText(process.env.SYSTEM_ADMIN_GRAFANA_REFRESH || '10s', 20, { allowEmpty: true }) || '10s';
+
+  const normalizeGrafanaBaseUrl = (value) => {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    try {
+      const parsed = new URL(raw);
+      if (!['http:', 'https:'].includes(parsed.protocol)) return '';
+      const normalizedPathname = String(parsed.pathname || '/').replace(/\/+$/, '');
+      parsed.search = '';
+      parsed.hash = '';
+      return `${parsed.origin}${normalizedPathname === '/' ? '' : normalizedPathname}`;
+    } catch {
+      return '';
+    }
+  };
+
+  const normalizeGrafanaUid = (value) =>
+    String(value || '')
+      .trim()
+      .replace(/[^a-zA-Z0-9_-]/g, '')
+      .slice(0, 120);
+
+  const slugifyGrafanaDashboard = (value) => {
+    const raw = String(value || '')
+      .trim()
+      .toLowerCase();
+    const slug = raw
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 90);
+    return slug || 'dashboard';
+  };
+
+  const parseGrafanaDashboardDefinitions = () => {
+    const raw = String(process.env.SYSTEM_ADMIN_GRAFANA_DASHBOARDS || '')
+      .split(',')
+      .map((item) => String(item || '').trim())
+      .filter(Boolean);
+
+    const parsed = raw
+      .map((entry) => {
+        const [uidPart, ...titleParts] = entry.split('|');
+        const uid = normalizeGrafanaUid(uidPart);
+        const title = sanitizeText(titleParts.join('|') || '', 90, { allowEmpty: true }) || '';
+        return uid ? { uid, title } : null;
+      })
+      .filter(Boolean);
+
+    if (parsed.length) return parsed;
+
+    return [
+      { uid: 'omnizap-system-admin', title: 'System Admin' },
+      { uid: 'omnizap-overview', title: 'Overview' },
+      { uid: 'omnizap-mysql', title: 'MySQL' },
+    ];
+  };
+
+  const buildAdminGrafanaObservabilityLinks = () => {
+    const baseUrl = normalizeGrafanaBaseUrl(process.env.SYSTEM_ADMIN_GRAFANA_URL || process.env.GRAFANA_PUBLIC_URL || '');
+    if (!baseUrl) {
+      return {
+        enabled: false,
+        base_url: null,
+        dashboards: [],
+      };
+    }
+
+    const base = new URL(`${baseUrl}/`);
+    const definitions = parseGrafanaDashboardDefinitions();
+
+    const dashboards = definitions
+      .map((entry, index) => {
+        const uid = normalizeGrafanaUid(entry?.uid || '');
+        if (!uid) return null;
+        const title = sanitizeText(entry?.title || '', 90, { allowEmpty: true }) || `Dashboard ${index + 1}`;
+        const slug = slugifyGrafanaDashboard(title || uid);
+        const viewUrl = new URL(`d/${encodeURIComponent(uid)}/${encodeURIComponent(slug)}`, base);
+        viewUrl.searchParams.set('orgId', '1');
+        viewUrl.searchParams.set('from', SYSTEM_ADMIN_GRAFANA_TIME_FROM);
+        viewUrl.searchParams.set('to', SYSTEM_ADMIN_GRAFANA_TIME_TO);
+        viewUrl.searchParams.set('refresh', SYSTEM_ADMIN_GRAFANA_REFRESH);
+
+        const embedUrl = new URL(String(viewUrl));
+        embedUrl.searchParams.set('kiosk', 'tv');
+
+        return {
+          uid,
+          title,
+          view_url: viewUrl.toString(),
+          embed_url: embedUrl.toString(),
+        };
+      })
+      .filter(Boolean);
+
+    return {
+      enabled: dashboards.length > 0,
+      base_url: baseUrl,
+      dashboards,
+    };
+  };
+  const grafanaObservabilityLinks = buildAdminGrafanaObservabilityLinks();
 
   const adminPanelSessionMap = new Map();
   let adminPanelSessionPruneAt = 0;
@@ -997,7 +1102,7 @@ export const createStickerCatalogAdminHandlers = ({ executeQuery, tables, logger
       systemMeta,
     });
 
-    return {
+    const overviewPayload = {
       admin_session: mapAdminPanelSessionResponseData(adminSession),
       marketplace_stats: marketplaceStats,
       counters: {
@@ -1045,9 +1150,19 @@ export const createStickerCatalogAdminHandlers = ({ executeQuery, tables, logger
       visit_metrics: visitSummary,
       system_summary: systemSummary,
       system_meta: systemMeta,
+      observability_links: {
+        grafana: grafanaObservabilityLinks,
+      },
       message_flow_daily: messageFlowDaily,
       updated_at: __timeNowIso(),
     };
+
+    setAdminOverviewSnapshot({
+      overview: overviewPayload,
+      source: 'admin_overview_payload',
+    });
+
+    return overviewPayload;
   };
 
   const findAdminPackContextByKey = async (rawPackKey) => {
