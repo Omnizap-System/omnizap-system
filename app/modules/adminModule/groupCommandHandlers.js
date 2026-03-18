@@ -384,7 +384,7 @@ export async function handleAdminCommand({ command, args, text, sock, messageInf
       const isOwner = Boolean(OWNER_JID && (await isAdminSenderAsync(senderIdentity)));
 
       if (!subAction) {
-        await handleMenuAdmCommand(sock, remoteJid, messageInfo, expirationMessage, commandPrefix);
+        await handleMenuAdmCommand(sock, remoteJid, messageInfo, expirationMessage, commandPrefix, []);
         break;
       }
 
@@ -455,14 +455,7 @@ export async function handleAdminCommand({ command, args, text, sock, messageInf
         break;
       }
 
-      await sendAndStore(
-        sock,
-        remoteJid,
-        {
-          text: getAdminUsageText('menuadm', { commandPrefix, variant: 'default' }),
-        },
-        { quoted: messageInfo, ephemeralExpiration: expirationMessage },
-      );
+      await handleMenuAdmCommand(sock, remoteJid, messageInfo, expirationMessage, commandPrefix, args);
       break;
     }
 

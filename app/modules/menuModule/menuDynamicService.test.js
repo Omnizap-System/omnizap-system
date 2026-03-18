@@ -103,3 +103,39 @@ test('menu dinâmico todos lista categorias e comandos', () => {
   assert.match(text, /\/admincmd1/);
   assert.match(text, /\/mediacmd1/);
 });
+
+test('menu dinâmico aceita comando customizado e escopo de categorias', () => {
+  const mainText = buildDynamicMenuText({
+    catalogSnapshot: buildCatalogFixture(),
+    usageRows: [
+      { commandName: 'mediacmd3', usageCount: 500 },
+      { commandName: 'admincmd2', usageCount: 90 },
+    ],
+    args: [],
+    senderName: 'Equipe Admin',
+    commandPrefix: '/',
+    menuCommandName: 'menuadm',
+    categoryScopeKeys: ['admin'],
+  });
+
+  assert.match(mainText, /\/menuadm top/);
+  assert.doesNotMatch(mainText, /\/menu top/);
+  assert.doesNotMatch(mainText, /\/mediacmd3/);
+
+  const topText = buildDynamicMenuText({
+    catalogSnapshot: buildCatalogFixture(),
+    usageRows: [
+      { commandName: 'mediacmd3', usageCount: 500 },
+      { commandName: 'admincmd2', usageCount: 90 },
+    ],
+    args: ['top'],
+    senderName: 'Equipe Admin',
+    commandPrefix: '/',
+    menuCommandName: 'menuadm',
+    categoryScopeKeys: ['admin'],
+  });
+
+  assert.match(topText, /\/admincmd2/);
+  assert.match(topText, /Use \/menuadm categoria <nome>/);
+  assert.doesNotMatch(topText, /\/mediacmd3/);
+});

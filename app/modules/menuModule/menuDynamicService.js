@@ -27,6 +27,7 @@ const MENU_CATEGORY_PREVIEW_LIMIT = toPositiveInt(process.env.MENU_CATEGORY_PREV
 const TOP_TOKENS = new Set(['top', 'tops', 'maisusados', 'popular', 'populares', 'trending']);
 const ALL_TOKENS = new Set(['todos', 'todas', 'all', 'completo', 'completa']);
 const CATEGORY_TOKENS = new Set(['categoria', 'cat', 'categorias']);
+const DEFAULT_MENU_COMMAND_NAME = 'menu';
 
 const sanitizeLogValue = (value) =>
   String(value ?? '')
@@ -48,6 +49,17 @@ const normalizeCommandName = (value) =>
     .toLowerCase()
     .replace(/[^a-z0-9_-]/g, '')
     .slice(0, 64);
+
+const normalizeMenuCommandName = (value) => normalizeCommandName(value) || DEFAULT_MENU_COMMAND_NAME;
+
+const buildMenuCall = ({ commandPrefix = '/', menuCommandName = DEFAULT_MENU_COMMAND_NAME, args = '' } = {}) => {
+  const safePrefix = String(commandPrefix || '/');
+  const safeCommandName = normalizeMenuCommandName(menuCommandName);
+  const safeArgs = String(args || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return safeArgs ? `${safePrefix}${safeCommandName} ${safeArgs}` : `${safePrefix}${safeCommandName}`;
+};
 
 const shortText = (value, max = 62) => {
   const text = String(value || '')
@@ -251,13 +263,34 @@ const resolveCategoryFromQuery = (categories = [], query = '') => {
   return categories.find((entry) => normalizeLookupToken(entry.label).includes(normalizedQuery) || normalizeLookupToken(entry.key).includes(normalizedQuery)) || null;
 };
 
+const applyCategoryScope = (categories = [], commands = [], categoryScopeKeys = []) => {
+  const normalizedScopeKeys = Array.isArray(categoryScopeKeys) ? categoryScopeKeys.map((entry) => normalizeLookupToken(entry)).filter(Boolean) : [];
+
+  if (!normalizedScopeKeys.length) {
+    return { categories, commands };
+  }
+
+  const scopeKeySet = new Set(normalizedScopeKeys);
+  const scopedCategories = categories.filter((category) => scopeKeySet.has(normalizeLookupToken(category.key)));
+  if (!scopedCategories.length) {
+    return { categories, commands };
+  }
+
+  const scopedCategoryKeys = new Set(scopedCategories.map((category) => category.key));
+  const scopedCommands = commands.filter((command) => scopedCategoryKeys.has(command.categoryKey));
+  return {
+    categories: scopedCategories,
+    commands: scopedCommands,
+  };
+};
+
 const formatUsageSuffix = (commandName, usageMap, withLabel = true) => {
   const usage = usageMap.get(commandName) || 0;
   if (!usage) return '';
   return withLabel ? ` (${usage} usos)` : ` (${usage})`;
 };
 
-const buildMainMenuText = ({ senderName = '', commandPrefix = '/', categories = [], commands = [], usageMap = new Map(), catalogSnapshot = null } = {}) => {
+const buildMainMenuText = ({ senderName = '', commandPrefix = '/', menuCommandName = DEFAULT_MENU_COMMAND_NAME, categories = [], commands = [], usageMap = new Map(), catalogSnapshot = null } = {}) => {
   const rankedCommands = rankCommands(commands, usageMap);
   const hasManyCommands = commands.length > MENU_MANY_COMMANDS_THRESHOLD;
   const primary = rankedCommands.slice(0, MENU_MAIN_PRIMARY_LIMIT);
@@ -281,7 +314,7 @@ const buildMainMenuText = ({ senderName = '', commandPrefix = '/', categories = 
 
   lines.push('', '*Categorias rápidas:*');
   for (const category of quickCategories) {
-    lines.push(`• ${category.label} (${category.commands.length}) → ${commandPrefix}menu ${category.key}`);
+    lines.push(`• ${category.label} (${category.commands.length}) → ${buildMenuCall({ commandPrefix, menuCommandName, args: category.key })}`);
   }
 
   if (categories.length > quickCategories.length) {
@@ -297,11 +330,11 @@ const buildMainMenuText = ({ senderName = '', commandPrefix = '/', categories = 
     lines.push('• Nenhum comando em destaque encontrado.');
   }
 
-  lines.push('', '*Navegação:*', `• ${commandPrefix}menu top`, `• ${commandPrefix}menu categoria <nome>`, `• ${commandPrefix}menu todos`, '', `🌐 ${MENU_SITE_URL}`);
+  lines.push('', '*Navegação:*', `• ${buildMenuCall({ commandPrefix, menuCommandName, args: 'top' })}`, `• ${buildMenuCall({ commandPrefix, menuCommandName, args: 'categoria <nome>' })}`, `• ${buildMenuCall({ commandPrefix, menuCommandName, args: 'todos' })}`, '', `🌐 ${MENU_SITE_URL}`);
   return lines.join('\n');
 };
 
-const buildTopMenuText = ({ commandPrefix = '/', commands = [], usageMap = new Map() } = {}) => {
+const buildTopMenuText = ({ commandPrefix = '/', menuCommandName = DEFAULT_MENU_COMMAND_NAME, commands = [], usageMap = new Map() } = {}) => {
   const ranked = rankCommands(commands, usageMap).slice(0, MENU_TOP_LIMIT);
   const hasUsage = ranked.some((command) => (usageMap.get(command.name) || 0) > 0);
   const lines = [hasUsage ? `🏆 *Top comandos (${MENU_USAGE_WINDOW_DAYS} dias)*` : '🏆 *Destaques de comandos*', ''];
@@ -314,12 +347,12 @@ const buildTopMenuText = ({ commandPrefix = '/', commands = [], usageMap = new M
     lines.push('Nenhum comando disponível no catálogo no momento.');
   }
 
-  lines.push('', `Use ${commandPrefix}menu categoria <nome> para abrir uma categoria.`);
+  lines.push('', `Use ${buildMenuCall({ commandPrefix, menuCommandName, args: 'categoria <nome>' })} para abrir uma categoria.`);
   lines.push(`🌐 ${MENU_SITE_URL}`);
   return lines.join('\n');
 };
 
-const buildCategoryMenuText = ({ commandPrefix = '/', category = null, usageMap = new Map() } = {}) => {
+const buildCategoryMenuText = ({ commandPrefix = '/', menuCommandName = DEFAULT_MENU_COMMAND_NAME, category = null, usageMap = new Map() } = {}) => {
   if (!category) return null;
 
   const ranked = rankCommands(category.commands, usageMap);
@@ -333,7 +366,7 @@ const buildCategoryMenuText = ({ commandPrefix = '/', category = null, usageMap 
 
   if (hiddenCount > 0) {
     lines.push('', `... e mais *${hiddenCount}* comando(s) nesta categoria.`);
-    lines.push(`Use ${commandPrefix}menu todos para ver a lista completa.`);
+    lines.push(`Use ${buildMenuCall({ commandPrefix, menuCommandName, args: 'todos' })} para ver a lista completa.`);
   }
 
   lines.push('', `🌐 ${MENU_SITE_URL}`);
@@ -358,30 +391,33 @@ const buildAllMenuText = ({ commandPrefix = '/', categories = [] } = {}) => {
   return lines.join('\n').trim();
 };
 
-const buildUnknownCategoryText = ({ commandPrefix = '/', query = '', categories = [] } = {}) => {
+const buildUnknownCategoryText = ({ commandPrefix = '/', menuCommandName = DEFAULT_MENU_COMMAND_NAME, query = '', categories = [] } = {}) => {
   const quickCategories = [...categories].sort((left, right) => right.commands.length - left.commands.length).slice(0, MENU_CATEGORY_PREVIEW_LIMIT);
   const lines = [`Não encontrei a categoria *${query || 'informada'}*.`, '', '*Tente uma destas:*'];
 
   for (const category of quickCategories) {
-    lines.push(`• ${commandPrefix}menu ${category.key}`);
+    lines.push(`• ${buildMenuCall({ commandPrefix, menuCommandName, args: category.key })}`);
   }
 
   lines.push('', `Ou acesse: ${MENU_SITE_URL}`);
   return lines.join('\n');
 };
 
-export const buildDynamicMenuText = ({ catalogSnapshot = null, usageRows = [], args = [], senderName = '', commandPrefix = '/' } = {}) => {
-  const { categories, commands } = extractCatalogModel(catalogSnapshot);
+export const buildDynamicMenuText = ({ catalogSnapshot = null, usageRows = [], args = [], senderName = '', commandPrefix = '/', menuCommandName = DEFAULT_MENU_COMMAND_NAME, categoryScopeKeys = [] } = {}) => {
+  const baseModel = extractCatalogModel(catalogSnapshot);
+  const { categories, commands } = applyCategoryScope(baseModel.categories, baseModel.commands, categoryScopeKeys);
   if (!categories.length || !commands.length) return null;
 
   const usageMap = buildUsageMap(usageRows);
   const safeArgs = Array.isArray(args) ? args.map((value) => String(value || '').trim()).filter(Boolean) : [];
   const firstToken = normalizeLookupToken(safeArgs[0] || '');
+  const safeMenuCommandName = normalizeMenuCommandName(menuCommandName);
 
   if (!firstToken) {
     return buildMainMenuText({
       senderName,
       commandPrefix,
+      menuCommandName: safeMenuCommandName,
       categories,
       commands,
       usageMap,
@@ -392,6 +428,7 @@ export const buildDynamicMenuText = ({ catalogSnapshot = null, usageRows = [], a
   if (TOP_TOKENS.has(firstToken)) {
     return buildTopMenuText({
       commandPrefix,
+      menuCommandName: safeMenuCommandName,
       commands,
       usageMap,
     });
@@ -408,13 +445,14 @@ export const buildDynamicMenuText = ({ catalogSnapshot = null, usageRows = [], a
   const query = isCategorySelector ? safeArgs.slice(1).join(' ') : safeArgs.join(' ');
 
   if (isCategorySelector && !query) {
-    return [`Use ${commandPrefix}menu categoria <nome>.`, '', `Exemplo: ${commandPrefix}menu categoria admin`, `🌐 ${MENU_SITE_URL}`].join('\n');
+    return [`Use ${buildMenuCall({ commandPrefix, menuCommandName: safeMenuCommandName, args: 'categoria <nome>' })}.`, '', `Exemplo: ${buildMenuCall({ commandPrefix, menuCommandName: safeMenuCommandName, args: 'categoria admin' })}`, `🌐 ${MENU_SITE_URL}`].join('\n');
   }
 
   const category = resolveCategoryFromQuery(categories, query);
   if (!category) {
     return buildUnknownCategoryText({
       commandPrefix,
+      menuCommandName: safeMenuCommandName,
       query,
       categories,
     });
@@ -422,12 +460,13 @@ export const buildDynamicMenuText = ({ catalogSnapshot = null, usageRows = [], a
 
   return buildCategoryMenuText({
     commandPrefix,
+    menuCommandName: safeMenuCommandName,
     category,
     usageMap,
   });
 };
 
-export const resolveDynamicMenuText = async ({ args = [], senderName = '', commandPrefix = '/', remoteJid = null } = {}) => {
+export const resolveDynamicMenuText = async ({ args = [], senderName = '', commandPrefix = '/', remoteJid = null, menuCommandName = DEFAULT_MENU_COMMAND_NAME, categoryScopeKeys = [] } = {}) => {
   try {
     const { listTopCommandsByUsage } = await import('./menuCommandUsageRepository.js');
     const catalogSnapshot = await getCommandsCatalogSnapshot();
@@ -450,6 +489,8 @@ export const resolveDynamicMenuText = async ({ args = [], senderName = '', comma
       args,
       senderName,
       commandPrefix,
+      menuCommandName,
+      categoryScopeKeys,
     });
   } catch (error) {
     logger.warn('Falha ao montar menu dinamico. Aplicando fallback para menu estatico.', {

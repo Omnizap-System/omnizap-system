@@ -76,6 +76,22 @@ export async function handleMenuCommand(sock, remoteJid, messageInfo, expiration
   await sendMenuImage(sock, remoteJid, messageInfo, expirationMessage, caption);
 }
 
-export async function handleMenuAdmCommand(sock, remoteJid, messageInfo, expirationMessage, commandPrefix) {
+export async function handleMenuAdmCommand(sock, remoteJid, messageInfo, expirationMessage, commandPrefix, args = []) {
+  const safeArgs = Array.isArray(args) ? args.map((value) => String(value || '').trim()).filter(Boolean) : [];
+  const dynamicArgs = safeArgs.length ? safeArgs : ['categoria', 'admin'];
+  const dynamicCaption = await resolveDynamicMenuText({
+    args: dynamicArgs,
+    senderName: 'admin',
+    commandPrefix,
+    remoteJid,
+    menuCommandName: 'menuadm',
+    categoryScopeKeys: ['admin'],
+  });
+
+  if (dynamicCaption) {
+    await sendMenuImage(sock, remoteJid, messageInfo, expirationMessage, dynamicCaption.trim());
+    return;
+  }
+
   await sendMenuImage(sock, remoteJid, messageInfo, expirationMessage, buildAdminMenu(commandPrefix).trim());
 }
