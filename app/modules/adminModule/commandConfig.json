@@ -7993,6 +7993,413 @@
         "resumo_usuario_origem": "auto_ia_assistida",
         "resumo_usuario_revisao_pendente": true
       }
+    },
+    {
+      "name": "stickerallowance",
+      "aliases": ["limiteqtdfigurinha", "allowancefigurinha"],
+      "descricao": "Configura quantas mensagens cada usuário pode enviar no modo sticker durante a janela de cooldown.",
+      "metodos_de_uso": ["<prefix>stickerallowance status", "<prefix>stickerallowance <quantidade>", "<prefix>stickerallowance reset"],
+      "permissao_necessaria": "admin do grupo",
+      "limite_de_uso": "sem limite especifico",
+      "local_de_uso": ["grupo"],
+      "informacoes_coletadas": ["identificador do chat (remoteJid)", "identificador do remetente (senderJid)", "texto do comando e argumentos", "contexto da mensagem (citacao e mencoes, quando existir)", "configuracoes do grupo no store"],
+      "categoria": "admin",
+      "enabled": true,
+      "argumentos": [
+        {
+          "nome": "valor",
+          "tipo": "string",
+          "obrigatorio": false,
+          "validacao": "status|reset|<1-10>",
+          "default": null
+        }
+      ],
+      "pre_condicoes": {
+        "requer_grupo": true,
+        "requer_admin": true,
+        "requer_admin_principal": false,
+        "requer_google_login": true,
+        "requer_nsfw": false,
+        "requer_midia": false,
+        "requer_mensagem_respondida": false
+      },
+      "id": "admin.stickerallowance",
+      "description": "Configura quantas mensagens cada usuário pode enviar no modo sticker durante a janela de cooldown.",
+      "usage": ["<prefix>stickerallowance status", "<prefix>stickerallowance <quantidade>", "<prefix>stickerallowance reset"],
+      "permission": "admin do grupo",
+      "contexts": ["grupo"],
+      "collected_data": ["identificador do chat (remoteJid)", "identificador do remetente (senderJid)", "texto do comando e argumentos", "contexto da mensagem (citacao e mencoes, quando existir)", "configuracoes do grupo no store"],
+      "requirements": {
+        "require_group": true,
+        "require_group_admin": true,
+        "require_bot_owner": false,
+        "require_google_login": true,
+        "require_nsfw_enabled": false,
+        "require_media": false,
+        "require_reply_message": false,
+        "legacy": {
+          "requer_grupo": true,
+          "requer_admin": true,
+          "requer_admin_principal": false,
+          "requer_google_login": true,
+          "requer_nsfw": false,
+          "requer_midia": false,
+          "requer_mensagem_respondida": false
+        }
+      },
+      "arguments": [
+        {
+          "name": "valor",
+          "type": "string",
+          "required": false,
+          "default": null,
+          "enum": null,
+          "description": "status|reset|<1-10>",
+          "position": 0,
+          "validation": "status|reset|<1-10>"
+        }
+      ],
+      "dependencies": ["API do WhatsApp (ações de grupo)", "stores/configuração interna"],
+      "side_effects": ["altera configurações de grupo e permissões", "envia mensagens administrativas"],
+      "docs": {
+        "summary": "Configura quantas mensagens cada usuário pode enviar no modo sticker durante a janela de cooldown.",
+        "usage_examples": ["<prefix>stickerallowance status", "<prefix>stickerallowance <quantidade>", "<prefix>stickerallowance reset"],
+        "usage_variants": {}
+      },
+      "behavior": {
+        "type": "configuration_window",
+        "allowed_actions": ["status", "reset", "set"],
+        "action_argument": "valor"
+      },
+      "limits": {
+        "usage_description": "sem limite especifico",
+        "rate_limit": {
+          "max": null,
+          "janela_ms": null,
+          "escopo": "sem_rate_limit_explicito"
+        }
+      },
+      "observability": {
+        "event_name": "command.executed",
+        "event_key": "admin.stickerallowance",
+        "analytics_event": "whatsapp_command_stickerallowance",
+        "log_level": "info",
+        "tags": ["whatsapp", "command", "adminModule", "stickerallowance"]
+      },
+      "privacy": {
+        "data_categories": ["chat_identifier", "sender_identifier", "command_content"],
+        "sensitive_fields": ["remoteJid", "senderJid", "text", "args"],
+        "retention_policy": "standard_app_logs",
+        "legal_basis": "service_execution_and_legitimate_interest"
+      },
+      "discovery": {
+        "keywords": ["stickerallowance", "sticker", "allowance", "limite"],
+        "faq_queries": ["como usar stickerallowance", "o que faz stickerallowance", "comando stickerallowance"],
+        "user_phrasings": ["quero usar stickerallowance", "me ajuda com stickerallowance"],
+        "suggestion_priority": 100
+      },
+      "access": {
+        "premium_only": false,
+        "allowed_plans": ["comum", "premium"]
+      },
+      "plan_limits": {
+        "comum": {
+          "max": 25,
+          "janela_ms": 60000,
+          "escopo": "usuario"
+        },
+        "premium": {
+          "max": 120,
+          "janela_ms": 60000,
+          "escopo": "usuario"
+        }
+      },
+      "version": "1.0.0",
+      "stability": "stable",
+      "deprecated": false,
+      "replaced_by": null,
+      "risk_level": "medium",
+      "handler": {
+        "file": "groupCommandHandlers.js",
+        "method": "handleAdminCommand",
+        "command_case": "stickerallowance"
+      }
+    },
+    {
+      "name": "noticiasfiltro",
+      "aliases": ["newsfilter", "filtronoticias"],
+      "descricao": "Gerencia filtros de envio de notícias por source, franchise, tag/entity e tendência.",
+      "metodos_de_uso": ["<prefix>noticiasfiltro status", "<prefix>noticiasfiltro source <add|remove|list|clear> <valor...>", "<prefix>noticiasfiltro franchise <add|remove|list|clear> <valor...>", "<prefix>noticiasfiltro tag <add|remove|list|clear> <valor...>", "<prefix>noticiasfiltro trending <on|off|status>", "<prefix>noticiasfiltro reset"],
+      "permissao_necessaria": "admin do grupo",
+      "limite_de_uso": "sem limite especifico",
+      "local_de_uso": ["grupo"],
+      "informacoes_coletadas": ["identificador do chat (remoteJid)", "identificador do remetente (senderJid)", "texto do comando e argumentos", "contexto da mensagem (citacao e mencoes, quando existir)", "configuracoes do grupo no store"],
+      "categoria": "admin",
+      "enabled": true,
+      "argumentos": [
+        {
+          "nome": "escopo",
+          "tipo": "string",
+          "obrigatorio": false,
+          "validacao": "status|reset|source|franchise|tag|entity|trending",
+          "default": null
+        },
+        {
+          "nome": "acao",
+          "tipo": "string",
+          "obrigatorio": false,
+          "validacao": "add|remove|list|clear|on|off|status",
+          "default": null
+        },
+        {
+          "nome": "valores",
+          "tipo": "array<string>",
+          "obrigatorio": false,
+          "validacao": "lista de slugs/ids",
+          "default": []
+        }
+      ],
+      "pre_condicoes": {
+        "requer_grupo": true,
+        "requer_admin": true,
+        "requer_admin_principal": false,
+        "requer_google_login": true,
+        "requer_nsfw": false,
+        "requer_midia": false,
+        "requer_mensagem_respondida": false
+      },
+      "id": "admin.noticiasfiltro",
+      "description": "Gerencia filtros de envio de notícias por source, franchise, tag/entity e tendência.",
+      "usage": ["<prefix>noticiasfiltro status", "<prefix>noticiasfiltro source <add|remove|list|clear> <valor...>", "<prefix>noticiasfiltro franchise <add|remove|list|clear> <valor...>", "<prefix>noticiasfiltro tag <add|remove|list|clear> <valor...>", "<prefix>noticiasfiltro trending <on|off|status>", "<prefix>noticiasfiltro reset"],
+      "permission": "admin do grupo",
+      "contexts": ["grupo"],
+      "collected_data": ["identificador do chat (remoteJid)", "identificador do remetente (senderJid)", "texto do comando e argumentos", "contexto da mensagem (citacao e mencoes, quando existir)", "configuracoes do grupo no store"],
+      "requirements": {
+        "require_group": true,
+        "require_group_admin": true,
+        "require_bot_owner": false,
+        "require_google_login": true,
+        "require_nsfw_enabled": false,
+        "require_media": false,
+        "require_reply_message": false,
+        "legacy": {
+          "requer_grupo": true,
+          "requer_admin": true,
+          "requer_admin_principal": false,
+          "requer_google_login": true,
+          "requer_nsfw": false,
+          "requer_midia": false,
+          "requer_mensagem_respondida": false
+        }
+      },
+      "arguments": [
+        {
+          "name": "escopo",
+          "type": "string",
+          "required": false,
+          "default": null,
+          "enum": null,
+          "description": "status|reset|source|franchise|tag|entity|trending",
+          "position": 0,
+          "validation": "status|reset|source|franchise|tag|entity|trending"
+        },
+        {
+          "name": "acao",
+          "type": "string",
+          "required": false,
+          "default": null,
+          "enum": null,
+          "description": "add|remove|list|clear|on|off|status",
+          "position": 1,
+          "validation": "add|remove|list|clear|on|off|status"
+        },
+        {
+          "name": "valores",
+          "type": "array",
+          "required": false,
+          "default": [],
+          "enum": null,
+          "description": "lista de slugs/ids",
+          "position": 2,
+          "validation": "lista de slugs/ids"
+        }
+      ],
+      "dependencies": ["API do WhatsApp (ações de grupo)", "stores/configuração interna"],
+      "side_effects": ["altera configurações de grupo e permissões", "envia mensagens administrativas"],
+      "docs": {
+        "summary": "Gerencia filtros de envio de notícias por source, franchise, tag/entity e tendência.",
+        "usage_examples": ["<prefix>noticiasfiltro status", "<prefix>noticiasfiltro source <add|remove|list|clear> <valor...>", "<prefix>noticiasfiltro franchise <add|remove|list|clear> <valor...>", "<prefix>noticiasfiltro tag <add|remove|list|clear> <valor...>", "<prefix>noticiasfiltro trending <on|off|status>", "<prefix>noticiasfiltro reset"],
+        "usage_variants": {}
+      },
+      "behavior": {
+        "type": "subcommand",
+        "allowed_actions": ["status", "reset", "source", "franchise", "tag", "entity", "trending"],
+        "action_argument": "escopo"
+      },
+      "limits": {
+        "usage_description": "sem limite especifico",
+        "rate_limit": {
+          "max": null,
+          "janela_ms": null,
+          "escopo": "sem_rate_limit_explicito"
+        }
+      },
+      "observability": {
+        "event_name": "command.executed",
+        "event_key": "admin.noticiasfiltro",
+        "analytics_event": "whatsapp_command_noticiasfiltro",
+        "log_level": "info",
+        "tags": ["whatsapp", "command", "adminModule", "noticiasfiltro"]
+      },
+      "privacy": {
+        "data_categories": ["chat_identifier", "sender_identifier", "command_content"],
+        "sensitive_fields": ["remoteJid", "senderJid", "text", "args"],
+        "retention_policy": "standard_app_logs",
+        "legal_basis": "service_execution_and_legitimate_interest"
+      },
+      "discovery": {
+        "keywords": ["noticiasfiltro", "noticias", "filtro", "news"],
+        "faq_queries": ["como usar noticiasfiltro", "o que faz noticiasfiltro", "comando noticiasfiltro"],
+        "user_phrasings": ["quero usar noticiasfiltro", "me ajuda com noticiasfiltro"],
+        "suggestion_priority": 100
+      },
+      "access": {
+        "premium_only": false,
+        "allowed_plans": ["comum", "premium"]
+      },
+      "plan_limits": {
+        "comum": {
+          "max": 25,
+          "janela_ms": 60000,
+          "escopo": "usuario"
+        },
+        "premium": {
+          "max": 120,
+          "janela_ms": 60000,
+          "escopo": "usuario"
+        }
+      },
+      "version": "1.0.0",
+      "stability": "stable",
+      "deprecated": false,
+      "replaced_by": null,
+      "risk_level": "low",
+      "handler": {
+        "file": "groupCommandHandlers.js",
+        "method": "handleAdminCommand",
+        "command_case": "noticiasfiltro"
+      }
+    },
+    {
+      "name": "grupoaudit",
+      "aliases": ["groupaudit", "auditgrupo", "statusgrupo"],
+      "descricao": "Mostra um resumo consolidado das configurações administrativas ativas no grupo.",
+      "metodos_de_uso": ["<prefix>grupoaudit"],
+      "permissao_necessaria": "admin do grupo",
+      "limite_de_uso": "sem limite especifico",
+      "local_de_uso": ["grupo"],
+      "informacoes_coletadas": ["identificador do chat (remoteJid)", "identificador do remetente (senderJid)", "texto do comando e argumentos", "contexto da mensagem (citacao e mencoes, quando existir)", "configuracoes do grupo no store"],
+      "categoria": "admin",
+      "enabled": true,
+      "argumentos": [],
+      "pre_condicoes": {
+        "requer_grupo": true,
+        "requer_admin": true,
+        "requer_admin_principal": false,
+        "requer_google_login": true,
+        "requer_nsfw": false,
+        "requer_midia": false,
+        "requer_mensagem_respondida": false
+      },
+      "id": "admin.grupoaudit",
+      "description": "Mostra um resumo consolidado das configurações administrativas ativas no grupo.",
+      "usage": ["<prefix>grupoaudit"],
+      "permission": "admin do grupo",
+      "contexts": ["grupo"],
+      "collected_data": ["identificador do chat (remoteJid)", "identificador do remetente (senderJid)", "texto do comando e argumentos", "contexto da mensagem (citacao e mencoes, quando existir)", "configuracoes do grupo no store"],
+      "requirements": {
+        "require_group": true,
+        "require_group_admin": true,
+        "require_bot_owner": false,
+        "require_google_login": true,
+        "require_nsfw_enabled": false,
+        "require_media": false,
+        "require_reply_message": false,
+        "legacy": {
+          "requer_grupo": true,
+          "requer_admin": true,
+          "requer_admin_principal": false,
+          "requer_google_login": true,
+          "requer_nsfw": false,
+          "requer_midia": false,
+          "requer_mensagem_respondida": false
+        }
+      },
+      "arguments": [],
+      "dependencies": ["API do WhatsApp (ações de grupo)", "stores/configuração interna"],
+      "side_effects": ["altera configurações de grupo e permissões", "envia mensagens administrativas"],
+      "docs": {
+        "summary": "Mostra um resumo consolidado das configurações administrativas ativas no grupo.",
+        "usage_examples": ["<prefix>grupoaudit"],
+        "usage_variants": {}
+      },
+      "behavior": {
+        "type": "inspection",
+        "action_argument": null
+      },
+      "limits": {
+        "usage_description": "sem limite especifico",
+        "rate_limit": {
+          "max": null,
+          "janela_ms": null,
+          "escopo": "sem_rate_limit_explicito"
+        }
+      },
+      "observability": {
+        "event_name": "command.executed",
+        "event_key": "admin.grupoaudit",
+        "analytics_event": "whatsapp_command_grupoaudit",
+        "log_level": "info",
+        "tags": ["whatsapp", "command", "adminModule", "grupoaudit"]
+      },
+      "privacy": {
+        "data_categories": ["chat_identifier", "sender_identifier", "command_content"],
+        "sensitive_fields": ["remoteJid", "senderJid", "text", "args"],
+        "retention_policy": "standard_app_logs",
+        "legal_basis": "service_execution_and_legitimate_interest"
+      },
+      "discovery": {
+        "keywords": ["grupoaudit", "grupo", "audit", "status"],
+        "faq_queries": ["como usar grupoaudit", "o que faz grupoaudit", "comando grupoaudit"],
+        "user_phrasings": ["quero usar grupoaudit", "me ajuda com grupoaudit"],
+        "suggestion_priority": 100
+      },
+      "access": {
+        "premium_only": false,
+        "allowed_plans": ["comum", "premium"]
+      },
+      "plan_limits": {
+        "comum": {
+          "max": 25,
+          "janela_ms": 60000,
+          "escopo": "usuario"
+        },
+        "premium": {
+          "max": 120,
+          "janela_ms": 60000,
+          "escopo": "usuario"
+        }
+      },
+      "version": "1.0.0",
+      "stability": "stable",
+      "deprecated": false,
+      "replaced_by": null,
+      "risk_level": "low",
+      "handler": {
+        "file": "groupCommandHandlers.js",
+        "method": "handleAdminCommand",
+        "command_case": "grupoaudit"
+      }
     }
   ],
   "textos": {

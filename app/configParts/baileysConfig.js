@@ -14,19 +14,91 @@ import { pipeline } from 'node:stream/promises';
 import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 
+/**
+ * Utilitários centrais de integração com Baileys.
+ *
+ * Responsabilidades deste módulo:
+ * - validar/normalizar JIDs e tipos de presença;
+ * - encapsular chamadas seguras no socket ativo;
+ * - extrair/detectar mídia em mensagens;
+ * - resolver mapeamento LID <-> JID com cache e persistência.
+ */
+
+/**
+ * @typedef {import('@whiskeysockets/baileys').WASocket} BaileysSocket
+ * @typedef {import('@whiskeysockets/baileys').WAMessage} BaileysMessage
+ * @typedef {import('@whiskeysockets/baileys').WAProto.IMessage} BaileysProtoMessage
+ * @typedef {'lid'|'pn'} AddressingMode
+ * @typedef {{includeAllTypes?: boolean, includeQuoted?: boolean, includeUnknown?: boolean}} MediaExtractionOptions
+ * @typedef {{
+ *   mediaType: string,
+ *   mediaKey: Record<string, any>,
+ *   messageKey: string,
+ *   isQuoted: boolean,
+ *   isBinary: boolean,
+ *   isUnknownType?: boolean,
+ *   hasUrl: boolean,
+ *   hasDirectPath: boolean,
+ *   hasMediaKey: boolean,
+ *   hasFileEncSha256: boolean,
+ *   mimetype: string|null,
+ *   fileLength: number|string|null,
+ *   fileName: string|null,
+ *   caption: string|null
+ * }} MediaEntry
+ * @typedef {{
+ *   mediaType: string,
+ *   mediaKey: Record<string, any>,
+ *   isQuoted: boolean,
+ *   details: {
+ *     messageKey: string,
+ *     isBinary: boolean,
+ *     isUnknownType?: boolean,
+ *     hasUrl: boolean,
+ *     hasDirectPath: boolean,
+ *     hasMediaKey: boolean,
+ *     hasFileEncSha256: boolean,
+ *     mimetype: string|null,
+ *     fileLength: number|string|null,
+ *     fileName: string|null,
+ *     caption: string|null,
+ *     allMediaFound: MediaEntry[]|null
+ *   }
+ * }} MediaExtractionResult
+ * @typedef {{lid?: string|null, jid?: string|null, participantAlt?: string|null}} IdentityParams
+ * @typedef {{jid: string|null, expiresAt: number, lastStoredAt: number|null}} LidCacheEntry
+ * @typedef {{
+ *   lid: string|null,
+ *   jid: string|null,
+ *   participantAlt: string|null,
+ *   remoteJid: string|null,
+ *   remoteJidAlt: string|null,
+ *   groupMessage: boolean
+ * }} SenderInfo
+ */
+
 const DEFAULT_BAILEYS_VERSION = [7, 0, 0];
 
 let activeSocket = null;
 
+/**
+ * Atualiza a referência global do socket ativo.
+ * @param {BaileysSocket|null} socket Instância conectada ou `null` para limpar.
+ * @returns {void}
+ */
 export const setActiveSocket = (socket) => {
   activeSocket = socket;
 };
 
+/**
+ * Retorna a instância de socket ativa no processo.
+ * @returns {BaileysSocket|null}
+ */
 export const getActiveSocket = () => activeSocket;
 
 /**
  * Indica se uma instância de socket está aberta para operações.
- * @param {object|null|undefined} socket Instância de socket.
+ * @param {BaileysSocket|null|undefined} socket Instância de socket.
  * @returns {boolean}
  */
 export const isSocketOpen = (socket) => {
@@ -43,7 +115,7 @@ export const isActiveSocketOpen = () => isSocketOpen(activeSocket);
 
 /**
  * Executa um método em uma instância de socket validando disponibilidade.
- * @param {object|null|undefined} socket Instância de socket.
+ * @param {BaileysSocket|null|undefined} socket Instância de socket.
  * @param {string} methodName Nome do método no socket.
  * @param {...any} args Argumentos do método.
  * @returns {Promise<any>}
@@ -71,7 +143,7 @@ export const runActiveSocketMethod = async (methodName, ...args) => runSocketMet
 
 /**
  * Recupera a blocklist da conta conectada.
- * @returns {Promise<(string|undefined)[]>}
+ * @returns {Promise<string[]>}
  */
 export const fetchBlocklistFromActiveSocket = async () => runActiveSocketMethod('fetchBlocklist');
 
@@ -128,7 +200,8 @@ const decodeJidParts = (() => {
 
 /**
  * Tipos de mensagem conhecidos do Baileys
- * Mapeamento de chaves do proto.Message para tipos normalizados
+ * (mapeamento de chaves do proto.Message para tipos normalizados).
+ * @type {Record<string, string>}
  */
 export const MEDIA_TYPE_MAPPING = {
   conversation: 'text',
@@ -182,7 +255,8 @@ export const MEDIA_TYPE_MAPPING = {
 };
 
 /**
- * Tipos de midia que contem conteudo binario/arquivo
+ * Tipos de mídia que carregam conteúdo binário/arquivo.
+ * @type {Set<string>}
  */
 export const BINARY_MEDIA_TYPES = new Set(['image', 'video', 'videoNote', 'audio', 'voice', 'document', 'sticker']);
 
@@ -521,13 +595,22 @@ export function isWhatsAppJid(jid) {
   return Boolean(server && WHATSAPP_USER_JID_SERVERS.has(server));
 }
 
+/**
+ * Modo de endereçamento por LID.
+ * @type {'lid'}
+ */
 export const ADDRESSING_MODE_LID = 'lid';
+
+/**
+ * Modo de endereçamento por PN/JID canônico.
+ * @type {'pn'}
+ */
 export const ADDRESSING_MODE_PN = 'pn';
 
 /**
  * Normaliza um modo de endereçamento (lid/pn).
  * @param {unknown} value
- * @returns {'lid'|'pn'|undefined}
+ * @returns {AddressingMode|undefined}
  */
 export const normalizeAddressingMode = (value) => {
   if (value === undefined || value === null) return undefined;
@@ -540,8 +623,8 @@ export const normalizeAddressingMode = (value) => {
 /**
  * Resolve modo de endereçamento a partir da chave da mensagem.
  * @param {object} [key={}]
- * @param {object} [senderInfo={}]
- * @returns {'lid'|'pn'|undefined}
+ * @param {SenderInfo|Record<string, any>} [senderInfo={}]
+ * @returns {AddressingMode|undefined}
  */
 export const resolveAddressingModeFromMessageKey = (key = {}, senderInfo = {}) => {
   const explicit = normalizeAddressingMode(key?.addressingMode);
@@ -560,7 +643,7 @@ export const resolveAddressingModeFromMessageKey = (key = {}, senderInfo = {}) =
 
 /**
  * Resolve JID canônico de usuário WhatsApp a partir de candidatos.
- * @param {...string} candidates
+ * @param {...(string|null|undefined)} candidates
  * @returns {string}
  */
 export const resolveCanonicalWhatsAppJid = (...candidates) => {
@@ -716,7 +799,7 @@ export async function resolveBaileysVersion() {
 
 /**
  * Baixa a foto de perfil associada à mensagem recebida.
- * @param {import('@whiskeysockets/baileys').WASocket} sock - Instância conectada do socket.
+ * @param {BaileysSocket} sock - Instância conectada do socket.
  * @param {import('@whiskeysockets/baileys').proto.IWebMessageInfo} msg - Mensagem usada para resolver o JID.
  * @returns {Promise<Buffer|null>} Buffer da imagem ou `null` se indisponível.
  */
@@ -740,17 +823,17 @@ export async function getProfilePicBuffer(sock, msg) {
 
 /**
  * Extrai o valor de expiração de uma mensagem do WhatsApp, ou retorna 24 horas (em segundos) por padrão.
- * @param {{message?: object}|null|undefined} sock - Estrutura contendo a propriedade `message`.
+ * @param {{message?: Record<string, any>}|null|undefined} messageInfo - Estrutura contendo a propriedade `message`.
  * @returns {number} Tempo de expiração em segundos.
  */
-export function getExpiration(sock) {
+export function getExpiration(messageInfo) {
   const DEFAULT_EXPIRATION_SECONDS = 24 * 60 * 60;
 
-  if (!sock || typeof sock !== 'object' || !sock.message) {
+  if (!messageInfo || typeof messageInfo !== 'object' || !messageInfo.message) {
     return DEFAULT_EXPIRATION_SECONDS;
   }
 
-  const normalizedMessage = normalizeMessage(sock.message);
+  const normalizedMessage = normalizeMessage(messageInfo.message);
   const expiration = findExpiration(normalizedMessage);
 
   return typeof expiration === 'number' ? expiration : DEFAULT_EXPIRATION_SECONDS;
@@ -758,7 +841,7 @@ export function getExpiration(sock) {
 
 /**
  * Extrai o conteúdo de texto de uma mensagem do WhatsApp.
- * @param {{message?: object}} messageInfo - Objeto que contém o payload da mensagem.
+ * @param {{message?: Record<string, any>}} messageInfo - Objeto que contém o payload da mensagem.
  * @returns {string} Conteúdo textual extraído ou descrição do tipo de mensagem.
  */
 export const extractMessageContent = ({ message }) => {
@@ -810,7 +893,7 @@ export const extractMessageContent = ({ message }) => {
 
 /**
  * Faz o download de mídia a partir de uma mensagem do Baileys.
- * @param {import('@whiskeysockets/baileys').WAProto.IMessage} message - Objeto da mídia a ser baixada.
+ * @param {BaileysProtoMessage} message - Objeto da mídia a ser baixada.
  * @param {string} type - Tipo de mídia (ex.: `image`, `video`, `audio`, `document`).
  * @param {string} outputPath - Diretório onde o arquivo será salvo.
  * @returns {Promise<string|null>} Caminho do arquivo salvo ou `null` em caso de falha.
@@ -867,10 +950,10 @@ export const downloadMediaMessage = async (message, type, outputPath) => {
 };
 
 /**
- * Detecta dinamicamente todos os tipos de midia em um objeto de mensagem
- * @param {object} messageContent - Conteudo da mensagem
- * @param {boolean} isQuoted - Se e de uma mensagem citada
- * @returns {Array} Array de objetos com detalhes da midia encontrada
+ * Detecta dinamicamente os tipos de mídia presentes em um payload de mensagem.
+ * @param {Record<string, any>} messageContent Conteúdo da mensagem (normal ou quoted).
+ * @param {boolean} [isQuoted=false] Sinaliza se o payload veio de uma citação.
+ * @returns {MediaEntry[]} Lista de mídias detectadas (pode estar vazia).
  */
 export function detectAllMediaTypes(messageContent, isQuoted = false) {
   if (!messageContent || typeof messageContent !== 'object') {
@@ -914,13 +997,10 @@ export function detectAllMediaTypes(messageContent, isQuoted = false) {
 }
 
 /**
- * Extrai detalhes da midia da mensagem de forma dinamica
- * @param {object} message - O objeto da mensagem
- * @param {object} options - Opcoes de configuracao
- * @param {boolean} options.includeAllTypes - Se deve incluir todos os tipos, nao apenas binarios
- * @param {boolean} options.includeQuoted - Se deve incluir midia de mensagens citadas
- * @param {boolean} options.includeUnknown - Se deve incluir tipos desconhecidos
- * @returns {{mediaType: string, mediaKey: object, details: object}|null} - Detalhes da midia ou null se nao encontrada
+ * Extrai a mídia primária de uma mensagem com filtros configuráveis.
+ * @param {BaileysMessage|{message?: Record<string, any>}|Record<string, any>} message Objeto da mensagem.
+ * @param {MediaExtractionOptions} [options={}] Opções de filtragem.
+ * @returns {MediaExtractionResult|null} Estrutura da mídia primária ou `null` quando não houver mídia.
  */
 export function extractMediaDetails(message, options = {}) {
   const { includeAllTypes = false, includeQuoted = true, includeUnknown = false } = options;
@@ -955,10 +1035,10 @@ export function extractMediaDetails(message, options = {}) {
 }
 
 /**
- * Extrai todos os tipos de midia de uma mensagem
- * @param {object} message - O objeto da mensagem
- * @param {object} options - Opcoes de configuracao
- * @returns {Array} Array com todos os tipos de midia encontrados
+ * Extrai todas as mídias detectadas de uma mensagem.
+ * @param {BaileysMessage|{message?: Record<string, any>}|Record<string, any>} message Objeto da mensagem.
+ * @param {MediaExtractionOptions} [options={}] Opções de filtragem.
+ * @returns {MediaEntry[]} Array com todas as mídias encontradas.
  */
 export function extractAllMediaDetails(message, options = {}) {
   const { includeAllTypes = true, includeQuoted = true, includeUnknown = true } = options;
@@ -968,10 +1048,10 @@ export function extractAllMediaDetails(message, options = {}) {
 }
 
 /**
- * Verifica se uma mensagem contem midia
- * @param {object} message - O objeto da mensagem
- * @param {string} specificType - Tipo especifico para verificar (opcional)
- * @returns {boolean} True se contem midia
+ * Verifica se uma mensagem contém mídia.
+ * @param {BaileysMessage|{message?: Record<string, any>}|Record<string, any>} message Objeto da mensagem.
+ * @param {string|null} [specificType=null] Tipo específico para filtrar (ex.: `image`).
+ * @returns {boolean} `true` quando ao menos uma mídia compatível é encontrada.
  */
 export function hasMedia(message, specificType = null) {
   const allMedia = collectMediaFromMessage(message, { includeQuoted: true });
@@ -989,8 +1069,13 @@ export function hasMedia(message, specificType = null) {
 }
 
 /**
- * Obtem informacoes sobre os tipos de midia suportados
- * @returns {object} Informacoes sobre tipos de midia
+ * Obtém metadados dos tipos de mídia suportados.
+ * @returns {{
+ *   knownTypes: string[],
+ *   binaryTypes: string[],
+ *   typeMapping: Record<string, string>,
+ *   totalKnownTypes: number
+ * }}
  */
 export function getMediaTypeInfo() {
   return {
@@ -1002,9 +1087,9 @@ export function getMediaTypeInfo() {
 }
 
 /**
- * ===============================
+ * ===========================
  * LID Map Utilities
- * ===============================
+ * ===========================
  */
 const CACHE_TTL_MS = 20 * 60 * 1000;
 const NEGATIVE_TTL_MS = 5 * 60 * 1000;
@@ -1132,7 +1217,7 @@ const maskJid = (jid) => {
 /**
  * Busca entrada do cache (com expiração).
  * @param {string|null|undefined} lid
- * @returns {{jid: string|null, expiresAt: number, lastStoredAt: number|null}|null}
+ * @returns {LidCacheEntry|null}
  */
 const getCacheEntry = (lid) => {
   if (!lid) return null;
@@ -1194,9 +1279,10 @@ export const getCachedJidForLid = (lid) => {
 
 /**
  * Divide lista em batches.
- * @param {Array<any>} items
+ * @template T
+ * @param {T[]} items
  * @param {number} [limit=BATCH_LIMIT]
- * @returns {Array<Array<any>>}
+ * @returns {T[][]}
  */
 const buildChunks = (items, limit = BATCH_LIMIT) => {
   const chunks = [];
@@ -1326,7 +1412,7 @@ const buildServerLikeFilter = (column, servers) => {
 /**
  * Resolve candidatos principais de identidade de usuário.
  * Centraliza regra usada por `resolveUserIdCached` e `resolveUserId`.
- * @param {{lid?: string|null, jid?: string|null, participantAlt?: string|null}} [params]
+ * @param {IdentityParams} [params]
  * @returns {{directJid: string|null, lidValue: string|null, fallback: string|null}}
  */
 const resolveIdentityCandidates = ({ lid, jid, participantAlt } = {}) => {
@@ -1431,7 +1517,7 @@ export const queueLidUpdate = (lid, jid, source = 'message') => {
 
 /**
  * Resolve ID canônico usando apenas cache.
- * @param {{lid?: string|null, jid?: string|null, participantAlt?: string|null}} [params]
+ * @param {IdentityParams} [params]
  * @returns {string|null}
  */
 export const resolveUserIdCached = ({ lid, jid, participantAlt } = {}) => {
@@ -1445,9 +1531,9 @@ export const resolveUserIdCached = ({ lid, jid, participantAlt } = {}) => {
 };
 
 /**
- * Extrai informacoes do remetente a partir de uma mensagem do Baileys.
- * @param {import('@whiskeysockets/baileys').WAMessage} msg
- * @returns {{lid: string|null, jid: string|null, participantAlt: string|null, remoteJid: string|null, remoteJidAlt: string|null, groupMessage: boolean}}
+ * Extrai informações de identidade do remetente a partir da mensagem.
+ * @param {BaileysMessage} msg
+ * @returns {SenderInfo}
  */
 export const extractSenderInfoFromMessage = (msg) => {
   const remoteJid = normalizeJid(msg?.key?.remoteJid || '') || null;
@@ -1556,7 +1642,7 @@ const fetchJidByLid = async (lid) => {
 
 /**
  * Resolve ID canônico consultando banco se necessário.
- * @param {{lid?: string|null, jid?: string|null, participantAlt?: string|null}} [params]
+ * @param {IdentityParams} [params]
  * @returns {Promise<string|null>}
  */
 export const resolveUserId = async ({ lid, jid, participantAlt } = {}) => {
@@ -1669,6 +1755,13 @@ export const flushLidQueue = async () => {
   await lidFlushRunner.run();
 };
 
+/**
+ * Enfileira atualização de mapa LID/JID e retorna estado simplificado.
+ * @param {string} lid
+ * @param {string|null} jid
+ * @param {string} [source='message']
+ * @returns {Promise<{stored: boolean, reconciled: boolean}>}
+ */
 export const maybeStoreLidMap = async (lid, jid, source = 'message') => {
   const result = queueLidUpdate(lid, jid, source);
   return { stored: result.queued, reconciled: result.reconciled };

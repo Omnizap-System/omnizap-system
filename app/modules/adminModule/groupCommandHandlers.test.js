@@ -209,6 +209,9 @@ after(() => {
 test('isAdminCommand reconhece comandos válidos', () => {
   assert.equal(isAdminCommand('nsfw'), true);
   assert.equal(isAdminCommand('banir'), true);
+  assert.equal(isAdminCommand('stickerallowance'), true);
+  assert.equal(isAdminCommand('noticiasfiltro'), true);
+  assert.equal(isAdminCommand('grupoaudit'), true);
   assert.equal(isAdminCommand('comando-inexistente'), false);
 });
 
@@ -375,4 +378,91 @@ test('prefix atualiza, consulta status e reseta para padrão', async () => {
     sock,
   });
   assert.equal(dbHarness.getGroupConfig(GROUP_JID).commandPrefix, null);
+});
+
+test('stickerallowance atualiza e consulta limite por janela', async () => {
+  const { sock, messages } = createSockStub();
+  dbHarness.setGroupParticipants(GROUP_JID, [{ id: OWNER_JID, admin: 'admin' }]);
+
+  await runAdminCommand({
+    command: 'stickerallowance',
+    args: ['4'],
+    sock,
+  });
+
+  const updatedConfig = dbHarness.getGroupConfig(GROUP_JID);
+  assert.equal(updatedConfig.stickerFocusMessageAllowance, 4);
+  assert.equal(updatedConfig.stickerFocusMessageAllowanceCount, 4);
+
+  await runAdminCommand({
+    command: 'stickerallowance',
+    args: ['status'],
+    sock,
+  });
+
+  assert.match(messages[messages.length - 1].content.text, /Limite atual de mensagens por usuário/i);
+  assert.match(messages[messages.length - 1].content.text, /\*4\*/);
+});
+
+test('noticiasfiltro aplica source/tag e trending no config do grupo', async () => {
+  const { sock } = createSockStub();
+  dbHarness.setGroupParticipants(GROUP_JID, [{ id: OWNER_JID, admin: 'admin' }]);
+
+  await runAdminCommand({
+    command: 'noticiasfiltro',
+    args: ['source', 'add', 'ann,mal'],
+    sock,
+  });
+
+  await runAdminCommand({
+    command: 'noticiasfiltro',
+    args: ['tag', 'add', 'shounen'],
+    sock,
+  });
+
+  await runAdminCommand({
+    command: 'noticiasfiltro',
+    args: ['trending', 'on'],
+    sock,
+  });
+
+  const updatedConfig = dbHarness.getGroupConfig(GROUP_JID);
+  assert.deepEqual(updatedConfig.newsSourceIds, ['ann', 'mal']);
+  assert.deepEqual(updatedConfig.newsEntitySlugs, ['shounen']);
+  assert.equal(updatedConfig.newsOnlyTrending, true);
+  assert.equal(updatedConfig.newsFilters.onlyTrending, true);
+});
+
+test('grupoaudit retorna resumo consolidado do grupo', async () => {
+  const { sock, messages } = createSockStub();
+  dbHarness.setGroupParticipants(GROUP_JID, [{ id: OWNER_JID, admin: 'admin' }]);
+  dbHarness.setGroupConfig(GROUP_JID, {
+    commandPrefix: '!',
+    nsfwEnabled: true,
+    autoStickerEnabled: false,
+    stickerFocusEnabled: true,
+    stickerFocusMessageCooldownMinutes: 30,
+    stickerFocusMessageAllowance: 3,
+    captchaEnabled: true,
+    autoApproveRequestsEnabled: false,
+    antilinkEnabled: true,
+    antilinkAllowedNetworks: ['youtube'],
+    antilinkAllowedDomains: ['example.com'],
+    newsEnabled: true,
+    newsSentIds: ['n1', 'n2'],
+    newsLastSentAt: '2026-03-18T00:00:00.000Z',
+    welcomeMessageEnabled: true,
+    farewellMessageEnabled: false,
+  });
+
+  await runAdminCommand({
+    command: 'grupoaudit',
+    args: [],
+    sock,
+  });
+
+  assert.equal(messages.length, 1);
+  assert.match(messages[0].content.text, /Auditoria do Grupo/i);
+  assert.match(messages[0].content.text, /Notícias enviadas: \*2\*/i);
+  assert.match(messages[0].content.text, /Antilink: \*ativado\*/i);
 });

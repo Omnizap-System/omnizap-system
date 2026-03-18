@@ -11,7 +11,7 @@ import { sendAndStore } from '../../services/messaging/messagePersistenceService
 import { clearCaptchasForGroup } from '../../services/messaging/captchaService.js';
 import { getAdminJid, isAdminSenderAsync } from '../../config/index.js';
 import { extractUserIdInfo, resolveUserId } from '../../config/index.js';
-import { DEFAULT_STICKER_FOCUS_CHAT_WINDOW_MINUTES, DEFAULT_STICKER_FOCUS_MESSAGE_COOLDOWN_MINUTES, MAX_STICKER_FOCUS_CHAT_WINDOW_MINUTES, MAX_STICKER_FOCUS_MESSAGE_COOLDOWN_MINUTES, MIN_STICKER_FOCUS_CHAT_WINDOW_MINUTES, MIN_STICKER_FOCUS_MESSAGE_COOLDOWN_MINUTES, clampStickerFocusChatWindowMinutes, clampStickerFocusMessageCooldownMinutes, resolveStickerFocusState } from '../../services/sticker/stickerFocusService.js';
+import { DEFAULT_STICKER_FOCUS_CHAT_WINDOW_MINUTES, DEFAULT_STICKER_FOCUS_MESSAGE_ALLOWANCE, DEFAULT_STICKER_FOCUS_MESSAGE_COOLDOWN_MINUTES, MAX_STICKER_FOCUS_CHAT_WINDOW_MINUTES, MAX_STICKER_FOCUS_MESSAGE_ALLOWANCE, MAX_STICKER_FOCUS_MESSAGE_COOLDOWN_MINUTES, MIN_STICKER_FOCUS_CHAT_WINDOW_MINUTES, MIN_STICKER_FOCUS_MESSAGE_ALLOWANCE, MIN_STICKER_FOCUS_MESSAGE_COOLDOWN_MINUTES, clampStickerFocusChatWindowMinutes, clampStickerFocusMessageAllowance, clampStickerFocusMessageCooldownMinutes, resolveStickerFocusState } from '../../services/sticker/stickerFocusService.js';
 import { getAdminTextConfig, getAdminUsageText, isAdminCommandName, resolveAdminCommandName } from './adminConfigRuntime.js';
 import { explicarComando, gerarFaqAutomatica, responderPergunta, startAdminAiHelpScheduler } from './adminAiHelpService.js';
 const OWNER_JID = getAdminJid();
@@ -161,6 +161,96 @@ const buildStickerFocusStatusText = ({ state, commandPrefix }) => {
   const chatWindowStatus = state.isChatWindowOpen ? `aberta (restam ~${remainingMinutes} min)` : 'fechada';
 
   return ['🖼️ *Status do modo Sticker*', '', `Modo sticker: *${state.enabled ? 'ativado' : 'desativado'}*`, `Janela de chat: *${chatWindowStatus}*`, `Regra fora da janela: *${formatStickerFocusRule(state)}*`, '', `Comandos:`, `${commandPrefix}stickermode <on|off|status>`, `${commandPrefix}chatwindow <on|off|status> [minutos]`, `${commandPrefix}stickermsglimit <minutos|status|reset>`].join('\n');
+};
+
+const formatListForMessage = (items = [], emptyLabel = 'nenhum') => {
+  const safeItems = Array.isArray(items) ? items.map((item) => String(item || '').trim()).filter(Boolean) : [];
+  return safeItems.length ? safeItems.join(', ') : emptyLabel;
+};
+
+const parseFilterValues = (values = []) => {
+  const rawText = Array.isArray(values) ? values.join(' ') : String(values || '');
+  if (!rawText.trim()) return [];
+  const normalized = rawText
+    .split(/[\s,]+/)
+    .map((value) =>
+      String(value || '')
+        .trim()
+        .toLowerCase(),
+    )
+    .filter(Boolean);
+  return Array.from(new Set(normalized)).sort((left, right) => left.localeCompare(right));
+};
+
+const normalizeStringList = (value) => {
+  const source = Array.isArray(value) ? value : typeof value === 'string' ? value.split(',') : [];
+  return source
+    .map((entry) =>
+      String(entry || '')
+        .trim()
+        .toLowerCase(),
+    )
+    .filter(Boolean);
+};
+
+const normalizeNewsFilterState = (groupConfig = {}) => {
+  const nested = groupConfig?.newsFilters && typeof groupConfig.newsFilters === 'object' ? groupConfig.newsFilters : {};
+  const sourceIds = Array.from(new Set([...normalizeStringList(groupConfig.newsSources), ...normalizeStringList(groupConfig.newsSourceIds), ...normalizeStringList(nested.sources), ...normalizeStringList(nested.sourceIds)])).sort((left, right) => left.localeCompare(right));
+  const franchiseSlugs = Array.from(new Set([...normalizeStringList(groupConfig.newsFranchises), ...normalizeStringList(groupConfig.newsFranchiseSlugs), ...normalizeStringList(nested.franchises), ...normalizeStringList(nested.franchiseSlugs)])).sort((left, right) => left.localeCompare(right));
+  const entitySlugs = Array.from(new Set([...normalizeStringList(groupConfig.newsEntities), ...normalizeStringList(groupConfig.newsEntitySlugs), ...normalizeStringList(groupConfig.newsTags), ...normalizeStringList(nested.entities), ...normalizeStringList(nested.entitySlugs), ...normalizeStringList(nested.tags)])).sort((left, right) => left.localeCompare(right));
+  const onlyTrending = Boolean(groupConfig.newsOnlyTrending || nested.onlyTrending);
+
+  return {
+    sourceIds,
+    franchiseSlugs,
+    entitySlugs,
+    onlyTrending,
+  };
+};
+
+const buildNewsFilterConfigPatch = (groupConfig, nextState) => {
+  const nested = groupConfig?.newsFilters && typeof groupConfig.newsFilters === 'object' ? groupConfig.newsFilters : {};
+  const safeSources = Array.isArray(nextState?.sourceIds) ? nextState.sourceIds : [];
+  const safeFranchises = Array.isArray(nextState?.franchiseSlugs) ? nextState.franchiseSlugs : [];
+  const safeEntities = Array.isArray(nextState?.entitySlugs) ? nextState.entitySlugs : [];
+  const safeOnlyTrending = Boolean(nextState?.onlyTrending);
+
+  return {
+    newsSourceIds: safeSources,
+    newsSources: safeSources,
+    newsFranchiseSlugs: safeFranchises,
+    newsFranchises: safeFranchises,
+    newsEntitySlugs: safeEntities,
+    newsEntities: safeEntities,
+    newsTags: safeEntities,
+    newsOnlyTrending: safeOnlyTrending,
+    newsFilters: {
+      ...nested,
+      sourceIds: safeSources,
+      sources: safeSources,
+      franchiseSlugs: safeFranchises,
+      franchises: safeFranchises,
+      entitySlugs: safeEntities,
+      entities: safeEntities,
+      tags: safeEntities,
+      onlyTrending: safeOnlyTrending,
+    },
+  };
+};
+
+const formatDateTimeLabel = (value) => {
+  if (!value) return 'nunca';
+  const parsed = Date.parse(String(value));
+  if (!Number.isFinite(parsed)) return String(value);
+  return new Date(parsed).toLocaleString('pt-BR');
+};
+
+const buildGroupAuditText = ({ config, stickerState, newsStatus, commandPrefix }) => {
+  const prefix = String(config?.commandPrefix || '').trim() || DEFAULT_COMMAND_PREFIX;
+  const newsFilters = normalizeNewsFilterState(config);
+  const stickerWindowText = stickerState.isChatWindowOpen ? `aberta (~${Math.max(1, Math.ceil(stickerState.chatWindowRemainingMs / (60 * 1000)))} min restantes)` : 'fechada';
+
+  return ['🧾 *Auditoria do Grupo*', '', `Prefixo: *${prefix}*`, `NSFW: *${config?.nsfwEnabled ? 'ativado' : 'desativado'}*`, `AutoSticker: *${config?.autoStickerEnabled ? 'ativado' : 'desativado'}*`, `Modo Sticker: *${stickerState.enabled ? 'ativado' : 'desativado'}*`, `Janela de chat: *${stickerWindowText}*`, `Regra de texto: *${formatStickerFocusRule(stickerState)}*`, `Captcha: *${config?.captchaEnabled ? 'ativado' : 'desativado'}*`, `Auto-aprovação de solicitações: *${config?.autoApproveRequestsEnabled ? 'ativada' : 'desativada'}*`, `Antilink: *${config?.antilinkEnabled ? 'ativado' : 'desativado'}*`, `Antilink redes permitidas: ${formatListForMessage(config?.antilinkAllowedNetworks || [])}`, `Antilink domínios permitidos: ${formatListForMessage(config?.antilinkAllowedDomains || [])}`, `Notícias: *${newsStatus?.enabled ? 'ativado' : 'desativado'}*`, `Notícias enviadas: *${Number(newsStatus?.sentCount || 0)}*`, `Último envio de notícias: *${formatDateTimeLabel(newsStatus?.lastSentAt)}*`, `Filtro notícias [source]: ${formatListForMessage(newsFilters.sourceIds)}`, `Filtro notícias [franchise]: ${formatListForMessage(newsFilters.franchiseSlugs)}`, `Filtro notícias [tag/entity]: ${formatListForMessage(newsFilters.entitySlugs)}`, `Filtro notícias [somente em alta]: *${newsFilters.onlyTrending ? 'sim' : 'não'}*`, `Boas-vindas: *${config?.welcomeMessageEnabled ? 'ativadas' : 'desativadas'}*`, `Despedida: *${config?.farewellMessageEnabled ? 'ativadas' : 'desativadas'}*`, '', `Dica: use *${commandPrefix}noticiasfiltro status* para ver os filtros em detalhe.`].join('\n');
 };
 
 export const isAdminCommand = (command) => isAdminCommandName(command);
@@ -627,7 +717,6 @@ export async function handleAdminCommand({ command, args, text, sock, messageInf
       if (['reset', 'default', 'padrao', 'padrão'].includes(normalized)) {
         await groupConfigStore.updateGroupConfig(remoteJid, {
           stickerFocusMessageCooldownMinutes: DEFAULT_STICKER_FOCUS_MESSAGE_COOLDOWN_MINUTES,
-          // compatibilidade com configuração antiga
           stickerFocusTextCooldownMinutes: DEFAULT_STICKER_FOCUS_MESSAGE_COOLDOWN_MINUTES,
         });
         await sendAndStore(
@@ -669,7 +758,6 @@ export async function handleAdminCommand({ command, args, text, sock, messageInf
       const minutes = clampStickerFocusMessageCooldownMinutes(parsed, DEFAULT_STICKER_FOCUS_MESSAGE_COOLDOWN_MINUTES);
       await groupConfigStore.updateGroupConfig(remoteJid, {
         stickerFocusMessageCooldownMinutes: minutes,
-        // compatibilidade com configuração antiga
         stickerFocusTextCooldownMinutes: minutes,
       });
 
@@ -678,6 +766,93 @@ export async function handleAdminCommand({ command, args, text, sock, messageInf
         remoteJid,
         {
           text: `✅ Intervalo de mensagem por usuário atualizado para *${minutes} min* no modo sticker.`,
+        },
+        { quoted: messageInfo, ephemeralExpiration: expirationMessage },
+      );
+      break;
+    }
+
+    case 'stickerallowance': {
+      if (!isGroupMessage) {
+        await sendAndStore(sock, remoteJid, { text: GROUP_ONLY_COMMAND_MESSAGE }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
+        break;
+      }
+      if (!(await isUserAdmin(remoteJid, senderIdentity))) {
+        await sendAndStore(sock, remoteJid, { text: NO_PERMISSION_COMMAND_MESSAGE }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
+        break;
+      }
+
+      const rawValue = args[0];
+      const normalized = String(rawValue || '')
+        .trim()
+        .toLowerCase();
+
+      if (!normalized || normalized === 'status') {
+        const config = await groupConfigStore.getGroupConfig(remoteJid);
+        const state = resolveStickerFocusState(config);
+        await sendAndStore(
+          sock,
+          remoteJid,
+          {
+            text: `📏 Limite atual de mensagens por usuário no modo sticker: *${state.messageAllowanceCount}*.` + `\nRegra vigente: *${formatStickerFocusRule(state)}*.` + `\nUse *${commandPrefix}stickerallowance <quantidade>* para alterar.`,
+          },
+          { quoted: messageInfo, ephemeralExpiration: expirationMessage },
+        );
+        break;
+      }
+
+      if (['reset', 'default', 'padrao', 'padrão'].includes(normalized)) {
+        await groupConfigStore.updateGroupConfig(remoteJid, {
+          stickerFocusMessageAllowance: DEFAULT_STICKER_FOCUS_MESSAGE_ALLOWANCE,
+          stickerFocusMessageAllowanceCount: DEFAULT_STICKER_FOCUS_MESSAGE_ALLOWANCE,
+        });
+        await sendAndStore(
+          sock,
+          remoteJid,
+          {
+            text: `✅ Limite restaurado para o padrão: *${DEFAULT_STICKER_FOCUS_MESSAGE_ALLOWANCE}* mensagem(ns) por janela.`,
+          },
+          { quoted: messageInfo, ephemeralExpiration: expirationMessage },
+        );
+        break;
+      }
+
+      const parsed = parsePositiveInteger(rawValue);
+      if (!parsed) {
+        await sendAndStore(
+          sock,
+          remoteJid,
+          {
+            text: getAdminUsageText('stickerallowance', { commandPrefix }),
+          },
+          { quoted: messageInfo, ephemeralExpiration: expirationMessage },
+        );
+        break;
+      }
+
+      if (parsed < MIN_STICKER_FOCUS_MESSAGE_ALLOWANCE || parsed > MAX_STICKER_FOCUS_MESSAGE_ALLOWANCE) {
+        await sendAndStore(
+          sock,
+          remoteJid,
+          {
+            text: `Informe uma quantidade entre ${MIN_STICKER_FOCUS_MESSAGE_ALLOWANCE} e ${MAX_STICKER_FOCUS_MESSAGE_ALLOWANCE}.`,
+          },
+          { quoted: messageInfo, ephemeralExpiration: expirationMessage },
+        );
+        break;
+      }
+
+      const allowance = clampStickerFocusMessageAllowance(parsed, DEFAULT_STICKER_FOCUS_MESSAGE_ALLOWANCE);
+      await groupConfigStore.updateGroupConfig(remoteJid, {
+        stickerFocusMessageAllowance: allowance,
+        stickerFocusMessageAllowanceCount: allowance,
+      });
+
+      await sendAndStore(
+        sock,
+        remoteJid,
+        {
+          text: `✅ Limite de mensagens por usuário atualizado para *${allowance}* no modo sticker.`,
         },
         { quoted: messageInfo, ephemeralExpiration: expirationMessage },
       );
@@ -1782,6 +1957,231 @@ ${JSON.stringify(response, null, 2)}`,
         });
         await sendAndStore(sock, remoteJid, { text: `Não foi possível configurar o antilink. Detalhes: ${error.message}` }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
       }
+      break;
+    }
+
+    case 'noticiasfiltro': {
+      if (!isGroupMessage) {
+        await sendAndStore(sock, remoteJid, { text: GROUP_ONLY_COMMAND_MESSAGE }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
+        break;
+      }
+      if (!(await isUserAdmin(remoteJid, senderIdentity))) {
+        await sendAndStore(sock, remoteJid, { text: NO_PERMISSION_COMMAND_MESSAGE }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
+        break;
+      }
+
+      const groupConfig = await groupConfigStore.getGroupConfig(remoteJid);
+      const currentFilters = normalizeNewsFilterState(groupConfig);
+      const scope = String(args[0] || '')
+        .trim()
+        .toLowerCase();
+      const scopeToKey = {
+        source: 'sourceIds',
+        franchise: 'franchiseSlugs',
+        tag: 'entitySlugs',
+        entity: 'entitySlugs',
+      };
+
+      const buildStatusText = (filters) => ['🧪 *Filtros de notícias deste grupo*', '', `Sources: ${formatListForMessage(filters.sourceIds)}`, `Franchises: ${formatListForMessage(filters.franchiseSlugs)}`, `Tags/Entities: ${formatListForMessage(filters.entitySlugs)}`, `Somente em alta: *${filters.onlyTrending ? 'sim' : 'não'}*`, '', 'Exemplos:', `${commandPrefix}noticiasfiltro source add ann,mal`, `${commandPrefix}noticiasfiltro franchise add one-piece`, `${commandPrefix}noticiasfiltro tag add shounen`, `${commandPrefix}noticiasfiltro trending on`].join('\n');
+
+      if (!scope || scope === 'status' || scope === 'list') {
+        await sendAndStore(
+          sock,
+          remoteJid,
+          {
+            text: buildStatusText(currentFilters),
+          },
+          { quoted: messageInfo, ephemeralExpiration: expirationMessage },
+        );
+        break;
+      }
+
+      if (scope === 'reset') {
+        const resetFilters = {
+          sourceIds: [],
+          franchiseSlugs: [],
+          entitySlugs: [],
+          onlyTrending: false,
+        };
+        await groupConfigStore.updateGroupConfig(remoteJid, buildNewsFilterConfigPatch(groupConfig, resetFilters));
+        await sendAndStore(
+          sock,
+          remoteJid,
+          {
+            text: '✅ Filtros de notícias resetados com sucesso.',
+          },
+          { quoted: messageInfo, ephemeralExpiration: expirationMessage },
+        );
+        break;
+      }
+
+      if (scope === 'trending') {
+        const action = String(args[1] || '')
+          .trim()
+          .toLowerCase();
+        if (!action || !['on', 'off', 'status'].includes(action)) {
+          await sendAndStore(
+            sock,
+            remoteJid,
+            {
+              text: getAdminUsageText('noticiasfiltro', { commandPrefix, variant: 'trending' }),
+            },
+            { quoted: messageInfo, ephemeralExpiration: expirationMessage },
+          );
+          break;
+        }
+
+        if (action === 'status') {
+          await sendAndStore(
+            sock,
+            remoteJid,
+            {
+              text: `📈 Filtro "somente em alta" está *${currentFilters.onlyTrending ? 'ativado' : 'desativado'}*.`,
+            },
+            { quoted: messageInfo, ephemeralExpiration: expirationMessage },
+          );
+          break;
+        }
+
+        const nextFilters = {
+          ...currentFilters,
+          onlyTrending: action === 'on',
+        };
+        await groupConfigStore.updateGroupConfig(remoteJid, buildNewsFilterConfigPatch(groupConfig, nextFilters));
+        await sendAndStore(
+          sock,
+          remoteJid,
+          {
+            text: `✅ Filtro "somente em alta" ${nextFilters.onlyTrending ? 'ativado' : 'desativado'} com sucesso.`,
+          },
+          { quoted: messageInfo, ephemeralExpiration: expirationMessage },
+        );
+        break;
+      }
+
+      const filterKey = scopeToKey[scope];
+      if (!filterKey) {
+        await sendAndStore(
+          sock,
+          remoteJid,
+          {
+            text: getAdminUsageText('noticiasfiltro', { commandPrefix, variant: 'invalid_scope' }),
+          },
+          { quoted: messageInfo, ephemeralExpiration: expirationMessage },
+        );
+        break;
+      }
+
+      const action = String(args[1] || '')
+        .trim()
+        .toLowerCase();
+      if (!action || !['add', 'remove', 'list', 'clear'].includes(action)) {
+        await sendAndStore(
+          sock,
+          remoteJid,
+          {
+            text: getAdminUsageText('noticiasfiltro', { commandPrefix, variant: 'invalid_action' }),
+          },
+          { quoted: messageInfo, ephemeralExpiration: expirationMessage },
+        );
+        break;
+      }
+
+      const scopeLabel = filterKey === 'sourceIds' ? 'sources' : filterKey === 'franchiseSlugs' ? 'franchises' : 'tags/entities';
+
+      if (action === 'list') {
+        await sendAndStore(
+          sock,
+          remoteJid,
+          {
+            text: `📋 Filtro de notícias (${scopeLabel}): ${formatListForMessage(currentFilters[filterKey])}`,
+          },
+          { quoted: messageInfo, ephemeralExpiration: expirationMessage },
+        );
+        break;
+      }
+
+      if (action === 'clear') {
+        const nextFilters = {
+          ...currentFilters,
+          [filterKey]: [],
+        };
+        await groupConfigStore.updateGroupConfig(remoteJid, buildNewsFilterConfigPatch(groupConfig, nextFilters));
+        await sendAndStore(
+          sock,
+          remoteJid,
+          {
+            text: `✅ Filtro de notícias (${scopeLabel}) limpo com sucesso.`,
+          },
+          { quoted: messageInfo, ephemeralExpiration: expirationMessage },
+        );
+        break;
+      }
+
+      const values = parseFilterValues(args.slice(2));
+      if (values.length === 0) {
+        await sendAndStore(
+          sock,
+          remoteJid,
+          {
+            text: getAdminUsageText('noticiasfiltro', { commandPrefix, variant: 'missing_values' }),
+          },
+          { quoted: messageInfo, ephemeralExpiration: expirationMessage },
+        );
+        break;
+      }
+
+      const currentSet = new Set(currentFilters[filterKey]);
+      if (action === 'add') {
+        values.forEach((value) => currentSet.add(value));
+      } else {
+        values.forEach((value) => currentSet.delete(value));
+      }
+
+      const nextFilters = {
+        ...currentFilters,
+        [filterKey]: Array.from(currentSet).sort((left, right) => left.localeCompare(right)),
+      };
+      await groupConfigStore.updateGroupConfig(remoteJid, buildNewsFilterConfigPatch(groupConfig, nextFilters));
+      await sendAndStore(
+        sock,
+        remoteJid,
+        {
+          text: `✅ Filtro de notícias (${scopeLabel}) atualizado: ${formatListForMessage(nextFilters[filterKey])}`,
+        },
+        { quoted: messageInfo, ephemeralExpiration: expirationMessage },
+      );
+      break;
+    }
+
+    case 'grupoaudit': {
+      if (!isGroupMessage) {
+        await sendAndStore(sock, remoteJid, { text: GROUP_ONLY_COMMAND_MESSAGE }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
+        break;
+      }
+      if (!(await isUserAdmin(remoteJid, senderIdentity))) {
+        await sendAndStore(sock, remoteJid, { text: NO_PERMISSION_COMMAND_MESSAGE }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
+        break;
+      }
+
+      const groupConfig = await groupConfigStore.getGroupConfig(remoteJid);
+      const stickerState = resolveStickerFocusState(groupConfig);
+      const newsStatus = await getNewsStatusForGroup(remoteJid);
+      const auditText = buildGroupAuditText({
+        config: groupConfig,
+        stickerState,
+        newsStatus,
+        commandPrefix,
+      });
+
+      await sendAndStore(
+        sock,
+        remoteJid,
+        {
+          text: auditText,
+        },
+        { quoted: messageInfo, ephemeralExpiration: expirationMessage },
+      );
       break;
     }
 

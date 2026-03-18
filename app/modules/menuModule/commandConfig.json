@@ -144,15 +144,15 @@
     {
       "name": "menu",
       "aliases": [],
-      "descricao": "Exibe o menu principal ou um menu por categoria.",
-      "metodos_de_uso": ["<prefix>menu", "<prefix>menu anime", "<prefix>menu stats"],
+      "descricao": "Exibe o menu dinâmico de comandos (com destaques por uso), categorias e atalhos para catálogo completo.",
+      "metodos_de_uso": ["<prefix>menu", "<prefix>menu top", "<prefix>menu categoria <nome>", "<prefix>menu todos", "<prefix>menu anime", "<prefix>menu stats"],
       "permissao_necessaria": "usuario comum",
       "limite_de_uso": "sem limite especifico",
       "local_de_uso": ["privado", "grupo"],
       "informacoes_coletadas": ["identificador do chat (remoteJid)", "identificador do remetente (senderJid)", "texto do comando e argumentos", "contexto da mensagem (citacao e mencoes, quando existir)", "categoria solicitada no menu (quando informada)"],
       "enabled": true,
       "categoria": "menu",
-      "subcomandos": ["figurinhas", "sticker", "stickers", "midia", "media", "quote", "quotes", "ia", "ai", "stats", "estatisticas", "anime"],
+      "subcomandos": ["top", "todos", "categoria", "figurinhas", "sticker", "stickers", "midia", "media", "quote", "quotes", "ia", "ai", "stats", "estatisticas", "anime"],
       "argumentos": [
         {
           "nome": "categoria",
@@ -214,16 +214,22 @@
         }
       },
       "mensagens_uso": {
-        "default": ["<prefix>menu", "<prefix>menu anime", "<prefix>menu stats"]
+        "default": ["<prefix>menu", "<prefix>menu top", "<prefix>menu categoria <nome>", "<prefix>menu todos", "<prefix>menu anime", "<prefix>menu stats"],
+        "category": ["<prefix>menu categoria <nome>"],
+        "top": ["<prefix>menu top"],
+        "all": ["<prefix>menu todos"]
       },
       "id": "menu.menu",
-      "description": "Exibe o menu principal ou um menu por categoria.",
-      "usage": ["<prefix>menu", "<prefix>menu anime", "<prefix>menu stats"],
+      "description": "Exibe o menu dinâmico de comandos (com destaques por uso), categorias e atalhos para catálogo completo.",
+      "usage": ["<prefix>menu", "<prefix>menu top", "<prefix>menu categoria <nome>", "<prefix>menu todos", "<prefix>menu anime", "<prefix>menu stats"],
       "docs": {
-        "summary": "Exibe o menu principal ou um menu por categoria.",
-        "usage_examples": ["<prefix>menu", "<prefix>menu anime", "<prefix>menu stats"],
+        "summary": "Exibe o menu dinâmico de comandos (com destaques por uso), categorias e atalhos para catálogo completo.",
+        "usage_examples": ["<prefix>menu", "<prefix>menu top", "<prefix>menu categoria <nome>", "<prefix>menu todos", "<prefix>menu anime", "<prefix>menu stats"],
         "usage_variants": {
-          "default": ["<prefix>menu", "<prefix>menu anime", "<prefix>menu stats"]
+          "default": ["<prefix>menu", "<prefix>menu top", "<prefix>menu categoria <nome>", "<prefix>menu todos", "<prefix>menu anime", "<prefix>menu stats"],
+          "category": ["<prefix>menu categoria <nome>"],
+          "top": ["<prefix>menu top"],
+          "all": ["<prefix>menu todos"]
         }
       },
       "permission": "usuario comum",
@@ -264,7 +270,7 @@
       ],
       "behavior": {
         "type": "subcommand",
-        "allowed_actions": ["figurinhas", "sticker", "stickers", "midia", "media", "quote", "quotes", "ia", "ai", "stats", "estatisticas", "anime"]
+        "allowed_actions": ["top", "todos", "categoria", "figurinhas", "sticker", "stickers", "midia", "media", "quote", "quotes", "ia", "ai", "stats", "estatisticas", "anime"]
       },
       "limits": {
         "usage_description": "sem limite especifico",
@@ -359,26 +365,26 @@
         "legacy_fields_present": ["descricao", "metodos_de_uso", "permissao_necessaria", "local_de_uso", "informacoes_coletadas", "argumentos", "pre_condicoes", "dependencias_externas", "efeitos_colaterais", "observabilidade", "privacidade", "acesso", "limite_uso_por_plano"]
       },
       "user_experience": {
-        "resumo_usuario": "Exibe o menu principal ou um menu por categoria. Use <prefix>menu para ver opções; <prefix>menu <categoria> para abrir uma categoria específica.",
-        "quando_usar": ["Quando quiser ver as opções disponíveis do bot de forma rápida.", "Para navegar entre categorias como anime ou stats sem buscar comandos específicos.", "Quando precisar confirmar quais itens existem antes de usa-los com um comando específico."],
+        "resumo_usuario": "Exibe um menu dinâmico com comandos em destaque por uso, navegação por categoria e acesso ao catálogo completo do site.",
+        "quando_usar": ["Quando quiser descobrir os comandos mais usados sem receber uma lista gigante.", "Quando precisar navegar por comandos de uma categoria específica.", "Quando quiser abrir rapidamente o catálogo completo no site."],
         "exemplos_reais": [
           {
-            "situacao": "Usuário quer ver o menu principal.",
-            "comando": "<prefix>menu",
-            "resposta_esperada": "O menu principal com as opções fica visível.",
-            "variacao": "sem argumento."
+            "situacao": "Usuário quer ver os comandos mais usados.",
+            "comando": "<prefix>menu top",
+            "resposta_esperada": "Lista com comandos em destaque por uso recente.",
+            "variacao": "ranking por uso"
           },
           {
-            "situacao": "Usuário quer ver o menu da categoria anime.",
-            "comando": "<prefix>menu anime",
-            "resposta_esperada": "Menu da categoria 'anime' exibido com opções correspondentes.",
-            "variacao": "com categoria."
+            "situacao": "Usuário quer comandos da categoria admin.",
+            "comando": "<prefix>menu categoria admin",
+            "resposta_esperada": "Lista de comandos da categoria solicitada.",
+            "variacao": "filtro por categoria"
           },
           {
-            "situacao": "Usuário quer ver o menu de estatísticas.",
-            "comando": "<prefix>menu stats",
-            "resposta_esperada": "Menu de estatísticas exibido com opções relacionadas.",
-            "variacao": "com categoria."
+            "situacao": "Usuário quer ver o catálogo completo.",
+            "comando": "<prefix>menu todos",
+            "resposta_esperada": "Visão completa dos comandos por categoria e link do site.",
+            "variacao": "catálogo completo"
           }
         ],
         "resposta_esperada": ["Menu carregado com as opções disponíveis.", "Menu da categoria exibido com opções correspondentes.", "Menu de estatísticas exibido com opções relevantes."],

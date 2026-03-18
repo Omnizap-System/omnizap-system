@@ -1,5 +1,6 @@
 import logger from '#logger';
 import { buildAnimeMenu, buildAiMenu, buildMediaMenu, buildMenuCaption, buildQuoteMenu, buildStatsMenu, buildStickerMenu, buildAdminMenu } from './common.js';
+import { resolveDynamicMenuText } from './menuDynamicService.js';
 import getImageBuffer from '../../utils/http/getImageBufferModule.js';
 import { sendAndStore } from '../../services/messaging/messagePersistenceService.js';
 
@@ -11,10 +12,13 @@ const sanitizeLogValue = (value) =>
     .trim();
 
 const sendMenuImage = async (sock, remoteJid, messageInfo, expirationMessage, caption) => {
+  const safeCaption = String(caption || '').trim() || 'Menu indisponível no momento.';
   const imageUrl = process.env[MENU_IMAGE_ENV];
   if (!imageUrl) {
-    logger.error('IMAGE_MENU environment variable not set.');
-    await sendAndStore(sock, remoteJid, { text: 'Ocorreu um erro ao carregar o menu.' }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
+    logger.warn('IMAGE_MENU environment variable not set. Sending plain-text menu fallback.', {
+      action: 'menu_image_env_missing',
+    });
+    await sendAndStore(sock, remoteJid, { text: safeCaption }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
     return;
   }
 
@@ -25,7 +29,7 @@ const sendMenuImage = async (sock, remoteJid, messageInfo, expirationMessage, ca
       remoteJid,
       {
         image: imageBuffer,
-        caption,
+        caption: safeCaption,
       },
       { quoted: messageInfo, ephemeralExpiration: expirationMessage },
     );
@@ -33,11 +37,22 @@ const sendMenuImage = async (sock, remoteJid, messageInfo, expirationMessage, ca
     logger.error('Error fetching menu image.', {
       error: sanitizeLogValue(error?.message) || 'unknown_error',
     });
-    await sendAndStore(sock, remoteJid, { text: 'Ocorreu um erro ao carregar a imagem do menu.' }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
+    await sendAndStore(sock, remoteJid, { text: safeCaption }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
   }
 };
 
 export async function handleMenuCommand(sock, remoteJid, messageInfo, expirationMessage, senderName, commandPrefix, args = []) {
+  const dynamicCaption = await resolveDynamicMenuText({
+    args,
+    senderName,
+    commandPrefix,
+    remoteJid,
+  });
+  if (dynamicCaption) {
+    await sendMenuImage(sock, remoteJid, messageInfo, expirationMessage, dynamicCaption.trim());
+    return;
+  }
+
   const category = args?.[0]?.toLowerCase();
   const categoryMap = new Map([
     ['figurinhas', (prefix) => buildStickerMenu(prefix)],

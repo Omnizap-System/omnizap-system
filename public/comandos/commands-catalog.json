@@ -1,10 +1,10 @@
 {
   "schema_version": "3.0.0",
-  "generated_at": "2026-03-18T02:34:11.273Z",
+  "generated_at": "2026-03-18T03:37:14.058Z",
   "totals": {
     "modules": 14,
     "categories": 10,
-    "commands": 55
+    "commands": 58
   },
   "modules": [
     {
@@ -12,7 +12,7 @@
       "label": "adminModule",
       "source_file": "app/modules/adminModule/commandConfig.json",
       "enabled": true,
-      "command_count": 32
+      "command_count": 35
     },
     {
       "key": "stickerModule",
@@ -111,7 +111,7 @@
       "key": "admin",
       "label": "Moderação e Admin",
       "icon": "🛡️",
-      "command_count": 32,
+      "command_count": 35,
       "modules": ["adminModule"],
       "commands": [
         {
@@ -1611,6 +1611,85 @@
           }
         },
         {
+          "key": "adminModule:grupoaudit",
+          "name": "grupoaudit",
+          "id": "admin.grupoaudit",
+          "aliases": ["groupaudit", "auditgrupo", "statusgrupo"],
+          "module": "adminModule",
+          "module_label": "adminModule",
+          "category": "admin",
+          "category_label": "Moderação e Admin",
+          "descricao": "Mostra um resumo consolidado das configurações administrativas ativas no grupo.",
+          "requirements": {
+            "group": true,
+            "admin": true,
+            "owner": false,
+            "google_login": true,
+            "nsfw": false,
+            "media": false,
+            "reply": false
+          },
+          "premium": false,
+          "allowed_plans": ["comum", "premium"],
+          "rate_limit": null,
+          "local_de_uso": ["grupo"],
+          "subcomandos": [],
+          "metodos_de_uso": ["/grupoaudit"],
+          "mensagens_uso": {},
+          "resumo_usuario": "Mostra um resumo consolidado das configurações administrativas ativas no grupo.",
+          "quando_usar": ["Use quando você precisa desta ação: Mostra um resumo consolidado das configurações administrativas ativas no grupo.", "Funciona dentro de grupos.", "Você precisa ser admin para executar.", "É necessário estar logado no sistema para usar."],
+          "exemplos_reais": [
+            {
+              "situacao": "Cenário comum: Mostra um resumo consolidado das configurações administrativas ativas no grupo.",
+              "comando": "/grupoaudit",
+              "resposta_esperada": "Comando executado com sucesso.",
+              "variacao": "Formato de uso inválido. Consulte metodos_de_uso."
+            }
+          ],
+          "resposta_esperada": ["Sucesso: Comando executado com sucesso.", "Uso incorreto: Formato de uso inválido. Consulte metodos_de_uso.", "Permissão: Permissão insuficiente para executar este comando."],
+          "erros_comuns_usuario": ["Digitar o comando fora do formato esperado.", "Tentar executar fora de um grupo.", "Tentar executar sem ser admin.", "Tentar usar sem estar logado no sistema."],
+          "passos_se_der_erro": ["Copie e teste um exemplo pronto desta página.", "Confira se você está no local certo (grupo/privado) e com a permissão necessária.", "Se ainda falhar, fale com o admin do sistema no privado."],
+          "resumo_usuario_origem": "auto_ia_assistida",
+          "resumo_usuario_revisao_pendente": true,
+          "arguments": [],
+          "responses": {
+            "success": "Comando executado com sucesso.",
+            "usage_error": "Formato de uso inválido. Consulte metodos_de_uso.",
+            "permission_error": "Permissão insuficiente para executar este comando."
+          },
+          "technical": {
+            "collected_data": ["chat_identifier", "sender_identifier", "command_content", "identificador do chat (remoteJid)", "identificador do remetente (senderJid)", "texto do comando e argumentos", "contexto da mensagem (citacao e mencoes, quando existir)", "configuracoes do grupo no store"],
+            "dependencies": ["API do WhatsApp (ações de grupo)", "stores/configuração interna"],
+            "side_effects": ["altera configurações de grupo e permissões", "envia mensagens administrativas"],
+            "behavior": {
+              "type": "inspection",
+              "action_argument": null
+            },
+            "handler": {
+              "file": "groupCommandHandlers.js",
+              "method": "handleAdminCommand",
+              "command_case": "grupoaudit"
+            },
+            "risk_level": "low",
+            "stability": "stable",
+            "version": "1.0.0"
+          },
+          "observability": {
+            "event_name": "command.executed",
+            "analytics_event": "whatsapp_command_grupoaudit",
+            "tags": ["whatsapp", "command", "adminModule", "grupoaudit"]
+          },
+          "privacy": {
+            "retention": "standard_app_logs",
+            "legal_basis": "service_execution_and_legitimate_interest"
+          },
+          "discovery": {
+            "keywords": ["grupoaudit", "grupo", "audit", "status"],
+            "user_phrasings": ["quero usar grupoaudit", "me ajuda com grupoaudit"],
+            "priority": 100
+          }
+        },
+        {
           "key": "adminModule:infoconvite",
           "name": "infoconvite",
           "id": "admin.infoconvite",
@@ -2427,6 +2506,123 @@
           "discovery": {
             "keywords": ["noticias", "news", "admin", "grupo"],
             "user_phrasings": ["quero usar noticias", "me ajuda com noticias", "ativa/desativa envio automatico de"],
+            "priority": 100
+          }
+        },
+        {
+          "key": "adminModule:noticiasfiltro",
+          "name": "noticiasfiltro",
+          "id": "admin.noticiasfiltro",
+          "aliases": ["newsfilter", "filtronoticias"],
+          "module": "adminModule",
+          "module_label": "adminModule",
+          "category": "admin",
+          "category_label": "Moderação e Admin",
+          "descricao": "Gerencia filtros de envio de notícias por source, franchise, tag/entity e tendência.",
+          "requirements": {
+            "group": true,
+            "admin": true,
+            "owner": false,
+            "google_login": true,
+            "nsfw": false,
+            "media": false,
+            "reply": false
+          },
+          "premium": false,
+          "allowed_plans": ["comum", "premium"],
+          "rate_limit": null,
+          "local_de_uso": ["grupo"],
+          "subcomandos": [],
+          "metodos_de_uso": ["/noticiasfiltro status", "/noticiasfiltro source <add|remove|list|clear> <valor...>", "/noticiasfiltro franchise <add|remove|list|clear> <valor...>", "/noticiasfiltro tag <add|remove|list|clear> <valor...>", "/noticiasfiltro trending <on|off|status>", "/noticiasfiltro reset"],
+          "mensagens_uso": {},
+          "resumo_usuario": "Gerencia filtros de envio de notícias por source, franchise, tag/entity e tendência.",
+          "quando_usar": ["Use quando você precisa desta ação: Gerencia filtros de envio de notícias por source, franchise, tag/entity e tendência.", "Funciona dentro de grupos.", "Você precisa ser admin para executar.", "É necessário estar logado no sistema para usar."],
+          "exemplos_reais": [
+            {
+              "situacao": "Cenário comum: Gerencia filtros de envio de notícias por source, franchise, tag/entity e tendência.",
+              "comando": "/noticiasfiltro status",
+              "resposta_esperada": "Comando executado com sucesso.",
+              "variacao": "Formato de uso inválido. Consulte metodos_de_uso."
+            },
+            {
+              "situacao": "Variação 2 de uso do comando no mesmo contexto.",
+              "comando": "/noticiasfiltro source <add|remove|list|clear> <valor...>",
+              "resposta_esperada": "Comando executado com sucesso.",
+              "variacao": "Formato de uso inválido. Consulte metodos_de_uso."
+            },
+            {
+              "situacao": "Variação 3 de uso do comando no mesmo contexto.",
+              "comando": "/noticiasfiltro franchise <add|remove|list|clear> <valor...>",
+              "resposta_esperada": "Comando executado com sucesso.",
+              "variacao": "Formato de uso inválido. Consulte metodos_de_uso."
+            }
+          ],
+          "resposta_esperada": ["Sucesso: Comando executado com sucesso.", "Uso incorreto: Formato de uso inválido. Consulte metodos_de_uso.", "Permissão: Permissão insuficiente para executar este comando."],
+          "erros_comuns_usuario": ["Digitar o comando fora do formato esperado.", "Tentar executar fora de um grupo.", "Tentar executar sem ser admin.", "Tentar usar sem estar logado no sistema."],
+          "passos_se_der_erro": ["Copie e teste um exemplo pronto desta página.", "Confira se você está no local certo (grupo/privado) e com a permissão necessária.", "Se ainda falhar, fale com o admin do sistema no privado."],
+          "resumo_usuario_origem": "auto_ia_assistida",
+          "resumo_usuario_revisao_pendente": true,
+          "arguments": [
+            {
+              "name": "escopo",
+              "type": "string",
+              "required": false,
+              "description": "status|reset|source|franchise|tag|entity|trending",
+              "default": null,
+              "validation": "status|reset|source|franchise|tag|entity|trending"
+            },
+            {
+              "name": "acao",
+              "type": "string",
+              "required": false,
+              "description": "add|remove|list|clear|on|off|status",
+              "default": null,
+              "validation": "add|remove|list|clear|on|off|status"
+            },
+            {
+              "name": "valores",
+              "type": "array",
+              "required": false,
+              "description": "lista de slugs/ids",
+              "default": [],
+              "validation": "lista de slugs/ids"
+            }
+          ],
+          "responses": {
+            "success": "Comando executado com sucesso.",
+            "usage_error": "Formato de uso inválido. Consulte metodos_de_uso.",
+            "permission_error": "Permissão insuficiente para executar este comando."
+          },
+          "technical": {
+            "collected_data": ["chat_identifier", "sender_identifier", "command_content", "identificador do chat (remoteJid)", "identificador do remetente (senderJid)", "texto do comando e argumentos", "contexto da mensagem (citacao e mencoes, quando existir)", "configuracoes do grupo no store"],
+            "dependencies": ["API do WhatsApp (ações de grupo)", "stores/configuração interna"],
+            "side_effects": ["altera configurações de grupo e permissões", "envia mensagens administrativas"],
+            "behavior": {
+              "type": "subcommand",
+              "allowed_actions": ["status", "reset", "source", "franchise", "tag", "entity", "trending"],
+              "action_argument": "escopo"
+            },
+            "handler": {
+              "file": "groupCommandHandlers.js",
+              "method": "handleAdminCommand",
+              "command_case": "noticiasfiltro"
+            },
+            "risk_level": "low",
+            "stability": "stable",
+            "version": "1.0.0"
+          },
+          "observability": {
+            "event_name": "command.executed",
+            "analytics_event": "whatsapp_command_noticiasfiltro",
+            "tags": ["whatsapp", "command", "adminModule", "noticiasfiltro"]
+          },
+          "privacy": {
+            "retention": "standard_app_logs",
+            "legal_basis": "service_execution_and_legitimate_interest"
+          },
+          "discovery": {
+            "keywords": ["noticiasfiltro", "noticias", "filtro", "news"],
+            "user_phrasings": ["quero usar noticiasfiltro", "me ajuda com noticiasfiltro"],
             "priority": 100
           }
         },
@@ -3357,6 +3553,107 @@
           "discovery": {
             "keywords": ["solicitacoes", "admin", "grupo"],
             "user_phrasings": ["quero usar solicitacoes", "me ajuda com solicitacoes", "lista solicitacoes pendentes para"],
+            "priority": 100
+          }
+        },
+        {
+          "key": "adminModule:stickerallowance",
+          "name": "stickerallowance",
+          "id": "admin.stickerallowance",
+          "aliases": ["limiteqtdfigurinha", "allowancefigurinha"],
+          "module": "adminModule",
+          "module_label": "adminModule",
+          "category": "admin",
+          "category_label": "Moderação e Admin",
+          "descricao": "Configura quantas mensagens cada usuário pode enviar no modo sticker durante a janela de cooldown.",
+          "requirements": {
+            "group": true,
+            "admin": true,
+            "owner": false,
+            "google_login": true,
+            "nsfw": false,
+            "media": false,
+            "reply": false
+          },
+          "premium": false,
+          "allowed_plans": ["comum", "premium"],
+          "rate_limit": null,
+          "local_de_uso": ["grupo"],
+          "subcomandos": [],
+          "metodos_de_uso": ["/stickerallowance status", "/stickerallowance <quantidade>", "/stickerallowance reset"],
+          "mensagens_uso": {},
+          "resumo_usuario": "Configura quantas mensagens cada usuário pode enviar no modo sticker durante a janela de cooldown.",
+          "quando_usar": ["Use quando você precisa desta ação: Configura quantas mensagens cada usuário pode enviar no modo sticker durante a janela de cooldown.", "Funciona dentro de grupos.", "Você precisa ser admin para executar.", "É necessário estar logado no sistema para usar."],
+          "exemplos_reais": [
+            {
+              "situacao": "Cenário comum: Configura quantas mensagens cada usuário pode enviar no modo sticker durante a janela de cooldown.",
+              "comando": "/stickerallowance status",
+              "resposta_esperada": "Comando executado com sucesso.",
+              "variacao": "Formato de uso inválido. Consulte metodos_de_uso."
+            },
+            {
+              "situacao": "Variação 2 de uso do comando no mesmo contexto.",
+              "comando": "/stickerallowance <quantidade>",
+              "resposta_esperada": "Comando executado com sucesso.",
+              "variacao": "Formato de uso inválido. Consulte metodos_de_uso."
+            },
+            {
+              "situacao": "Variação 3 de uso do comando no mesmo contexto.",
+              "comando": "/stickerallowance reset",
+              "resposta_esperada": "Comando executado com sucesso.",
+              "variacao": "Formato de uso inválido. Consulte metodos_de_uso."
+            }
+          ],
+          "resposta_esperada": ["Sucesso: Comando executado com sucesso.", "Uso incorreto: Formato de uso inválido. Consulte metodos_de_uso.", "Permissão: Permissão insuficiente para executar este comando."],
+          "erros_comuns_usuario": ["Digitar o comando fora do formato esperado.", "Tentar executar fora de um grupo.", "Tentar executar sem ser admin.", "Tentar usar sem estar logado no sistema."],
+          "passos_se_der_erro": ["Copie e teste um exemplo pronto desta página.", "Confira se você está no local certo (grupo/privado) e com a permissão necessária.", "Se ainda falhar, fale com o admin do sistema no privado."],
+          "resumo_usuario_origem": "auto_ia_assistida",
+          "resumo_usuario_revisao_pendente": true,
+          "arguments": [
+            {
+              "name": "valor",
+              "type": "string",
+              "required": false,
+              "description": "status|reset|<1-10>",
+              "default": null,
+              "validation": "status|reset|<1-10>"
+            }
+          ],
+          "responses": {
+            "success": "Comando executado com sucesso.",
+            "usage_error": "Formato de uso inválido. Consulte metodos_de_uso.",
+            "permission_error": "Permissão insuficiente para executar este comando."
+          },
+          "technical": {
+            "collected_data": ["chat_identifier", "sender_identifier", "command_content", "identificador do chat (remoteJid)", "identificador do remetente (senderJid)", "texto do comando e argumentos", "contexto da mensagem (citacao e mencoes, quando existir)", "configuracoes do grupo no store"],
+            "dependencies": ["API do WhatsApp (ações de grupo)", "stores/configuração interna"],
+            "side_effects": ["altera configurações de grupo e permissões", "envia mensagens administrativas"],
+            "behavior": {
+              "type": "configuration_window",
+              "allowed_actions": ["status", "reset", "set"],
+              "action_argument": "valor"
+            },
+            "handler": {
+              "file": "groupCommandHandlers.js",
+              "method": "handleAdminCommand",
+              "command_case": "stickerallowance"
+            },
+            "risk_level": "medium",
+            "stability": "stable",
+            "version": "1.0.0"
+          },
+          "observability": {
+            "event_name": "command.executed",
+            "analytics_event": "whatsapp_command_stickerallowance",
+            "tags": ["whatsapp", "command", "adminModule", "stickerallowance"]
+          },
+          "privacy": {
+            "retention": "standard_app_logs",
+            "legal_basis": "service_execution_and_legitimate_interest"
+          },
+          "discovery": {
+            "keywords": ["stickerallowance", "sticker", "allowance", "limite"],
+            "user_phrasings": ["quero usar stickerallowance", "me ajuda com stickerallowance"],
             "priority": 100
           }
         },
@@ -5765,7 +6062,7 @@
           "module_label": "menuModule",
           "category": "menu",
           "category_label": "Menu e Navegação",
-          "descricao": "Exibe o menu principal ou um menu por categoria.",
+          "descricao": "Exibe o menu dinâmico de comandos (com destaques por uso), categorias e atalhos para catálogo completo.",
           "requirements": {
             "group": false,
             "admin": false,
@@ -5779,31 +6076,34 @@
           "allowed_plans": ["comum", "premium"],
           "rate_limit": null,
           "local_de_uso": ["privado", "grupo"],
-          "subcomandos": ["figurinhas", "sticker", "stickers", "midia", "media", "quote", "quotes", "ia", "ai", "stats", "estatisticas", "anime"],
-          "metodos_de_uso": ["/menu", "/menu anime", "/menu stats"],
+          "subcomandos": ["top", "todos", "categoria", "figurinhas", "sticker", "stickers", "midia", "media", "quote", "quotes", "ia", "ai", "stats", "estatisticas", "anime"],
+          "metodos_de_uso": ["/menu", "/menu top", "/menu categoria <nome>", "/menu todos", "/menu anime", "/menu stats"],
           "mensagens_uso": {
-            "default": ["/menu", "/menu anime", "/menu stats"]
+            "default": ["/menu", "/menu top", "/menu categoria <nome>", "/menu todos", "/menu anime", "/menu stats"],
+            "category": ["/menu categoria <nome>"],
+            "top": ["/menu top"],
+            "all": ["/menu todos"]
           },
-          "resumo_usuario": "Exibe o menu principal ou um menu por categoria. Use <prefix>menu para ver opções; <prefix>menu <categoria> para abrir uma categoria específica.",
-          "quando_usar": ["Quando quiser ver as opções disponíveis do bot de forma rápida.", "Para navegar entre categorias como anime ou stats sem buscar comandos específicos.", "Quando precisar confirmar quais itens existem antes de usa-los com um comando específico."],
+          "resumo_usuario": "Exibe um menu dinâmico com comandos em destaque por uso, navegação por categoria e acesso ao catálogo completo do site.",
+          "quando_usar": ["Quando quiser descobrir os comandos mais usados sem receber uma lista gigante.", "Quando precisar navegar por comandos de uma categoria específica.", "Quando quiser abrir rapidamente o catálogo completo no site."],
           "exemplos_reais": [
             {
-              "situacao": "Usuário quer ver o menu principal.",
-              "comando": "/menu",
-              "resposta_esperada": "O menu principal com as opções fica visível.",
-              "variacao": "sem argumento."
+              "situacao": "Usuário quer ver os comandos mais usados.",
+              "comando": "/menu top",
+              "resposta_esperada": "Lista com comandos em destaque por uso recente.",
+              "variacao": "ranking por uso."
             },
             {
-              "situacao": "Usuário quer ver o menu da categoria anime.",
-              "comando": "/menu anime",
-              "resposta_esperada": "Menu da categoria 'anime' exibido com opções correspondentes.",
-              "variacao": "com categoria."
+              "situacao": "Usuário quer comandos da categoria admin.",
+              "comando": "/menu categoria admin",
+              "resposta_esperada": "Lista de comandos da categoria solicitada.",
+              "variacao": "filtro por categoria."
             },
             {
-              "situacao": "Usuário quer ver o menu de estatísticas.",
-              "comando": "/menu stats",
-              "resposta_esperada": "Menu de estatísticas exibido com opções relacionadas.",
-              "variacao": "com categoria."
+              "situacao": "Usuário quer ver o catálogo completo.",
+              "comando": "/menu todos",
+              "resposta_esperada": "Visão completa dos comandos por categoria e link do site.",
+              "variacao": "catálogo completo."
             }
           ],
           "resposta_esperada": ["Menu carregado com as opções disponíveis.", "Menu da categoria exibido com opções correspondentes.", "Menu de estatísticas exibido com opções relevantes."],
@@ -5835,7 +6135,7 @@
             "side_effects": ["envia menu no chat"],
             "behavior": {
               "type": "subcommand",
-              "allowed_actions": ["figurinhas", "sticker", "stickers", "midia", "media", "quote", "quotes", "ia", "ai", "stats", "estatisticas", "anime"]
+              "allowed_actions": ["top", "todos", "categoria", "figurinhas", "sticker", "stickers", "midia", "media", "quote", "quotes", "ia", "ai", "stats", "estatisticas", "anime"]
             },
             "handler": {
               "file": "menus.js",
