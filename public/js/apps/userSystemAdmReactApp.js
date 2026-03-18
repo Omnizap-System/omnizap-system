@@ -8,7 +8,6 @@ const DEFAULT_API_BASE_PATH = '/api';
 const DEFAULT_LOGIN_PATH = '/login';
 const DEFAULT_STICKERS_PATH = '/stickers';
 const FALLBACK_AVATAR = 'https://iili.io/FC3FABe.jpg';
-const COMPACT_MODE_STORAGE_KEY = 'omnizap_admin_compact_mode_v1';
 
 const NAV_ITEMS = Object.freeze([
   { id: 'overview', label: 'Dashboard', kbd: '1' },
@@ -25,7 +24,6 @@ const NAV_ITEMS = Object.freeze([
 const CRITICAL_OPS = new Set(['restart_worker', 'clear_cache']);
 
 const normalizeString = (value) => String(value || '').trim();
-const normalizeDigits = (value) => String(value || '').replace(/\D+/g, '');
 
 const normalizeBasePath = (value, fallback) => {
   const raw = normalizeString(value);
@@ -80,13 +78,6 @@ const formatMilliseconds = (value) => {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return 'n/d';
   return `${Math.round(numeric)} ms`;
-};
-
-const formatPhone = (digits) => {
-  const value = normalizeDigits(digits);
-  if (!value) return '';
-  if (value.length <= 4) return value;
-  return `${value.slice(0, 2)} ${value.slice(2, -4)}-${value.slice(-4)}`.trim();
 };
 
 const extractFilenameFromDisposition = (disposition, fallbackName) => {
@@ -185,7 +176,6 @@ const resolveGlobalStatus = ({ dashboardQuick = {}, systemHealth = {}, alerts = 
 
 const createAdminApi = (apiBasePath) => {
   const authSessionPath = `${apiBasePath}/auth/google/session`;
-  const botContactPath = `${apiBasePath}/bot-contact`;
   const adminSessionPath = `${apiBasePath}/admin/session`;
   const adminOverviewPath = `${apiBasePath}/admin/overview`;
   const adminSearchPath = `${apiBasePath}/admin/search`;
@@ -240,7 +230,6 @@ const createAdminApi = (apiBasePath) => {
 
   return {
     getGoogleSession: () => fetchJson(authSessionPath, { method: 'GET' }),
-    getBotContact: () => fetchJson(botContactPath, { method: 'GET' }),
     getAdminSession: () => fetchJson(adminSessionPath, { method: 'GET' }),
     unlockAdmin: (password) =>
       fetchJson(adminSessionPath, {
@@ -316,12 +305,9 @@ const UserSystemAdmReactApp = ({ config }) => {
   const api = useMemo(() => createAdminApi(config.apiBasePath), [config.apiBasePath]);
 
   const [activePage, setActivePage] = useState('overview');
-  const [compactMode, setCompactMode] = useState(false);
   const [envLabel, setEnvLabel] = useState('Production');
 
   const [googleSession, setGoogleSession] = useState(null);
-  const [botPhone, setBotPhone] = useState('');
-
   const [adminStatusPayload, setAdminStatusPayload] = useState(null);
   const [adminOverviewPayload, setAdminOverviewPayload] = useState(null);
   const [previousAdminOverviewPayload, setPreviousAdminOverviewPayload] = useState(null);
@@ -374,7 +360,22 @@ const UserSystemAdmReactApp = ({ config }) => {
   const auditLog = Array.isArray(overview?.audit_log) ? overview.audit_log : [];
   const featureFlags = Array.isArray(overview?.feature_flags) ? overview.feature_flags : [];
   const alerts = Array.isArray(overview?.alerts) ? overview.alerts : [];
+  const grafanaLinks = overview?.observability_links?.grafana || {};
   const grafanaDashboards = Array.isArray(overview?.observability_links?.grafana?.dashboards) ? overview.observability_links.grafana.dashboards : [];
+  const grafanaRuntime = overview?.observability_runtime?.grafana || null;
+  const grafanaStatusRaw = normalizeString(grafanaRuntime?.status).toLowerCase();
+  const grafanaStatusLabel =
+    grafanaStatusRaw === 'online' ? 'Online' : grafanaStatusRaw === 'degraded' ? 'Degradado' : grafanaStatusRaw === 'offline' ? 'Offline' : grafanaStatusRaw === 'unavailable' ? 'Indisponível' : 'N/D';
+  const grafanaStatusTrend = grafanaStatusRaw === 'online' ? 'up' : grafanaStatusRaw === 'degraded' ? 'warn' : 'down';
+  const grafanaStatusCardClass =
+    grafanaStatusRaw === 'online' ? 'metric-card system' : grafanaStatusRaw === 'degraded' ? 'metric-card security warning' : 'metric-card security critical';
+  const grafanaVersion = normalizeString(grafanaRuntime?.version) || 'n/d';
+  const grafanaDatabase = normalizeString(grafanaRuntime?.database) || 'n/d';
+  const grafanaDashboardsTotalRaw = grafanaRuntime?.dashboards_total ?? grafanaDashboards.length;
+  const grafanaDashboardsTotal = Math.max(0, Number(grafanaDashboardsTotalRaw || 0));
+  const grafanaCheckedAtLabel = formatDateTime(grafanaRuntime?.checked_at);
+  const grafanaResponseLabel = Number.isFinite(Number(grafanaRuntime?.response_ms)) ? formatMilliseconds(grafanaRuntime?.response_ms) : 'n/d';
+  const grafanaPrimaryUrl = normalizeString(grafanaDashboards?.[0]?.view_url || grafanaLinks?.base_url);
   const operationalShortcuts =
     Array.isArray(overview?.operational_shortcuts) && overview.operational_shortcuts.length
       ? overview.operational_shortcuts
@@ -435,22 +436,13 @@ const UserSystemAdmReactApp = ({ config }) => {
   }, []);
 
   useEffect(() => {
+    document.body.classList.remove('compact');
     try {
-      const stored = window.localStorage.getItem(COMPACT_MODE_STORAGE_KEY);
-      setCompactMode(stored === '1');
-    } catch {
-      setCompactMode(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    document.body.classList.toggle('compact', compactMode);
-    try {
-      window.localStorage.setItem(COMPACT_MODE_STORAGE_KEY, compactMode ? '1' : '0');
+      window.localStorage.removeItem('omnizap_admin_compact_mode_v1');
     } catch {
       // noop
     }
-  }, [compactMode]);
+  }, []);
 
   const [reloadTick, setReloadTick] = useState(0);
 
@@ -461,12 +453,11 @@ const UserSystemAdmReactApp = ({ config }) => {
       setBusy(true);
       setAdminError('');
       try {
-        const [googlePayload, botContactPayload, adminSessionPayload] = await Promise.all([api.getGoogleSession().catch(() => ({ data: null })), api.getBotContact().catch(() => ({ data: null })), api.getAdminSession()]);
+        const [googlePayload, adminSessionPayload] = await Promise.all([api.getGoogleSession().catch(() => ({ data: null })), api.getAdminSession()]);
 
         if (!active) return;
 
         setGoogleSession(googlePayload?.data || null);
-        setBotPhone(normalizeDigits(botContactPayload?.data?.phone || ''));
         const statusData = adminSessionPayload?.data || null;
         setAdminStatusPayload(statusData);
 
@@ -767,22 +758,16 @@ const UserSystemAdmReactApp = ({ config }) => {
     `;
   };
 
-  const botPhoneLabel = botPhone ? `+${formatPhone(botPhone)}` : '';
   const stickersBasePath = config.stickersPath.replace(/\/+$/, '') || DEFAULT_STICKERS_PATH;
   const stickersManagePath = `${stickersBasePath}/perfil`;
 
   return html`
-    <main className="admin-shell" data-sidebar=${compactMode ? 'collapsed' : 'expanded'}>
+    <main className="admin-shell" data-sidebar="expanded">
       <aside className="sidebar">
         <a href="/" className="brand">
           <img src=${FALLBACK_AVATAR} alt="OmniZap" loading="lazy" decoding="async" />
           <span>Omnizap</span>
         </a>
-
-        <div className="sidebar-summary">
-          <p>Painel corporativo de operações, segurança e moderação para bots e stickers.</p>
-          ${botPhoneLabel ? html`<p className="admin-item-meta" style=${{ marginTop: '8px' }}>Bot: ${botPhoneLabel}</p>` : null}
-        </div>
 
         <ul className="nav-list">
           ${NAV_ITEMS.map(
@@ -825,7 +810,6 @@ const UserSystemAdmReactApp = ({ config }) => {
           </div>
 
           <div className="topbar-right">
-            <button type="button" className="btn ghost" onClick=${() => setCompactMode((value) => !value)}>${compactMode ? 'Modo confortável' : 'Modo compacto'}</button>
             <div className="topbar-admin">
               <img src=${profilePicture} alt="Admin" />
               <span>${profileName}</span>
@@ -951,6 +935,31 @@ const UserSystemAdmReactApp = ({ config }) => {
                           <p className="admin-metric-value">${formatNumber(counters?.unique_visitors_7d)}</p>
                           <span className="trend up">Usuários</span>
                           <p className="metric-context">janela: 7 dias</p>
+                        </article>
+                        <article className=${grafanaStatusCardClass}>
+                          <p className="admin-metric-label">Grafana status</p>
+                          <p className="admin-metric-value">${grafanaStatusLabel}</p>
+                          <span className=${`trend ${grafanaStatusTrend}`}>Observabilidade</span>
+                          <p className="metric-context">checado: ${grafanaCheckedAtLabel} · latência: ${grafanaResponseLabel}</p>
+                        </article>
+                        <article className="metric-card system">
+                          <p className="admin-metric-label">Grafana versão</p>
+                          <p className="admin-metric-value">${grafanaVersion}</p>
+                          <span className="trend up">Observabilidade</span>
+                          <p className="metric-context">database: ${grafanaDatabase}</p>
+                        </article>
+                        <article className="metric-card">
+                          <p className="admin-metric-label">Dashboards Grafana</p>
+                          <p className="admin-metric-value">${formatNumber(grafanaDashboardsTotal)}</p>
+                          <span className="trend up">Observabilidade</span>
+                          <p className="metric-context">painéis configurados no admin</p>
+                          ${grafanaPrimaryUrl
+                            ? html`
+                                <div className="admin-item-actions" style=${{ marginTop: '8px' }}>
+                                  <a className="admin-mini-btn" href=${grafanaPrimaryUrl} target="_blank" rel="noreferrer noopener">Abrir Grafana</a>
+                                </div>
+                              `
+                            : null}
                         </article>
                       </div>
                     </section>

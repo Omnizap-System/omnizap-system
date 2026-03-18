@@ -3,7 +3,8 @@
 -- This script is idempotent and focused on metrics/logging for mysqld-exporter.
 
 -- 1) Metrics user for mysqld-exporter
--- Matches docker-compose default DSN: exporter:exporter@(host.docker.internal:3306)/
+-- Matches docker-compose default DSN:
+-- exporter:exporter@unix(/run/mysqld/mysqld.sock)/
 CREATE USER IF NOT EXISTS 'exporter'@'%' IDENTIFIED BY 'exporter';
 ALTER USER 'exporter'@'%' IDENTIFIED BY 'exporter';
 
@@ -17,9 +18,8 @@ FLUSH PRIVILEGES;
 SET GLOBAL slow_query_log = ON;
 SET GLOBAL long_query_time = 0.5;
 SET GLOBAL log_output = 'FILE';
--- Keep slow log in datadir for compatibility across MariaDB/MySQL host setups.
--- If needed, change to another writable path.
-SET GLOBAL slow_query_log_file = '/var/lib/mysql/mysql-slow.log';
+-- This path matches promtail's mysql-slow scrape target in observability/promtail-config.yml.
+SET GLOBAL slow_query_log_file = '/var/log/mysql/mysql-slow.log';
 
 -- 3) Performance Schema consumers/instruments
 -- NOTE: performance_schema itself cannot be enabled dynamically.

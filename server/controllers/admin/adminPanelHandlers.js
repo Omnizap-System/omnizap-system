@@ -20,6 +20,8 @@ export const createStickerCatalogAdminHandlers = ({ executeQuery, tables, logger
   const SYSTEM_ADMIN_GRAFANA_TIME_FROM = sanitizeText(process.env.SYSTEM_ADMIN_GRAFANA_TIME_FROM || 'now-6h', 40, { allowEmpty: true }) || 'now-6h';
   const SYSTEM_ADMIN_GRAFANA_TIME_TO = sanitizeText(process.env.SYSTEM_ADMIN_GRAFANA_TIME_TO || 'now', 40, { allowEmpty: true }) || 'now';
   const SYSTEM_ADMIN_GRAFANA_REFRESH = sanitizeText(process.env.SYSTEM_ADMIN_GRAFANA_REFRESH || '10s', 20, { allowEmpty: true }) || '10s';
+  const SYSTEM_ADMIN_GRAFANA_STATUS_TIMEOUT_MS = Math.max(800, Number(process.env.SYSTEM_ADMIN_GRAFANA_STATUS_TIMEOUT_MS) || 2500);
+  const SYSTEM_ADMIN_GRAFANA_STATUS_CACHE_TTL_MS = Math.max(5000, Number(process.env.SYSTEM_ADMIN_GRAFANA_STATUS_CACHE_TTL_MS) || 15000);
 
   const normalizeGrafanaBaseUrl = (value) => {
     const raw = String(value || '').trim();
@@ -121,6 +123,121 @@ export const createStickerCatalogAdminHandlers = ({ executeQuery, tables, logger
     };
   };
   const grafanaObservabilityLinks = buildAdminGrafanaObservabilityLinks();
+  let grafanaRuntimeSnapshotCache = {
+    expires_at_ms: 0,
+    payload: null,
+  };
+
+  const resolveGrafanaHealthEndpointUrl = () => {
+    const candidates = [process.env.GRAFANA_PROXY_TARGET_URL, process.env.GRAFANA_INTERNAL_URL, process.env.SYSTEM_ADMIN_GRAFANA_URL, process.env.GRAFANA_PUBLIC_URL];
+    for (const candidate of candidates) {
+      const baseUrl = normalizeGrafanaBaseUrl(candidate);
+      if (!baseUrl) continue;
+      try {
+        return new URL('api/health', `${baseUrl}/`).toString();
+      } catch {
+        // noop
+      }
+    }
+    return '';
+  };
+
+  const getGrafanaRuntimeSnapshot = async () => {
+    const nowMs = __timeNowMs();
+    if (grafanaRuntimeSnapshotCache.payload && nowMs < grafanaRuntimeSnapshotCache.expires_at_ms) {
+      return grafanaRuntimeSnapshotCache.payload;
+    }
+
+    const dashboardsTotal = Array.isArray(grafanaObservabilityLinks?.dashboards) ? grafanaObservabilityLinks.dashboards.length : 0;
+    const baseSnapshot = {
+      enabled: Boolean(grafanaObservabilityLinks?.enabled),
+      available: false,
+      status: 'unavailable',
+      response_ms: null,
+      checked_at: __timeNowIso(),
+      http_status: null,
+      version: null,
+      database: null,
+      commit: null,
+      dashboards_total: dashboardsTotal,
+      error: null,
+    };
+
+    const healthEndpointUrl = resolveGrafanaHealthEndpointUrl();
+    if (!healthEndpointUrl) {
+      grafanaRuntimeSnapshotCache = {
+        expires_at_ms: nowMs + SYSTEM_ADMIN_GRAFANA_STATUS_CACHE_TTL_MS,
+        payload: baseSnapshot,
+      };
+      return baseSnapshot;
+    }
+
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    const timeoutId =
+      controller && Number.isFinite(SYSTEM_ADMIN_GRAFANA_STATUS_TIMEOUT_MS)
+        ? setTimeout(() => {
+            controller.abort();
+          }, SYSTEM_ADMIN_GRAFANA_STATUS_TIMEOUT_MS)
+        : null;
+    const startedAtMs = __timeNowMs();
+
+    try {
+      const response = await globalThis.fetch(healthEndpointUrl, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+        },
+        signal: controller?.signal,
+      });
+      const responseMs = Math.max(0, __timeNowMs() - startedAtMs);
+      let payload = null;
+      try {
+        payload = await response.json();
+      } catch {
+        payload = null;
+      }
+
+      const version = sanitizeText(payload?.version || '', 40, { allowEmpty: true }) || null;
+      const commit = sanitizeText(payload?.commit || '', 80, { allowEmpty: true }) || null;
+      const database = sanitizeText(payload?.database || '', 30, { allowEmpty: true }) || null;
+      const normalizedDatabase = String(database || '').trim().toLowerCase();
+      const status = !response.ok ? 'offline' : normalizedDatabase === 'ok' ? 'online' : normalizedDatabase ? 'degraded' : 'online';
+
+      const snapshot = {
+        ...baseSnapshot,
+        available: response.ok,
+        status,
+        response_ms: responseMs,
+        checked_at: __timeNowIso(),
+        http_status: Number(response.status || 0) || null,
+        version,
+        database,
+        commit,
+      };
+      grafanaRuntimeSnapshotCache = {
+        expires_at_ms: __timeNowMs() + SYSTEM_ADMIN_GRAFANA_STATUS_CACHE_TTL_MS,
+        payload: snapshot,
+      };
+      return snapshot;
+    } catch (error) {
+      const responseMs = Math.max(0, __timeNowMs() - startedAtMs);
+      const isAbort = error?.name === 'AbortError';
+      const snapshot = {
+        ...baseSnapshot,
+        status: 'offline',
+        response_ms: responseMs,
+        checked_at: __timeNowIso(),
+        error: sanitizeText(isAbort ? 'timeout' : error?.message || 'fetch_failed', 80, { allowEmpty: true }) || 'fetch_failed',
+      };
+      grafanaRuntimeSnapshotCache = {
+        expires_at_ms: __timeNowMs() + SYSTEM_ADMIN_GRAFANA_STATUS_CACHE_TTL_MS,
+        payload: snapshot,
+      };
+      return snapshot;
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+    }
+  };
 
   const adminPanelSessionMap = new Map();
   let adminPanelSessionPruneAt = 0;
@@ -1062,7 +1179,7 @@ export const createStickerCatalogAdminHandlers = ({ executeQuery, tables, logger
   };
 
   const buildAdminOverviewPayload = async ({ adminSession = null } = {}) => {
-    const [marketplaceStats, activeSessions, knownUsers, bans, packsCountRows, stickersCountRows, recentPacks, visitSummary, systemSummaryPayload, messageFlowDaily, moderationQueue, auditLog, featureFlags] = await Promise.all([
+    const [marketplaceStats, activeSessions, knownUsers, bans, packsCountRows, stickersCountRows, recentPacks, visitSummary, systemSummaryPayload, messageFlowDaily, moderationQueue, auditLog, featureFlags, grafanaRuntimeSnapshot] = await Promise.all([
       getMarketplaceGlobalStatsCached().catch(() => null),
       listAdminActiveGoogleWebSessions({ limit: 80 }),
       listAdminKnownGoogleUsers({ limit: 120 }),
@@ -1081,6 +1198,19 @@ export const createStickerCatalogAdminHandlers = ({ executeQuery, tables, logger
       buildModerationQueueSnapshot({ limit: 80 }).catch(() => []),
       listAdminAuditLog({ limit: 120 }).catch(() => []),
       listAdminFeatureFlagsDetailed({ limit: 300 }).catch(() => []),
+      getGrafanaRuntimeSnapshot().catch(() => ({
+        enabled: Boolean(grafanaObservabilityLinks?.enabled),
+        available: false,
+        status: 'offline',
+        response_ms: null,
+        checked_at: __timeNowIso(),
+        http_status: null,
+        version: null,
+        database: null,
+        commit: null,
+        dashboards_total: Array.isArray(grafanaObservabilityLinks?.dashboards) ? grafanaObservabilityLinks.dashboards.length : 0,
+        error: 'runtime_snapshot_failed',
+      })),
     ]);
 
     const systemSummary = systemSummaryPayload?.data || null;
@@ -1152,6 +1282,9 @@ export const createStickerCatalogAdminHandlers = ({ executeQuery, tables, logger
       system_meta: systemMeta,
       observability_links: {
         grafana: grafanaObservabilityLinks,
+      },
+      observability_runtime: {
+        grafana: grafanaRuntimeSnapshot,
       },
       message_flow_daily: messageFlowDaily,
       updated_at: __timeNowIso(),

@@ -67,7 +67,7 @@ services:
     image: prom/mysqld-exporter:${MYSQL_EXPORTER_IMAGE_TAG:-v0.15.1}
     restart: unless-stopped
     environment:
-      - DATA_SOURCE_NAME=${MYSQL_EXPORTER_DSN:-exporter:exporter@(host.docker.internal:3306)/}
+      - DATA_SOURCE_NAME=${MYSQL_EXPORTER_DSN:-exporter:exporter@unix(/run/mysqld/mysqld.sock)/}
     command:
       - "--config.my-cnf=/etc/mysql-exporter/my.cnf"
       - "--collect.global_status"
@@ -81,6 +81,7 @@ services:
       - "--collect.perf_schema.tablelocks"
     volumes:
       - ${MYSQL_EXPORTER_CNF_PATH:-./observability/mysql-exporter.cnf}:/etc/mysql-exporter/my.cnf:ro
+      - /run/mysqld:/run/mysqld
     ports:
       - "${MYSQL_EXPORTER_BIND_HOST:-127.0.0.1}:${MYSQL_EXPORTER_PORT:-9104}:9104"
     extra_hosts:

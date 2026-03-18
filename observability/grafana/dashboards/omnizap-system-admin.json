@@ -3,7 +3,7 @@
   "title": "OmniZap System Admin",
   "timezone": "browser",
   "schemaVersion": 38,
-  "version": 1,
+  "version": 2,
   "refresh": "10s",
   "time": {
     "from": "now-6h",
@@ -137,6 +137,90 @@
         {
           "expr": "omnizap_admin_snapshot_items_total",
           "legendFormat": "{{section}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "MySQL Disponibilidade e Conexoes",
+      "datasource": "Prometheus",
+      "gridPos": { "x": 0, "y": 32, "w": 8, "h": 8 },
+      "targets": [
+        {
+          "expr": "mysql_up",
+          "legendFormat": "mysql_up",
+          "refId": "A"
+        },
+        {
+          "expr": "mysql_global_status_threads_connected",
+          "legendFormat": "threads_connected",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "MySQL Throughput (QPS/Writes/Slow)",
+      "datasource": "Prometheus",
+      "gridPos": { "x": 8, "y": 32, "w": 8, "h": 8 },
+      "targets": [
+        {
+          "expr": "rate(mysql_global_status_queries[5m])",
+          "legendFormat": "qps",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(mysql_global_status_commands_total{command=~\"insert|update|delete\"}[5m])) or (sum(rate(mysql_global_status_com_insert[5m])) + sum(rate(mysql_global_status_com_update[5m])) + sum(rate(mysql_global_status_com_delete[5m]))) or vector(0)",
+          "legendFormat": "writes",
+          "refId": "B"
+        },
+        {
+          "expr": "rate(mysql_global_status_slow_queries[5m])",
+          "legendFormat": "slow",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "MySQL Perf Schema (series ativas)",
+      "datasource": "Prometheus",
+      "gridPos": { "x": 16, "y": 32, "w": 8, "h": 8 },
+      "targets": [
+        {
+          "expr": "count(mysql_perf_schema_events_statements_errors_total)",
+          "legendFormat": "perf_schema_series",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "MySQL InnoDB (Locks e Buffer)",
+      "datasource": "Prometheus",
+      "gridPos": { "x": 0, "y": 40, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "rate(mysql_global_status_innodb_row_lock_waits[5m])",
+          "legendFormat": "lock_waits",
+          "refId": "A"
+        },
+        {
+          "expr": "1 - (rate(mysql_global_status_innodb_buffer_pool_reads[5m]) / rate(mysql_global_status_innodb_buffer_pool_read_requests[5m]))",
+          "legendFormat": "buffer_pool_hit_ratio",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "type": "logs",
+      "title": "MySQL Slow Log (Loki)",
+      "datasource": "Loki",
+      "gridPos": { "x": 12, "y": 40, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "{job=\"mysql-slow\"}",
           "refId": "A"
         }
       ]
