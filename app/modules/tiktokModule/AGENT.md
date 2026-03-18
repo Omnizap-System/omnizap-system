@@ -168,7 +168,7 @@ Este arquivo e destinado a agentes de IA para gerar respostas no contexto dos co
 - docs:
 - summary: Baixa midia do TikTok sem marca d'agua.
 - usage_examples: <prefix>baixartiktok <url>, <prefix>tt <url1> <url2>
-- usage_variants.default: 🎬 _Baixartiktok Downloader_, , Uso: _<prefix>baixartiktok <link1> [link2 ...]_, , Exemplo: _<prefix>baixartiktok https://www.baixartiktok.com/@usuario/video/123_
+- usage*variants.default: 🎬 \_Baixartiktok Downloader*, , Uso: _<prefix>baixartiktok <link1> [link2 ...]_, , Exemplo: _<prefix>baixartiktok https://www.baixartiktok.com/@usuario/video/123_
 - behavior:
 - type: argument_driven
 - allowed_actions: (nenhum)

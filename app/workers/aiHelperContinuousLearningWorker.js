@@ -35,24 +35,9 @@ const parseEnvFloat = (value, fallback, min, max) => {
 const AI_HELP_CONTINUOUS_LEARNING_ENABLED = parseEnvBool(process.env.AI_HELP_CONTINUOUS_LEARNING_ENABLED, true);
 const AI_HELP_CONTINUOUS_LEARNING_INTERVAL_MS = parseEnvInt(process.env.AI_HELP_CONTINUOUS_LEARNING_INTERVAL_MS, DEFAULT_INTERVAL_MS, 45_000, 24 * 60 * 60 * 1000);
 const AI_HELP_CONTINUOUS_LEARNING_BATCH_SIZE = parseEnvInt(process.env.AI_HELP_CONTINUOUS_LEARNING_BATCH_SIZE, DEFAULT_BATCH_SIZE, 1, 120);
-const AI_HELP_CONTINUOUS_LEARNING_MIN_AUTO_APPLY_CONFIDENCE = parseEnvFloat(
-  process.env.AI_HELP_CONTINUOUS_LEARNING_MIN_AUTO_APPLY_CONFIDENCE,
-  DEFAULT_MIN_AUTO_APPLY_CONFIDENCE,
-  0.1,
-  0.99,
-);
-const AI_HELP_CONTINUOUS_LEARNING_MAX_HELP_QUESTIONS_PER_COMMAND = parseEnvInt(
-  process.env.AI_HELP_CONTINUOUS_LEARNING_MAX_HELP_QUESTIONS_PER_COMMAND,
-  DEFAULT_MAX_HELP_QUESTIONS_PER_COMMAND,
-  1,
-  12,
-);
-const AI_HELP_CONTINUOUS_LEARNING_MAX_HELP_CALLS_PER_CYCLE = parseEnvInt(
-  process.env.AI_HELP_CONTINUOUS_LEARNING_MAX_HELP_CALLS_PER_CYCLE,
-  DEFAULT_MAX_HELP_CALLS_PER_CYCLE,
-  1,
-  250,
-);
+const AI_HELP_CONTINUOUS_LEARNING_MIN_AUTO_APPLY_CONFIDENCE = parseEnvFloat(process.env.AI_HELP_CONTINUOUS_LEARNING_MIN_AUTO_APPLY_CONFIDENCE, DEFAULT_MIN_AUTO_APPLY_CONFIDENCE, 0.1, 0.99);
+const AI_HELP_CONTINUOUS_LEARNING_MAX_HELP_QUESTIONS_PER_COMMAND = parseEnvInt(process.env.AI_HELP_CONTINUOUS_LEARNING_MAX_HELP_QUESTIONS_PER_COMMAND, DEFAULT_MAX_HELP_QUESTIONS_PER_COMMAND, 1, 12);
+const AI_HELP_CONTINUOUS_LEARNING_MAX_HELP_CALLS_PER_CYCLE = parseEnvInt(process.env.AI_HELP_CONTINUOUS_LEARNING_MAX_HELP_CALLS_PER_CYCLE, DEFAULT_MAX_HELP_CALLS_PER_CYCLE, 1, 250);
 
 let schedulerHandle = null;
 let schedulerStarted = false;
@@ -134,10 +119,7 @@ const readCommandUsageLimit = (entry = {}) => pickFirstText(entry?.limits?.usage
 
 const renderUsage = (method, commandPrefix = '/') => String(method || '').replaceAll('<prefix>', commandPrefix);
 
-const computeRegistrySignature = (records = []) =>
-  records
-    .map((record) => `${record?.toolName || ''}:${record?.moduleKey || ''}:${record?.commandName || ''}`)
-    .join('|');
+const computeRegistrySignature = (records = []) => records.map((record) => `${record?.toolName || ''}:${record?.moduleKey || ''}:${record?.commandName || ''}`).join('|');
 
 const buildDeterministicExplainAnswer = ({ record, commandPrefix = '/' }) => {
   const entry = record?.commandEntry && typeof record.commandEntry === 'object' ? record.commandEntry : {};
@@ -172,18 +154,7 @@ const buildSyntheticEvent = ({ record, round = 0 }) => {
   const faq = readCommandFaqPatterns(entry);
   const phrasings = readCommandUserPhrasings(entry);
 
-  const candidates = uniqueList(
-    [
-      ...phrasings,
-      ...faq,
-      ...usage,
-      `como usar ${commandName}`,
-      `o que faz ${commandName}`,
-      `quando devo usar ${commandName}`,
-      `me explica o comando ${commandName}`,
-    ],
-    18,
-  );
+  const candidates = uniqueList([...phrasings, ...faq, ...usage, `como usar ${commandName}`, `o que faz ${commandName}`, `quando devo usar ${commandName}`, `me explica o comando ${commandName}`], 18);
 
   const picked = candidates.length ? candidates[round % candidates.length] : `como usar ${commandName}`;
   return {
@@ -204,18 +175,7 @@ const buildHelpWarmupQuestions = ({ record, syntheticEvent }) => {
   const faq = readCommandFaqPatterns(entry);
   const phrasings = readCommandUserPhrasings(entry);
 
-  return uniqueList(
-    [
-      syntheticEvent?.user_question || '',
-      ...phrasings,
-      ...faq,
-      ...usage,
-      `como usar /${commandName}`,
-      `quero exemplo real de ${commandName}`,
-      `o que eu recebo de resposta ao usar ${commandName}`,
-    ],
-    AI_HELP_CONTINUOUS_LEARNING_MAX_HELP_QUESTIONS_PER_COMMAND,
-  );
+  return uniqueList([syntheticEvent?.user_question || '', ...phrasings, ...faq, ...usage, `como usar /${commandName}`, `quero exemplo real de ${commandName}`, `o que eu recebo de resposta ao usar ${commandName}`], AI_HELP_CONTINUOUS_LEARNING_MAX_HELP_QUESTIONS_PER_COMMAND);
 };
 
 const saveAiHelpSeedCacheEntries = async ({ record, syntheticEvent, maxEntries = 3 }) => {
@@ -419,7 +379,7 @@ const processContinuousLearningBatch = async ({ reason = 'scheduler' } = {}) => 
   try {
     const selected = selectProactiveBatch();
     if (!selected.batch.length) {
-    logger.info('Worker de aprendizado continuo IA sem comandos no registry.', {
+      logger.info('Worker de aprendizado continuo IA sem comandos no registry.', {
         action: 'ai_helper_continuous_learning_cycle_processed',
         reason,
         fetched_commands: 0,

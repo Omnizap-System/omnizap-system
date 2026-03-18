@@ -187,16 +187,7 @@ const shouldApplyProviderCooldown = (provider, error) => {
   const message = normalizeText(error?.message || error);
   if (!message) return false;
 
-  const hardErrorPatterns = [
-    'modelnotfound',
-    'does not exist',
-    'requested entity was not found',
-    'permission denied',
-    'unauthorized',
-    'invalid api key',
-    'quota',
-    '429',
-  ];
+  const hardErrorPatterns = ['modelnotfound', 'does not exist', 'requested entity was not found', 'permission denied', 'unauthorized', 'invalid api key', 'quota', '429'];
   if (hardErrorPatterns.some((token) => message.includes(token))) return true;
   return false;
 };

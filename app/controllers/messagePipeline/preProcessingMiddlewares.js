@@ -129,7 +129,7 @@ export const createPreProcessingMiddlewares = ({ executeQuery, TABLES, isStatusJ
       if (shouldSendStickerFocusWarning({ groupId: ctx.remoteJid, senderJid: ctx.senderJid })) {
         try {
           await sendReply(ctx.sock, ctx.remoteJid, ctx.messageInfo, ctx.expirationMessage, {
-            text: '🖼️ Este chat está com *foco em sticker* ativo.\n' + 'Siga o padrão: envie apenas *imagens* ou *vídeos* para criação automática, ou compartilhe seus *stickers*.\n' + `Mensagens como texto e áudio seguem uma janela de tempo: *${formatStickerFocusRuleLabel(stickerFocusState)}*.\n` + `Tente novamente em ~${formatRemainingMinutesLabel(messageGate.remainingMs)} min ou peça para um admin abrir a janela com *${ctx.commandPrefix}chatwindow on*.`,
+            text: '🖼️ *Modo Sticker ativo!*\n\n' + 'Este chat está focado em *stickers automáticos*.\n' + '👉 Envie apenas *imagens* ou *vídeos* para gerar stickers,\n' + '👉 Ou compartilhe *stickers* normalmente.\n\n' + '⏳ *Texto e áudio estão temporariamente limitados*.\n' + `Janela atual: *${formatStickerFocusRuleLabel(stickerFocusState)}*\n` + `Tente novamente em ~${formatRemainingMinutesLabel(messageGate.remainingMs)}.\n\n` + `💡 Um admin pode liberar com: *${ctx.commandPrefix}chatwindow on*`,
           });
         } catch (error) {
           logger.warn('Falha ao enviar aviso de sticker focus.', {

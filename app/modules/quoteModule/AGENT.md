@@ -171,7 +171,7 @@ Este arquivo e destinado a agentes de IA para gerar respostas no contexto dos co
 - docs:
 - summary: Transforma texto em figurinha estilo quote.
 - usage_examples: <prefix>citar seu texto, <prefix>qc @usuario texto
-- usage_variants.default: 🖼️ _Citar_, , Use assim:, _<prefix>citar_ sua mensagem, , Ou responda uma mensagem com:, _<prefix>citar_
+- usage*variants.default: 🖼️ \_Citar*, , Use assim:, _<prefix>citar_ sua mensagem, , Ou responda uma mensagem com:, _<prefix>citar_
 - behavior:
 - type: argument_driven
 - allowed_actions: (nenhum)

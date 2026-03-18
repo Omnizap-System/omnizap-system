@@ -8,27 +8,7 @@ const ENV_PATH = path.resolve(process.cwd(), '.env');
 const MANAGED_BLOCK_START = '# >>> CORE_AI_MODE_MANAGED >>>';
 const MANAGED_BLOCK_END = '# <<< CORE_AI_MODE_MANAGED <<<';
 
-const CORE_AI_FLAGS = [
-  'AI_LEARNING_WORKER_ENABLED',
-  'AI_HELP_CONTINUOUS_LEARNING_ENABLED',
-  'COMMAND_CONFIG_ENRICHMENT_WORKER_ENABLED',
-  'GLOBAL_HELP_ENABLE_WRAPPER_LLM_FALLBACK',
-  'MODULE_AI_HELP_ENABLE_LLM',
-  'ADMIN_AI_HELP_ENABLE_LLM',
-  'AI_AI_HELP_ENABLE_LLM',
-  'GAME_AI_HELP_ENABLE_LLM',
-  'MENU_AI_HELP_ENABLE_LLM',
-  'PLAY_AI_HELP_ENABLE_LLM',
-  'QUOTE_AI_HELP_ENABLE_LLM',
-  'RPG_POKEMON_AI_HELP_ENABLE_LLM',
-  'STATS_AI_HELP_ENABLE_LLM',
-  'STICKER_AI_HELP_ENABLE_LLM',
-  'STICKER_PACK_AI_HELP_ENABLE_LLM',
-  'SYSTEM_METRICS_AI_HELP_ENABLE_LLM',
-  'TIKTOK_AI_HELP_ENABLE_LLM',
-  'USER_AI_HELP_ENABLE_LLM',
-  'WAIFUPICS_AI_HELP_ENABLE_LLM',
-];
+const CORE_AI_FLAGS = ['AI_LEARNING_WORKER_ENABLED', 'AI_HELP_CONTINUOUS_LEARNING_ENABLED', 'COMMAND_CONFIG_ENRICHMENT_WORKER_ENABLED', 'GLOBAL_HELP_ENABLE_WRAPPER_LLM_FALLBACK', 'MODULE_AI_HELP_ENABLE_LLM', 'ADMIN_AI_HELP_ENABLE_LLM', 'AI_AI_HELP_ENABLE_LLM', 'GAME_AI_HELP_ENABLE_LLM', 'MENU_AI_HELP_ENABLE_LLM', 'PLAY_AI_HELP_ENABLE_LLM', 'QUOTE_AI_HELP_ENABLE_LLM', 'RPG_POKEMON_AI_HELP_ENABLE_LLM', 'STATS_AI_HELP_ENABLE_LLM', 'STICKER_AI_HELP_ENABLE_LLM', 'STICKER_PACK_AI_HELP_ENABLE_LLM', 'SYSTEM_METRICS_AI_HELP_ENABLE_LLM', 'TIKTOK_AI_HELP_ENABLE_LLM', 'USER_AI_HELP_ENABLE_LLM', 'WAIFUPICS_AI_HELP_ENABLE_LLM'];
 
 const parseArgs = (argv = []) => {
   const args = [...argv];
@@ -87,22 +67,14 @@ const removeManagedBlock = (content) => {
 };
 
 const buildManagedBlock = (value) => {
-  const lines = [
-    MANAGED_BLOCK_START,
-    '# Gerenciado por scripts/core-ai-mode.mjs',
-    ...CORE_AI_FLAGS.map((key) => `${key}=${value}`),
-    MANAGED_BLOCK_END,
-  ];
+  const lines = [MANAGED_BLOCK_START, '# Gerenciado por scripts/core-ai-mode.mjs', ...CORE_AI_FLAGS.map((key) => `${key}=${value}`), MANAGED_BLOCK_END];
   return `${lines.join('\n')}\n`;
 };
 
 const writeModeToEnv = async (modeValue) => {
   const current = await fs.readFile(ENV_PATH, 'utf8');
   const withoutManaged = removeManagedBlock(current);
-  const next =
-    withoutManaged.trimEnd().length > 0
-      ? `${withoutManaged.trimEnd()}\n\n${buildManagedBlock(modeValue)}`
-      : `${buildManagedBlock(modeValue)}`;
+  const next = withoutManaged.trimEnd().length > 0 ? `${withoutManaged.trimEnd()}\n\n${buildManagedBlock(modeValue)}` : `${buildManagedBlock(modeValue)}`;
   await fs.writeFile(ENV_PATH, next, 'utf8');
 };
 
@@ -110,7 +82,9 @@ const computeStatus = async () => {
   const content = await fs.readFile(ENV_PATH, 'utf8');
   const map = parseDotEnvEffectiveMap(content);
   const values = CORE_AI_FLAGS.map((key) => {
-    const raw = String(map.get(key) ?? '').trim().toLowerCase();
+    const raw = String(map.get(key) ?? '')
+      .trim()
+      .toLowerCase();
     return {
       key,
       raw: raw || '(unset)',

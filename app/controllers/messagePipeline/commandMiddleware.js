@@ -42,17 +42,19 @@ export const createCommandMiddleware = ({ isAdminCommand, isKnownNonAdminCommand
       }
     }
 
-    if (COMMAND_REACT_EMOJI) {
-      try {
-        await sendAndStore(ctx.sock, ctx.remoteJid, {
-          react: {
-            text: COMMAND_REACT_EMOJI,
-            key: ctx.key,
-          },
+    if (COMMAND_REACT_EMOJI?.trim() && ctx?.key) {
+      sendAndStore(ctx.sock, ctx.remoteJid, {
+        react: {
+          text: COMMAND_REACT_EMOJI,
+          key: ctx.key,
+        },
+      }).catch((error) => {
+        logger.warn('Falha ao enviar reação de comando', {
+          error: error?.message,
+          jid: ctx.remoteJid,
+          messageId: ctx.key?.id,
         });
-      } catch (error) {
-        logger.warn('Falha ao enviar reação de comando:', error?.message);
-      }
+      });
     }
 
     const execution = await executeMessageCommandRoute({

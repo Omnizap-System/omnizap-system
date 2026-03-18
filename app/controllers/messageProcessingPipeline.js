@@ -170,7 +170,7 @@ const maybeHandleStartLoginMessage = async ({ sock, messageInfo, extractedText, 
 
   if (isGroupMessage) {
     await sendReply(sock, remoteJid, messageInfo, expirationMessage, {
-      text: 'Por seguranca, envie *iniciar* no privado do bot para receber seu link de login.',
+      text: '🔐 *Segurança dos seus dados*\n\n' + 'Para proteger sua conta, o acesso é feito apenas no *privado*.\n' + 'Envie *iniciar* no chat privado do bot para receber seu link de login seguro.\n\n' + '⚠️ Por segurança, não enviamos links de acesso em grupos.',
     });
     return true;
   }
@@ -199,7 +199,7 @@ const maybeHandleStartLoginMessage = async ({ sock, messageInfo, extractedText, 
   const safeName = String(senderName || '').trim();
   const greeting = safeName ? `Oi, *${safeName}*!` : 'Oi!';
   await sendReply(sock, remoteJid, messageInfo, expirationMessage, {
-    text: `${greeting}\n\n` + 'Para continuar no OmniZap, faca login com Google neste link:\n' + `${loginUrl}\n\n` + 'Seu numero do WhatsApp sera vinculado automaticamente a conta logada.',
+    text: `${greeting}\n\n` + '🚀 *Bem-vindo ao OmniZap!*\n\n' + 'Para continuar, faça login com sua conta *Google* no link abaixo:\n\n' + `${loginUrl}\n\n` + '🔐 Seu número do WhatsApp será vinculado automaticamente à conta após o login.\n' + '⚠️ Use apenas este link e não compartilhe com outras pessoas.',
   });
 
   return true;
@@ -374,7 +374,7 @@ const ensureUserHasGoogleWebLoginForCommand = async ({ sock, messageInfo, sender
   }
 
   const loginUrl = isGroupMessage ? SITE_GROUP_LOGIN_URL : buildSiteLoginUrlForUser(resolvedCanonicalUserId || senderJid);
-  const loginMessage = isGroupMessage ? `Para usar os comandos do bot, você precisa estar logado no site com sua conta Google.\n\nAcesse:\n${loginUrl}` : `Para usar os comandos do bot, você precisa estar logado no site com sua conta Google.\n\nCadastre-se / faça login em:\n${loginUrl}\n\nDepois volte aqui e envie o comando novamente (ex.: ${commandPrefix}menu).`;
+  const loginMessage = isGroupMessage ? '🔐 *Login necessário*\n\n' + 'Para usar os comandos do bot, você precisa estar logado com sua conta *Google*.\n\n' + 'Acesse o link abaixo para entrar:\n' + `${loginUrl}\n\n` + '⚠️ Por segurança, recomendamos abrir o link no privado.' : '🔐 *Login necessário*\n\n' + 'Para usar os comandos do bot, faça login com sua conta *Google* no link abaixo:\n\n' + `${loginUrl}\n\n` + '✅ Após entrar, volte aqui e envie o comando novamente\n' + `(ex.: *${commandPrefix}menu*).`;
 
   await sendReply(sock, remoteJid, messageInfo, expirationMessage, {
     text: loginMessage,
