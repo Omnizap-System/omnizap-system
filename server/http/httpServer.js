@@ -6,6 +6,7 @@ import { getMetricsServerConfig, isMetricsEnabled, recordHttpRequest, resolveRou
 import { applyCachePolicy } from '../middleware/cachePolicy.js';
 import { applySensitiveRouteRateLimit } from '../middleware/endpointRateLimit.js';
 import { applySecurityHeaders } from '../middleware/securityHeaders.js';
+import { shouldHandleGrafanaProxyPath } from '../routes/observability/grafanaProxyRouter.js';
 import { getIndexRouteConfigs, routeRequest } from '../routes/indexRouter.js';
 import { parseRequestUrl, normalizeRequestId } from './requestContext.js';
 
@@ -65,6 +66,7 @@ export const startHttpServer = () => {
       userConfig: routeConfigs?.userConfig || null,
       systemAdminConfig: routeConfigs?.systemAdminConfig || null,
     });
+    const isGrafanaProxyRequest = shouldHandleGrafanaProxyPath(pathname, routeConfigs?.grafanaProxyConfig || null);
 
     res.once('finish', () => {
       recordHttpRequest({
@@ -76,10 +78,12 @@ export const startHttpServer = () => {
     });
 
     try {
-      applySecurityHeaders(req, res);
-      applyCachePolicy(req, res, { pathname });
-      const allowedByRateLimit = await applySensitiveRouteRateLimit(req, res, { pathname });
-      if (!allowedByRateLimit) return;
+      if (!isGrafanaProxyRequest) {
+        applySecurityHeaders(req, res);
+        applyCachePolicy(req, res, { pathname });
+        const allowedByRateLimit = await applySensitiveRouteRateLimit(req, res, { pathname });
+        if (!allowedByRateLimit) return;
+      }
 
       await routeRequest(req, res, {
         pathname,
