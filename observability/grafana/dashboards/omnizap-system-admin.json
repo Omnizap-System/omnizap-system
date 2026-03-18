@@ -1,0 +1,145 @@
+{
+  "uid": "omnizap-system-admin",
+  "title": "OmniZap System Admin",
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "10s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "tags": ["omnizap", "system-admin", "observability"],
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Admin Snapshot Freshness (s)",
+      "datasource": "Prometheus",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "time() - omnizap_admin_overview_updated_at_seconds",
+          "legendFormat": "freshness_s",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Snapshot Publishes/sec",
+      "datasource": "Prometheus",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "rate(omnizap_admin_overview_requests_total[5m])",
+          "legendFormat": "{{source}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Sessoes, Usuarios e Bans",
+      "datasource": "Prometheus",
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "omnizap_admin_counters{counter=~\"active_google_sessions|known_google_users|active_bans\"}",
+          "legendFormat": "{{counter}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Mensagens, Spam e Erros (Quick)",
+      "datasource": "Prometheus",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "omnizap_admin_dashboard_quick{metric=~\"messages_today|spam_blocked_today|errors_5xx\"}",
+          "legendFormat": "{{metric}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "CPU e RAM (%)",
+      "datasource": "Prometheus",
+      "gridPos": { "x": 0, "y": 16, "w": 8, "h": 8 },
+      "targets": [
+        {
+          "expr": "omnizap_admin_system_health{metric=~\"cpu_percent|ram_percent\"}",
+          "legendFormat": "{{metric}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Latencia P95 e Queue Pending",
+      "datasource": "Prometheus",
+      "gridPos": { "x": 8, "y": 16, "w": 8, "h": 8 },
+      "targets": [
+        {
+          "expr": "omnizap_admin_system_health{metric=~\"http_latency_p95_ms|queue_pending\"}",
+          "legendFormat": "{{metric}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "DB Total e Slow Queries",
+      "datasource": "Prometheus",
+      "gridPos": { "x": 16, "y": 16, "w": 8, "h": 8 },
+      "targets": [
+        {
+          "expr": "omnizap_admin_system_health{metric=~\"db_total_queries|db_slow_queries\"}",
+          "legendFormat": "{{metric}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Alertas por severidade",
+      "datasource": "Prometheus",
+      "gridPos": { "x": 0, "y": 24, "w": 8, "h": 8 },
+      "targets": [
+        {
+          "expr": "omnizap_admin_alerts_total",
+          "legendFormat": "{{severity}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Feature Flags",
+      "datasource": "Prometheus",
+      "gridPos": { "x": 8, "y": 24, "w": 8, "h": 8 },
+      "targets": [
+        {
+          "expr": "omnizap_admin_feature_flags_total",
+          "legendFormat": "{{state}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Itens por secao do Snapshot",
+      "datasource": "Prometheus",
+      "gridPos": { "x": 16, "y": 24, "w": 8, "h": 8 },
+      "targets": [
+        {
+          "expr": "omnizap_admin_snapshot_items_total",
+          "legendFormat": "{{section}}",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}

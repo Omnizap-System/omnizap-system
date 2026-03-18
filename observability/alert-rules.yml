@@ -58,3 +58,23 @@ groups:
         annotations:
           summary: "Memória acima de 80%"
           description: "Uso de memória acima de 80% por 10 minutos."
+
+  - name: omnizap-admin
+    rules:
+      - alert: OmniZapAdminSnapshotStale
+        expr: (time() - omnizap_admin_overview_updated_at_seconds) > 300
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Snapshot admin sem atualizacao recente"
+          description: "As métricas do painel admin estão sem atualização há mais de 5 minutos."
+
+      - alert: OmniZapAdminCriticalAlerts
+        expr: omnizap_admin_alerts_total{severity="critical"} > 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Alertas críticos ativos no painel admin"
+          description: "Existe ao menos um alerta crítico no snapshot de observabilidade do System Admin."

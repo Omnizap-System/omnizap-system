@@ -32,6 +32,8 @@ const METRICS_SERVICE = process.env.METRICS_SERVICE_NAME || process.env.ECOSYSTE
 const HTTP_SLO_TARGET_MS = Math.max(50, parseEnvNumber(process.env.HTTP_SLO_TARGET_MS, 750));
 
 const QUERY_THRESHOLDS_MS = parseThresholds(process.env.DB_QUERY_ALERT_THRESHOLDS, [500, 1000]);
+const ADMIN_ALERT_SEVERITIES = Object.freeze(['critical', 'high', 'medium', 'low', 'unknown']);
+const ADMIN_FEATURE_FLAG_STATES = Object.freeze(['enabled', 'disabled', 'total']);
 
 const registry = new client.Registry();
 let metrics = null;
@@ -375,6 +377,53 @@ const ensureMetrics = () => {
       labelNames: ['outcome'],
       registers: [registry],
     }),
+    adminOverviewUpdatedAtSeconds: new client.Gauge({
+      name: 'omnizap_admin_overview_updated_at_seconds',
+      help: 'Timestamp Unix (s) da ultima atualizacao de snapshot do painel admin',
+      registers: [registry],
+    }),
+    adminOverviewRequestsTotal: new client.Counter({
+      name: 'omnizap_admin_overview_requests_total',
+      help: 'Total de snapshots do painel admin publicados em metricas',
+      labelNames: ['source'],
+      registers: [registry],
+    }),
+    adminCounters: new client.Gauge({
+      name: 'omnizap_admin_counters',
+      help: 'Contadores agregados do painel admin',
+      labelNames: ['counter'],
+      registers: [registry],
+    }),
+    adminDashboardQuick: new client.Gauge({
+      name: 'omnizap_admin_dashboard_quick',
+      help: 'Metricas rapidas do dashboard admin',
+      labelNames: ['metric'],
+      registers: [registry],
+    }),
+    adminSystemHealth: new client.Gauge({
+      name: 'omnizap_admin_system_health',
+      help: 'Indicadores de saude expostos no painel admin',
+      labelNames: ['metric'],
+      registers: [registry],
+    }),
+    adminAlertsTotal: new client.Gauge({
+      name: 'omnizap_admin_alerts_total',
+      help: 'Total de alertas ativos por severidade no painel admin',
+      labelNames: ['severity'],
+      registers: [registry],
+    }),
+    adminFeatureFlagsTotal: new client.Gauge({
+      name: 'omnizap_admin_feature_flags_total',
+      help: 'Distribuicao de feature flags no painel admin',
+      labelNames: ['state'],
+      registers: [registry],
+    }),
+    adminSnapshotItemsTotal: new client.Gauge({
+      name: 'omnizap_admin_snapshot_items_total',
+      help: 'Total de itens por secao no snapshot do painel admin',
+      labelNames: ['section'],
+      registers: [registry],
+    }),
   };
 
   return metrics;
@@ -499,6 +548,93 @@ export const recordMessagesUpsert = ({ durationMs, type, messagesCount, ok }) =>
   const count = Number(messagesCount);
   if (Number.isFinite(count) && count > 0) {
     m.messagesUpsertMessagesTotal.inc({ type: eventType }, count);
+  }
+};
+
+export const setAdminOverviewSnapshot = ({ overview = null, source = 'admin_overview' } = {}) => {
+  const m = ensureMetrics();
+  if (!m) return;
+  if (!overview || typeof overview !== 'object') return;
+
+  const setGaugeIfFinite = (gauge, labels, value, { clampToZero = false } = {}) => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return;
+    gauge.set(labels, clampToZero ? Math.max(0, numeric) : numeric);
+  };
+
+  const sourceLabel = normalizeLabel(source, 'admin_overview').slice(0, 32);
+  m.adminOverviewRequestsTotal.inc({ source: sourceLabel });
+
+  const updatedAtMs = Date.parse(String(overview?.updated_at || ''));
+  const updatedAtSeconds = Number.isFinite(updatedAtMs) ? updatedAtMs / 1000 : Date.now() / 1000;
+  m.adminOverviewUpdatedAtSeconds.set(updatedAtSeconds);
+
+  const counters = overview?.counters && typeof overview.counters === 'object' ? overview.counters : {};
+  const counterKeys = ['total_packs_any_status', 'total_stickers_any_status', 'active_google_sessions', 'known_google_users', 'active_bans', 'visit_events_24h', 'visit_events_7d', 'unique_visitors_7d'];
+  for (const key of counterKeys) {
+    setGaugeIfFinite(m.adminCounters, { counter: key }, counters?.[key], { clampToZero: true });
+  }
+
+  const dashboardQuick = overview?.dashboard_quick && typeof overview.dashboard_quick === 'object' ? overview.dashboard_quick : {};
+  const quickKeys = ['bots_online', 'messages_today', 'spam_blocked_today', 'errors_5xx'];
+  for (const key of quickKeys) {
+    setGaugeIfFinite(m.adminDashboardQuick, { metric: key }, dashboardQuick?.[key], { clampToZero: true });
+  }
+
+  const systemHealth = overview?.system_health && typeof overview.system_health === 'object' ? overview.system_health : {};
+  const healthKeys = ['cpu_percent', 'ram_percent', 'http_latency_p95_ms', 'queue_pending', 'db_total_queries', 'db_slow_queries'];
+  for (const key of healthKeys) {
+    setGaugeIfFinite(m.adminSystemHealth, { metric: key }, systemHealth?.[key], { clampToZero: true });
+  }
+
+  const moderationQueue = Array.isArray(overview?.moderation_queue) ? overview.moderation_queue : [];
+  const auditLog = Array.isArray(overview?.audit_log) ? overview.audit_log : [];
+  const users = Array.isArray(overview?.users_sessions?.users) ? overview.users_sessions.users : [];
+  const activeSessions = Array.isArray(overview?.users_sessions?.active_sessions) ? overview.users_sessions.active_sessions : [];
+  const blockedAccounts = Array.isArray(overview?.users_sessions?.blocked_accounts) ? overview.users_sessions.blocked_accounts : [];
+  const alerts = Array.isArray(overview?.alerts) ? overview.alerts : [];
+  const featureFlags = Array.isArray(overview?.feature_flags) ? overview.feature_flags : [];
+
+  m.adminSnapshotItemsTotal.set({ section: 'moderation_queue' }, moderationQueue.length);
+  m.adminSnapshotItemsTotal.set({ section: 'audit_log' }, auditLog.length);
+  m.adminSnapshotItemsTotal.set({ section: 'users' }, users.length);
+  m.adminSnapshotItemsTotal.set({ section: 'active_sessions' }, activeSessions.length);
+  m.adminSnapshotItemsTotal.set({ section: 'blocked_accounts' }, blockedAccounts.length);
+  m.adminSnapshotItemsTotal.set({ section: 'alerts' }, alerts.length);
+  m.adminSnapshotItemsTotal.set({ section: 'feature_flags' }, featureFlags.length);
+
+  const severityCounts = Object.fromEntries(ADMIN_ALERT_SEVERITIES.map((severity) => [severity, 0]));
+  for (const alert of alerts) {
+    const severityRaw = String(alert?.severity || '')
+      .trim()
+      .toLowerCase();
+    const severity = ADMIN_ALERT_SEVERITIES.includes(severityRaw) ? severityRaw : 'unknown';
+    severityCounts[severity] = Number(severityCounts[severity] || 0) + 1;
+  }
+  for (const severity of ADMIN_ALERT_SEVERITIES) {
+    m.adminAlertsTotal.set({ severity }, Number(severityCounts[severity] || 0));
+  }
+
+  let enabledFlags = 0;
+  let disabledFlags = 0;
+  for (const flag of featureFlags) {
+    if (flag?.is_enabled) {
+      enabledFlags += 1;
+    } else {
+      disabledFlags += 1;
+    }
+  }
+  const totalFlags = enabledFlags + disabledFlags;
+  for (const state of ADMIN_FEATURE_FLAG_STATES) {
+    if (state === 'enabled') {
+      m.adminFeatureFlagsTotal.set({ state }, enabledFlags);
+      continue;
+    }
+    if (state === 'disabled') {
+      m.adminFeatureFlagsTotal.set({ state }, disabledFlags);
+      continue;
+    }
+    m.adminFeatureFlagsTotal.set({ state }, totalFlags);
   }
 };
 
