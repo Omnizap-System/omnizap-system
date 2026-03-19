@@ -47,7 +47,7 @@ UPDATE schema_change_log
    SET status = 'rolled_back',
        notes = 'D+7 rollback executed',
        updated_at = CURRENT_TIMESTAMP
- WHERE migration_key = @migration_key;
+ WHERE migration_key = CONVERT(@migration_key USING utf8mb4) COLLATE utf8mb4_unicode_ci;
 
 DROP PROCEDURE IF EXISTS __drop_column_if_exists;
 DROP PROCEDURE IF EXISTS __drop_index_if_exists;

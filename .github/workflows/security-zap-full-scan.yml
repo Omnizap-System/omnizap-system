@@ -39,5 +39,6 @@ jobs:
         with:
           target: ${{ env.TARGET_URL }}
           fail_action: false
+          artifact_name: zap-scan-full
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
