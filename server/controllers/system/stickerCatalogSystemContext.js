@@ -153,6 +153,12 @@ export const createStickerCatalogSystemContext = ({ executeQuery, tables, logger
           systemSummaryCache.expiresAt = __timeNowMs() + systemSummaryCacheSeconds * 1000;
           return payload;
         })
+        .catch((error) => {
+          if (hasValue && systemSummaryCache.value) {
+            return systemSummaryCache.value;
+          }
+          throw error;
+        })
         .finally(() => {
           systemSummaryCache.pending = null;
         });
@@ -328,6 +334,12 @@ export const createStickerCatalogSystemContext = ({ executeQuery, tables, logger
           readmeSummaryCache.value = payload;
           readmeSummaryCache.expiresAt = __timeNowMs() + readmeSummaryCacheSeconds * 1000;
           return payload;
+        })
+        .catch((error) => {
+          if (hasValue && readmeSummaryCache.value) {
+            return readmeSummaryCache.value;
+          }
+          throw error;
         })
         .finally(() => {
           readmeSummaryCache.pending = null;
@@ -542,6 +554,12 @@ export const createStickerCatalogSystemContext = ({ executeQuery, tables, logger
           globalRankCache.expiresAt = __timeNowMs() + globalRankRefreshSeconds * 1000;
           return data;
         })
+        .catch((error) => {
+          if (hasValue && globalRankCache.value) {
+            return globalRankCache.value;
+          }
+          throw error;
+        })
         .finally(() => {
           globalRankCache.pending = null;
         });
@@ -736,6 +754,12 @@ export const createStickerCatalogSystemContext = ({ executeQuery, tables, logger
           marketplaceGlobalStatsCache.value = data;
           marketplaceGlobalStatsCache.expiresAt = __timeNowMs() + marketplaceGlobalStatsCacheSeconds * 1000;
           return data;
+        })
+        .catch((error) => {
+          if (hasValue && marketplaceGlobalStatsCache.value) {
+            return marketplaceGlobalStatsCache.value;
+          }
+          throw error;
         })
         .finally(() => {
           marketplaceGlobalStatsCache.pending = null;

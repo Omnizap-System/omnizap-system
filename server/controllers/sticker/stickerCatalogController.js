@@ -1714,6 +1714,12 @@ const getMarketplaceStatsCached = async (visibility) => {
         bucket.expiresAt = __timeNowMs() + HOME_MARKETPLACE_STATS_CACHE_SECONDS * 1000;
         return data;
       })
+      .catch((error) => {
+        if (hasValue && bucket.value) {
+          return bucket.value;
+        }
+        throw error;
+      })
       .finally(() => {
         bucket.pending = null;
       });
