@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { test } from 'node:test';
+import { after, test } from 'node:test';
 
 import { __playYtDlpClientTestUtils } from './playCommandYtDlpClient.js';
 
@@ -30,6 +30,16 @@ const withEnv = async (overrides, fn) => {
     }
   }
 };
+
+let closeDatabasePoolForTests = null;
+
+after(async () => {
+  if (typeof closeDatabasePoolForTests !== 'function') {
+    return;
+  }
+  await closeDatabasePoolForTests();
+  closeDatabasePoolForTests = null;
+});
 
 test('resolve candidates deduplica URLs e ignora inválidas', () => {
   const urls = __playYtDlpClientTestUtils.extractCandidateUrlsFromSearchResult({
@@ -111,6 +121,8 @@ test('notifyFailure: envia admin só para erro técnico e deduplica alertas', { 
     },
     async () => {
       const mod = await import(`./playCommandCore.js?test=${__timeNowMs()}-${Math.random().toString(16).slice(2)}`);
+      const { closePool } = await import('../../../database/index.js');
+      closeDatabasePoolForTests = closePool;
       const utils = mod.__playCommandCoreTestUtils;
       utils.resetAdminAlertDedupCacheForTests();
 
