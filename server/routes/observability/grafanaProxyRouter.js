@@ -52,7 +52,11 @@ const normalizeTargetUrl = (rawUrl) => {
 };
 
 const normalizeHeaderValue = (value) => {
-  if (Array.isArray(value)) return value.map((item) => String(item || '').trim()).filter(Boolean).join(', ');
+  if (Array.isArray(value))
+    return value
+      .map((item) => String(item || '').trim())
+      .filter(Boolean)
+      .join(', ');
   return String(value || '').trim();
 };
 

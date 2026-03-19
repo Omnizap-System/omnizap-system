@@ -364,11 +364,9 @@ const UserSystemAdmReactApp = ({ config }) => {
   const grafanaDashboards = Array.isArray(overview?.observability_links?.grafana?.dashboards) ? overview.observability_links.grafana.dashboards : [];
   const grafanaRuntime = overview?.observability_runtime?.grafana || null;
   const grafanaStatusRaw = normalizeString(grafanaRuntime?.status).toLowerCase();
-  const grafanaStatusLabel =
-    grafanaStatusRaw === 'online' ? 'Online' : grafanaStatusRaw === 'degraded' ? 'Degradado' : grafanaStatusRaw === 'offline' ? 'Offline' : grafanaStatusRaw === 'unavailable' ? 'Indisponível' : 'N/D';
+  const grafanaStatusLabel = grafanaStatusRaw === 'online' ? 'Online' : grafanaStatusRaw === 'degraded' ? 'Degradado' : grafanaStatusRaw === 'offline' ? 'Offline' : grafanaStatusRaw === 'unavailable' ? 'Indisponível' : 'N/D';
   const grafanaStatusTrend = grafanaStatusRaw === 'online' ? 'up' : grafanaStatusRaw === 'degraded' ? 'warn' : 'down';
-  const grafanaStatusCardClass =
-    grafanaStatusRaw === 'online' ? 'metric-card system' : grafanaStatusRaw === 'degraded' ? 'metric-card security warning' : 'metric-card security critical';
+  const grafanaStatusCardClass = grafanaStatusRaw === 'online' ? 'metric-card system' : grafanaStatusRaw === 'degraded' ? 'metric-card security warning' : 'metric-card security critical';
   const grafanaVersion = normalizeString(grafanaRuntime?.version) || 'n/d';
   const grafanaDatabase = normalizeString(grafanaRuntime?.database) || 'n/d';
   const grafanaDashboardsTotalRaw = grafanaRuntime?.dashboards_total ?? grafanaDashboards.length;
@@ -819,11 +817,7 @@ const UserSystemAdmReactApp = ({ config }) => {
 
         <div className="viewport">
           <section className="section admin-panel">
-            ${!adminAuthenticated
-              ? html`<p className="admin-note">${adminEligible ? 'Conta elegível para admin. Informe a senha para liberar os dados sensíveis.' : 'Conta atual sem permissão para o painel admin.'}</p>`
-              : null}
-
-            ${adminError ? html` <p className="admin-error">${adminError}</p> ` : null}
+            ${!adminAuthenticated ? html`<p className="admin-note">${adminEligible ? 'Conta elegível para admin. Informe a senha para liberar os dados sensíveis.' : 'Conta atual sem permissão para o painel admin.'}</p>` : null} ${adminError ? html` <p className="admin-error">${adminError}</p> ` : null}
             ${!adminEligible
               ? html`
                   <div className="admin-item">
@@ -1054,7 +1048,7 @@ const UserSystemAdmReactApp = ({ config }) => {
                                           `
                                         : null}
                                       <div style=${{ marginTop: '10px', borderRadius: '12px', overflow: 'hidden', border: '1px solid rgba(148, 163, 184, 0.25)', background: '#020617' }}>
-                                        <iframe title=${`grafana-${uid}`} src=${embedUrl} loading="lazy" referrerPolicy="no-referrer" style=${{ inlineSize: '100%', blockSize: '420px', border: '0', background: '#020617' }}></iframe>
+                                        <iframe title=${`grafana-${uid}`} src=${embedUrl} loading="lazy" referrerpolicy="no-referrer" style=${{ inlineSize: '100%', blockSize: '420px', border: '0', background: '#020617' }}></iframe>
                                       </div>
                                     </article>
                                   `;

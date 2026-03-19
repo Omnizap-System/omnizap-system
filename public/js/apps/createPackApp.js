@@ -411,7 +411,7 @@ function CreatePackApp() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [publisher, setPublisher] = useState('');
-  const [visibility, setVisibility] = useState('public');
+  const [visibility, setVisibility] = useState('private');
   const [tags, setTags] = useState([]);
   const [tagInput, setTagInput] = useState('');
   const [suggestedTags, setSuggestedTags] = useState(DEFAULT_SUGGESTED_TAGS);
@@ -1322,7 +1322,7 @@ function CreatePackApp() {
     setName('');
     setDescription('');
     setPublisher('');
-    setVisibility('public');
+    setVisibility('private');
     setTags([]);
     setTagInput('');
     setFiles([]);
@@ -1480,7 +1480,7 @@ function CreatePackApp() {
                     </label>
                     <label className="block">
                       <span className="mb-2 inline-block text-xs font-semibold text-slate-300">Visibilidade</span>
-                      <select value=${visibility} onChange=${(e) => setVisibility(String(e.target.value || 'public'))} className="h-11 w-full rounded-2xl border border-line/70 bg-panelSoft/80 px-4 text-sm outline-none focus:border-accent/60 md:h-12">
+                      <select value=${visibility} onChange=${(e) => setVisibility(String(e.target.value || 'private'))} className="h-11 w-full rounded-2xl border border-line/70 bg-panelSoft/80 px-4 text-sm outline-none focus:border-accent/60 md:h-12">
                         <option value="public">Público</option>
                         <option value="unlisted">Não listado</option>
                         <option value="private">Privado</option>

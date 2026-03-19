@@ -331,7 +331,7 @@ export function createStickerPackService(options = {}) {
     };
   };
 
-  const sanitizeMetadata = ({ name, publisher, description, visibility }) => {
+  const sanitizeMetadata = ({ name, publisher, description, visibility, defaultVisibility = 'private' }) => {
     const normalizedName = sanitizeText(name, MAX_NAME_LENGTH, { allowEmpty: false });
     const normalizedPublisher = sanitizeText(publisher, MAX_PUBLISHER_LENGTH, {
       allowEmpty: false,
@@ -339,7 +339,7 @@ export function createStickerPackService(options = {}) {
     const normalizedDescription = sanitizeText(description, MAX_DESCRIPTION_LENGTH, {
       allowEmpty: true,
     });
-    const normalizedVisibility = toVisibility(visibility, 'public');
+    const normalizedVisibility = toVisibility(visibility, defaultVisibility);
 
     ensureValue(normalizedName, STICKER_PACK_ERROR_CODES.INVALID_INPUT, 'Nome do pack é obrigatório.');
     ensureValue(normalizedPublisher, STICKER_PACK_ERROR_CODES.INVALID_INPUT, 'Publisher do pack é obrigatório.');
@@ -352,13 +352,20 @@ export function createStickerPackService(options = {}) {
     };
   };
 
-  const createPack = async ({ ownerJid, name, publisher, description, visibility = 'public', status = 'published', packStatus = undefined, packThemeKey = undefined, packVolume = undefined, isAutoPack = undefined, lastRebalancedAt = undefined }) => {
+  const createPack = async ({ ownerJid, name, publisher, description, visibility = undefined, status = 'published', packStatus = undefined, packThemeKey = undefined, packVolume = undefined, isAutoPack = undefined, lastRebalancedAt = undefined }) => {
     const owner = resolveOwner(ownerJid);
+    const isAutoPackEnabled = isAutoPack === true || Number(isAutoPack || 0) === 1;
     const normalizedStatus = PACK_STATUS_VALUES.has(String(status || '').toLowerCase()) ? String(status).toLowerCase() : 'published';
 
     return runAction('create_pack', { owner_jid: owner }, async () => {
       return runInTransaction(async (connection) => {
-        const metadata = sanitizeMetadata({ name, publisher, description, visibility });
+        const metadata = sanitizeMetadata({
+          name,
+          publisher,
+          description,
+          visibility,
+          defaultVisibility: isAutoPackEnabled ? 'public' : 'private',
+        });
         if (hasOwnerPackLimit) {
           const existing = await deps.packRepository.listStickerPacksByOwner(owner, {
             limit: maxPacksPerOwner + 1,
@@ -384,7 +391,7 @@ export function createStickerPackService(options = {}) {
             pack_status: packStatus,
             pack_theme_key: packThemeKey,
             pack_volume: packVolume,
-            is_auto_pack: isAutoPack,
+            is_auto_pack: isAutoPackEnabled,
             last_rebalanced_at: lastRebalancedAt,
             version: 1,
           },
@@ -679,7 +686,7 @@ export function createStickerPackService(options = {}) {
             description: source.description,
             pack_key: packKey,
             cover_sticker_id: source.cover_sticker_id,
-            visibility: 'public',
+            visibility: 'private',
             version: 1,
           },
           connection,

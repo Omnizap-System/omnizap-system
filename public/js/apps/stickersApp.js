@@ -587,14 +587,14 @@ function PackCard({ pack, index, onOpen, hasNsfwAccess = true, onRequireLogin })
   };
 
   return html`
-    <button type="button" onClick=${handleOpen} className="group w-full text-left rounded-2xl border border-slate-800 bg-slate-900/90 shadow-soft overflow-hidden transition-all duration-200 active:scale-[0.985] md:hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-lg touch-manipulation">
-      <div className="relative aspect-[5/6] sm:aspect-[4/5] bg-slate-900 overflow-hidden">
-        <${LazyCatalogImage} src=${coverUrl} alt=${`Capa de ${pack.name}`} className=${`w-full h-full object-cover transition-transform duration-300 ${lockedByNsfw ? 'blur-md scale-105' : 'md:group-hover:scale-[1.05] group-active:scale-[1.02]'}`} />
+    <button type="button" onClick=${handleOpen} className="group w-full text-left rounded-[1rem] border border-slate-700/75 bg-slate-900/90 shadow-[0_16px_34px_rgba(2,6,23,0.34)] overflow-hidden transition-all duration-300 active:scale-[0.985] md:hover:scale-[1.02] hover:-translate-y-0.5 hover:border-cyan-400/35 hover:shadow-[0_24px_40px_rgba(2,6,23,0.5)] touch-manipulation">
+      <div className="relative aspect-[4/5] bg-slate-900 overflow-hidden">
+        <${LazyCatalogImage} src=${coverUrl} alt=${`Capa de ${pack.name}`} className=${`w-full h-full object-cover transition-transform duration-300 ${lockedByNsfw ? 'blur-md scale-105' : 'md:group-hover:scale-[1.06] group-active:scale-[1.02]'}`} />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-transparent"></div>
-        <div className="absolute top-2 left-2 flex items-center gap-1">${lockedByNsfw ? html`<span className="rounded-full border border-amber-300/35 bg-amber-500/25 backdrop-blur px-1.5 py-0.5 text-[9px] font-bold text-amber-100">🔞 Login</span>` : null} ${isTrending ? html`<span className="rounded-full border border-emerald-300/30 bg-emerald-400/80 backdrop-blur px-1.5 py-0.5 text-[9px] font-bold text-slate-900">Trending</span>` : null} ${isNew ? html`<span className="rounded-full border border-white/15 bg-black/45 backdrop-blur px-1.5 py-0.5 text-[9px] font-semibold text-slate-100">Novo</span>` : null}</div>
+        <div className="absolute top-2 left-2 flex items-center gap-1">${lockedByNsfw ? html`<span className="rounded-full border border-amber-300/40 bg-amber-500/30 backdrop-blur px-1.5 py-0.5 text-[9px] font-bold text-amber-100">🔞 Login</span>` : null} ${isTrending ? html`<span className="rounded-full border border-emerald-300/35 bg-emerald-400/85 backdrop-blur px-1.5 py-0.5 text-[9px] font-bold text-slate-900">Trending</span>` : null} ${isNew ? html`<span className="rounded-full border border-white/20 bg-black/55 backdrop-blur px-1.5 py-0.5 text-[9px] font-semibold text-slate-100">Novo</span>` : null}</div>
 
         <div className="absolute inset-x-0 bottom-0 p-2">
-          <h3 className="font-semibold text-sm leading-5 line-clamp-2">${pack.name || 'Pack sem nome'}</h3>
+          <h3 className="font-semibold text-sm leading-5 line-clamp-2 text-slate-100">${pack.name || 'Pack sem nome'}</h3>
           <div className="mt-1 flex items-center gap-1.5 text-[10px] text-slate-300">
             <${LazyCatalogImage} src=${getAvatarUrl(pack.publisher)} alt="Criador" className="w-4 h-4 rounded-full bg-slate-700" />
             <span className="truncate">${pack.publisher || 'Criador não informado'}</span>
@@ -607,7 +607,7 @@ function PackCard({ pack, index, onOpen, hasNsfwAccess = true, onRequireLogin })
         </div>
 
         <div className="pointer-events-none absolute inset-x-2 bottom-2 hidden md:flex justify-center opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-          <span className="inline-flex h-8 w-full items-center justify-center rounded-xl border border-emerald-400/35 bg-emerald-400/12 px-3 text-xs font-semibold text-emerald-200 backdrop-blur"> ${lockedByNsfw ? 'Entrar para desbloquear' : 'Abrir pack'} </span>
+          <span className="inline-flex h-8 w-full items-center justify-center rounded-xl border border-cyan-400/35 bg-cyan-500/15 px-3 text-xs font-semibold text-cyan-100 backdrop-blur"> ${lockedByNsfw ? 'Entrar para desbloquear' : 'Ver pack'} </span>
         </div>
         ${lockedByNsfw
           ? html`
@@ -618,8 +618,8 @@ function PackCard({ pack, index, onOpen, hasNsfwAccess = true, onRequireLogin })
           : null}
       </div>
 
-      <div className="px-2 pb-2 pt-1 bg-slate-900/95 md:hidden">
-        <span className="inline-flex h-[34px] w-full items-center justify-center rounded-xl border border-emerald-400/30 bg-emerald-400/10 text-xs font-semibold text-emerald-200 transition group-active:brightness-110"> ${lockedByNsfw ? 'Entrar para desbloquear' : 'Abrir pack'} </span>
+      <div className="px-2 pb-2 pt-1 bg-slate-950/88 md:hidden">
+        <span className="inline-flex h-[34px] w-full items-center justify-center rounded-xl border border-cyan-400/35 bg-cyan-500/15 text-xs font-semibold text-cyan-100 transition group-active:brightness-110"> ${lockedByNsfw ? 'Entrar para desbloquear' : 'Ver pack'} </span>
       </div>
     </button>
   `;
@@ -1397,7 +1397,7 @@ function CreatorProfileDashboard({ googleAuthConfig, googleAuth, googleAuthBusy,
 
 function SkeletonGrid({ count = 10 }) {
   return html`
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
       ${Array.from({ length: count }).map(
         (_, index) => html`
           <div key=${index} className="rounded-2xl border border-slate-700 bg-slate-800 overflow-hidden animate-pulse">
@@ -1416,11 +1416,14 @@ function SkeletonGrid({ count = 10 }) {
 
 function EmptyState({ onClear }) {
   return html`
-    <div className="rounded-2xl border border-dashed border-slate-600 bg-slate-800/60 p-10 text-center">
-      <div className="text-5xl mb-2">🧩</div>
-      <p className="text-slate-100 font-semibold">Nenhum pack encontrado</p>
-      <p className="text-slate-400 text-sm mt-1">Tente outra busca ou remova os filtros ativos.</p>
-      <button type="button" onClick=${onClear} className="mt-4 inline-flex items-center justify-center rounded-xl border border-slate-600 px-4 py-2 text-sm text-slate-200 hover:bg-slate-700 transition">Limpar filtros</button>
+    <div className="market-glass rounded-3xl p-8 text-center sm:p-10">
+      <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl border border-cyan-400/35 bg-cyan-500/12 text-2xl">🧩</div>
+      <p className="text-slate-100 font-semibold text-lg">Nenhum pack encontrado</p>
+      <p className="text-slate-400 text-sm mt-1">Tente outra busca, categoria ou limpe os filtros para descobrir novos packs.</p>
+      <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+        <button type="button" onClick=${onClear} className="inline-flex items-center justify-center rounded-xl border border-slate-600 px-4 py-2 text-sm text-slate-200 hover:bg-slate-800 transition">Limpar filtros</button>
+        <a href="/stickers/create/" className="inline-flex items-center justify-center rounded-xl border border-emerald-400/35 bg-emerald-500/12 px-4 py-2 text-sm font-semibold text-emerald-100 hover:bg-emerald-500/22 transition">Criar pack</a>
+      </div>
     </div>
   `;
 }
@@ -2089,6 +2092,28 @@ function StickersApp() {
         .slice(0, MOBILE_DISCOVER_CAROUSEL_LIMIT),
     [packs],
   );
+  const catalogTotals = useMemo(() => {
+    let stickers = 0;
+    let likes = 0;
+    let downloads = 0;
+    const creators = new Set();
+    for (const pack of packs) {
+      stickers += Math.max(0, Number(pack?.sticker_count || 0));
+      const engagement = getPackEngagement(pack);
+      likes += Math.max(0, Number(engagement.likeCount || 0));
+      downloads += Math.max(0, Number(engagement.openCount || 0));
+      const publisher = String(pack?.publisher || '').trim();
+      if (publisher) creators.add(publisher);
+    }
+    return {
+      packs: packs.length,
+      stickers,
+      likes,
+      downloads,
+      creators: creators.size,
+    };
+  }, [packs]);
+  const highlightCreator = String(featuredCreators?.[0]?.publisher || '').trim();
 
   const hasAnyResult = packs.length > 0;
   const canGoCatalogPrev = catalogPage > FIRST_CATALOG_PAGE && !packsLoading;
@@ -3449,11 +3474,74 @@ function StickersApp() {
   };
 
   return html`
-    <div className="min-h-screen bg-slate-950 text-slate-100">
+    <div className="min-h-screen bg-slate-950 text-slate-100 stickers-market-shell">
       <style>
         ${`@keyframes fadeInCard { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulseGlow { 0%, 100% { opacity: 0.58; } 50% { opacity: 0.94; } }
         .fade-card { animation: fadeInCard 260ms ease both; }
         .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .stickers-market-shell { --market-blue: #0f172a; --market-cyan: #22d3ee; --market-green: #34d399; scroll-behavior: smooth; }
+        .market-shell-glow {
+          pointer-events: none;
+          position: fixed;
+          inset: 0;
+          z-index: 0;
+          background:
+            radial-gradient(48rem 28rem at 4% -10%, rgba(52, 211, 153, 0.14), transparent 62%),
+            radial-gradient(40rem 24rem at 96% -8%, rgba(34, 211, 238, 0.15), transparent 60%),
+            radial-gradient(52rem 30rem at 50% 120%, rgba(15, 23, 42, 0.84), transparent 70%);
+        }
+        .market-glass {
+          border: 1px solid rgba(71, 85, 105, 0.52);
+          background: linear-gradient(180deg, rgba(15, 23, 42, 0.78), rgba(2, 6, 23, 0.72));
+          box-shadow: 0 20px 42px rgba(2, 6, 23, 0.36);
+          backdrop-filter: blur(14px);
+        }
+        .market-header-glass {
+          border-bottom: 1px solid rgba(71, 85, 105, 0.45);
+          background: linear-gradient(180deg, rgba(2, 6, 23, 0.84), rgba(2, 6, 23, 0.68));
+          backdrop-filter: blur(16px);
+        }
+        .market-search-shell {
+          border: 1px solid rgba(71, 85, 105, 0.55);
+          background: linear-gradient(180deg, rgba(15, 23, 42, 0.95), rgba(15, 23, 42, 0.85));
+          box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.35);
+        }
+        .catalog-hero {
+          position: relative;
+          overflow: hidden;
+        }
+        .catalog-hero::before {
+          content: '';
+          position: absolute;
+          inset: -24% -10% auto;
+          height: 82%;
+          background: radial-gradient(26rem 14rem at 22% 0%, rgba(52, 211, 153, 0.18), transparent 65%);
+          animation: pulseGlow 6.8s ease-in-out infinite;
+          pointer-events: none;
+        }
+        .catalog-hero::after {
+          content: '';
+          position: absolute;
+          inset: auto -20% -38% -15%;
+          height: 70%;
+          background: radial-gradient(26rem 12rem at 70% 60%, rgba(34, 211, 238, 0.13), transparent 70%);
+          pointer-events: none;
+        }
+        .kpi-card {
+          border: 1px solid rgba(71, 85, 105, 0.5);
+          background: rgba(2, 6, 23, 0.42);
+        }
+        .metric-card {
+          border: 1px solid rgba(71, 85, 105, 0.5);
+          background: linear-gradient(180deg, rgba(2, 6, 23, 0.62), rgba(2, 6, 23, 0.38));
+          border-radius: 14px;
+        }
+        .market-sidebar-panel {
+          border: 1px solid rgba(71, 85, 105, 0.54);
+          background: linear-gradient(180deg, rgba(15, 23, 42, 0.82), rgba(2, 6, 23, 0.72));
+          backdrop-filter: blur(10px);
+        }
         .chips-scroll {
           scroll-snap-type: x mandatory;
           -webkit-overflow-scrolling: touch;
@@ -3465,86 +3553,101 @@ function StickersApp() {
         .chips-scroll::-webkit-scrollbar { display: none; }
         .chip-item { scroll-snap-align: start; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
         .pack-stickers-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .market-catalog-grid { display: grid; gap: 0.8rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        @media (min-width: 768px) {
+          .market-catalog-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        }
         @media (min-width: 1024px) {
           .pack-stickers-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+          .market-catalog-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        }
+        @media (min-width: 1280px) {
+          .market-catalog-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        }
+        @media (min-width: 1536px) {
+          .market-catalog-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+        }
+        @media (max-width: 767px) {
+          .market-header-action-label {
+            display: none;
+          }
         }
         @media (prefers-reduced-motion: reduce) {
           .fade-card { animation: none; }
+          .catalog-hero::before { animation: none; }
         }`}
       </style>
 
-      <header className=${`sticky top-0 z-30 border-b border-slate-800 bg-slate-950/95 backdrop-blur transition-shadow ${isScrolled ? 'shadow-[0_8px_24px_rgba(2,6,23,0.45)]' : ''}`}>
-        <div className="max-w-7xl mx-auto h-14 px-3 flex items-center gap-2.5">
-          <a href="/" className="shrink-0 flex items-center gap-2">
-            <img src=${OMNIZAP_LOGO_DATA_URL} alt="OmniZap" className="w-7 h-7 rounded-full border border-slate-700" decoding="async" />
-            <span className="hidden sm:inline text-sm font-semibold">OmniZap</span>
-          </a>
+      <div className="market-shell-glow"></div>
 
-          ${currentView === 'catalog'
-            ? html`
-                <form onSubmit=${onSubmit} className="flex-1 relative">
-                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400">🔎</span>
-                  <input
-                    type="search"
-                    value=${query}
-                    onChange=${(e) => setQuery(e.target.value)}
-                    onFocus=${() => setShowAutocomplete(true)}
-                    onBlur=${() => setTimeout(() => setShowAutocomplete(false), 120)}
-                    onKeyDown=${(event) => {
-                      if (event.key === 'Escape') {
-                        setShowAutocomplete(false);
-                      }
-                    }}
-                    placeholder="Buscar packs..."
-                    className="w-full h-9 sm:h-10 rounded-2xl border border-slate-800 bg-slate-900 pl-[34px] sm:pl-9 pr-3 text-sm text-slate-100 placeholder:text-slate-500 outline-none transition focus:border-emerald-400/50 focus:ring-2 focus:ring-emerald-400/15"
-                  />
-                  ${showAutocomplete && filteredSuggestions.length
-                    ? html`
-                        <div className="absolute z-40 mt-2 w-full rounded-2xl border border-slate-800 bg-slate-900 shadow-xl overflow-hidden">
-                          ${filteredSuggestions.map(
-                            (item) => html`
-                              <button key=${item.value} type="button" onClick=${() => applySuggestion(item)} className="w-full px-3 py-2.5 text-left text-sm text-slate-200 hover:bg-slate-800 flex items-center justify-between gap-2 border-b border-slate-800 last:border-b-0">
-                                <span className="inline-flex items-center gap-2">
-                                  <span>${item.icon || '🏷'}</span>
-                                  <span className="truncate">${item.label}</span>
-                                </span>
-                                <span className="text-xs text-slate-400 truncate">${item.value}</span>
-                              </button>
-                            `,
-                          )}
-                        </div>
-                      `
-                    : null}
-                </form>
-              `
-            : html`<div className="flex-1"></div>`}
-
-          <div className="flex items-center gap-2">
-            <button type="button" className=${`text-xs rounded-lg border px-3 py-2 ${isProfileView ? 'border-amber-400/40 bg-amber-400/10 text-amber-200' : 'border-amber-500/30 bg-amber-500/5 text-amber-200 hover:bg-amber-500/10'}`} onClick=${() => openProfile(true)} title="Meu perfil e packs">
-              <span className="sm:hidden">👤</span>
-              <span className="hidden sm:inline">Meus Packs</span>
-            </button>
-            <a className="text-xs rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3 py-2 text-cyan-200 hover:bg-cyan-500/20" href="/stickers/create/" title="Criar pack">
-              <span className="sm:hidden">➕</span>
-              <span className="hidden sm:inline">✨ Criar pack agora</span>
+      <header className=${`sticky top-0 z-30 market-header-glass transition-shadow ${isScrolled ? 'shadow-[0_16px_44px_rgba(2,6,23,0.52)]' : ''}`}>
+        <div className="mx-auto w-full max-w-[1400px] px-3 sm:px-4 lg:px-6">
+          <div className="flex h-[74px] items-center gap-2.5 md:gap-3.5">
+            <a href="/" className="shrink-0 flex items-center gap-2.5">
+              <img src=${OMNIZAP_LOGO_DATA_URL} alt="OmniZap" className="h-9 w-9 rounded-full border border-slate-700/90 ring-2 ring-slate-800/70" decoding="async" />
+              <span className="hidden md:inline text-sm font-semibold tracking-wide text-slate-100">OmniZap Marketplace</span>
             </a>
-            ${supportInfo?.url
+
+            ${currentView === 'catalog'
               ? html`
-                  <a className="text-xs rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-emerald-200 hover:bg-emerald-500/20" href=${supportInfo.url} target="_blank" rel="noreferrer noopener" title="Suporte no WhatsApp">
-                    <span className="sm:hidden">💬</span>
-                    <span className="hidden sm:inline">Suporte</span>
-                  </a>
+                  <form onSubmit=${onSubmit} className="relative mx-auto w-full max-w-[760px]">
+                    <div className="market-search-shell h-11 rounded-2xl">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-slate-400">🔎</span>
+                      <input
+                        type="search"
+                        value=${query}
+                        onChange=${(e) => setQuery(e.target.value)}
+                        onFocus=${() => setShowAutocomplete(true)}
+                        onBlur=${() => setTimeout(() => setShowAutocomplete(false), 120)}
+                        onKeyDown=${(event) => {
+                          if (event.key === 'Escape') {
+                            setShowAutocomplete(false);
+                          }
+                        }}
+                        placeholder="Buscar packs, temas e criadores"
+                        className="h-full w-full rounded-2xl bg-transparent pl-10 pr-3 text-sm text-slate-100 placeholder:text-slate-500 outline-none transition focus:ring-2 focus:ring-cyan-400/25"
+                      />
+                    </div>
+                    ${showAutocomplete && filteredSuggestions.length
+                      ? html`
+                          <div className="absolute z-40 mt-2 w-full overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 shadow-xl">
+                            ${filteredSuggestions.map(
+                              (item) => html`
+                                <button key=${item.value} type="button" onClick=${() => applySuggestion(item)} className="w-full border-b border-slate-800 px-3 py-2.5 text-left text-sm text-slate-200 hover:bg-slate-800 last:border-b-0 flex items-center justify-between gap-2">
+                                  <span className="inline-flex items-center gap-2">
+                                    <span>${item.icon || '🏷'}</span>
+                                    <span className="truncate">${item.label}</span>
+                                  </span>
+                                  <span className="truncate text-xs text-slate-400">${item.value}</span>
+                                </button>
+                              `,
+                            )}
+                          </div>
+                        `
+                      : null}
+                  </form>
                 `
-              : null}
-            <div className="hidden sm:flex items-center gap-2">
-              <a className="text-xs rounded-lg border border-slate-700 px-3 py-2 text-slate-300 hover:bg-slate-800" href="/api-docs/">API</a>
-              <a className="text-xs rounded-lg border border-slate-700 px-3 py-2 text-slate-300 hover:bg-slate-800" href="https://github.com/Omnizap-System/omnizap" target="_blank" rel="noreferrer noopener">GitHub</a>
+              : html`<div className="flex-1"></div>`}
+
+            <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+              <button type="button" className=${`inline-flex h-10 items-center gap-1.5 rounded-xl border px-2.5 text-xs transition ${isProfileView ? 'border-cyan-400/45 bg-cyan-500/12 text-cyan-100' : 'border-slate-700 bg-slate-900/65 text-slate-200 hover:bg-slate-800'}`} onClick=${() => openProfile(true)} title="Meus packs">
+                <span>📦</span>
+                <span className="market-header-action-label">Meus Packs</span>
+              </button>
+              <a className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-emerald-400/35 bg-emerald-500/14 px-2.5 text-xs font-semibold text-emerald-100 hover:bg-emerald-500/24 transition" href="/stickers/create/" title="Criar pack">
+                <span>✨</span>
+                <span className="market-header-action-label">Criar Pack</span>
+              </a>
+              <button type="button" onClick=${() => openProfile(true)} className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-700 bg-slate-900/65 px-2 text-xs text-slate-200 hover:bg-slate-800 transition" title="Perfil">
+                ${hasGoogleLogin && googleAuth?.user?.picture ? html`<img src=${googleAuth.user.picture} alt="Perfil" className="h-6 w-6 rounded-full border border-slate-700 object-cover" />` : html`<span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-700 bg-slate-800">👤</span>`}
+                <span className="market-header-action-label">Perfil</span>
+              </button>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-3 py-2.5 sm:py-3 space-y-3 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+      <main className="relative z-[1] mx-auto w-full max-w-[1400px] px-3 py-3.5 sm:px-4 sm:py-4 lg:px-6 space-y-3.5 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         ${error ? html`<div className="rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">${error}</div>` : null}
         ${isProfileView
           ? html` <${CreatorProfileDashboard} googleAuthConfig=${googleAuthConfig} googleAuth=${googleAuth} googleAuthBusy=${googleAuthBusy} googleAuthError=${googleAuthError} googleSessionChecked=${googleSessionChecked} myPacks=${myPacks} myPacksLoading=${myPacksLoading} myPacksError=${myPacksError} myProfileStats=${myProfileStats} onBack=${goCatalog} onRefresh=${() => refreshMyProfile()} onLogout=${handleGoogleLogout} onOpenPublicPack=${openPack} onOpenPackActions=${openPackActionsSheet} onOpenManagePack=${(pack) => openManagePackByKey(pack?.pack_key || '')} onRequestDeletePack=${requestDeletePack} packActionBusyByKey=${packActionBusyByKey} /> `
@@ -3553,28 +3656,77 @@ function StickersApp() {
             : currentPackKey
               ? html` ${packLoading ? html`<${PackPageSkeleton} />` : html`<${PackPage} pack=${currentPack} relatedPacks=${relatedPacks} relatedLoading=${relatedPacksLoading} onLoadRelated=${requestRelatedPacksForCurrentPack} onBack=${goCatalog} onOpenRelated=${openPack} onLike=${handleLike} onDislike=${handleDislike} onTagClick=${openCatalogTagFilter} reactionLoading=${reactionLoading} reactionNotice=${reactionNotice} hasNsfwAccess=${hasNsfwAccess} onRequireLogin=${requestNsfwUnlock} />`} `
               : html`
-                  <div className="lg:grid lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-4">
+                  <section className="catalog-hero market-glass rounded-[28px] p-4 sm:p-5 lg:p-6">
+                    <div className="relative z-[1] flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                      <div className="max-w-3xl">
+                        <p className="text-[11px] uppercase tracking-[0.16em] text-emerald-200/85">OmniZap Marketplace</p>
+                        <h1 className="mt-1 text-xl font-semibold leading-tight text-slate-100 sm:text-2xl lg:text-3xl">Packs de stickers prontos para seu WhatsApp</h1>
+                        <p className="mt-2 text-sm leading-relaxed text-slate-300">Explore coleções curadas, descubra criadores com melhor performance e publique novos packs com mais conversão.</p>
+                        ${highlightCreator ? html`<p className="mt-2 text-xs text-cyan-200/90">⭐ Criador em destaque hoje: <span className="font-semibold">${highlightCreator}</span></p>` : null}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button type="button" onClick=${openTrendingCatalog} className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-cyan-400/35 bg-cyan-500/14 px-3 text-xs font-semibold text-cyan-100 hover:bg-cyan-500/24 transition">🔎 Explorar packs</button>
+                        <a href="/stickers/create/" className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-emerald-400/35 bg-emerald-500/14 px-3 text-xs font-semibold text-emerald-100 hover:bg-emerald-500/24 transition">✨ Criar pack</a>
+                        <button type="button" onClick=${() => openCreatorsRanking('popular', true)} className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-indigo-400/35 bg-indigo-500/10 px-3 text-xs font-semibold text-indigo-100 hover:bg-indigo-500/20 transition">⭐ Ver criadores</button>
+                      </div>
+                    </div>
+                    <div className="relative z-[1] mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+                      <article className="metric-card px-3 py-2.5">
+                        <p className="text-[10px] uppercase tracking-wide text-slate-400">Packs</p>
+                        <p className="mt-1 text-base font-semibold text-slate-100">${shortNum(catalogTotals.packs)}</p>
+                      </article>
+                      <article className="metric-card px-3 py-2.5">
+                        <p className="text-[10px] uppercase tracking-wide text-slate-400">Stickers</p>
+                        <p className="mt-1 text-base font-semibold text-slate-100">${shortNum(catalogTotals.stickers)}</p>
+                      </article>
+                      <article className="metric-card px-3 py-2.5">
+                        <p className="text-[10px] uppercase tracking-wide text-slate-400">Likes</p>
+                        <p className="mt-1 text-base font-semibold text-slate-100">${shortNum(catalogTotals.likes)}</p>
+                      </article>
+                      <article className="metric-card px-3 py-2.5">
+                        <p className="text-[10px] uppercase tracking-wide text-slate-400">Downloads</p>
+                        <p className="mt-1 text-base font-semibold text-slate-100">${shortNum(catalogTotals.downloads)}</p>
+                      </article>
+                      <article className="metric-card col-span-2 px-3 py-2.5 sm:col-span-1">
+                        <p className="text-[10px] uppercase tracking-wide text-slate-400">Criadores ativos</p>
+                        <p className="mt-1 text-base font-semibold text-slate-100">${shortNum(catalogTotals.creators)}</p>
+                      </article>
+                    </div>
+                  </section>
+                  <div className="lg:grid lg:grid-cols-[280px_minmax(0,1fr)] lg:gap-5">
                     <aside className="hidden lg:block">
-                      <div className="sticky top-[72px] space-y-2.5 rounded-2xl border border-slate-800 bg-slate-900/80 p-2.5">
-                        <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-2">
+                      <div className="market-sidebar-panel sticky top-[98px] space-y-3 rounded-2xl p-3">
+                        <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-3">
                           <div className="flex items-center justify-between gap-2">
-                            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-300">Filtros</h3>
-                            <button type="button" onClick=${clearFilters} className="h-8 rounded-lg border border-slate-700 px-2 text-[11px] text-slate-200 hover:bg-slate-800">Limpar</button>
+                            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-200">Filtros</h3>
+                            <button type="button" onClick=${clearFilters} className="h-8 rounded-lg border border-slate-700 px-2.5 text-[11px] text-slate-200 hover:bg-slate-800 transition">Limpar</button>
                           </div>
-                          <p className="mt-1 text-[11px] text-slate-500">${packs.length} packs nesta página</p>
+                          <p className="mt-1 text-[11px] text-slate-500">${sortedPacks.length} packs nesta página</p>
                         </div>
 
-                        <details open className="rounded-xl border border-slate-800 bg-slate-950/40 p-2">
-                          <summary className="cursor-pointer list-none text-xs font-semibold text-slate-200">Ordenar catálogo</summary>
-                          <div className="mt-2 space-y-1.5">${CATALOG_SORT_OPTIONS.map((option) => html` <button key=${option.value} type="button" onClick=${() => handleCatalogSortSelection(option.value)} disabled=${sortPickerBusy} className=${`w-full h-9 rounded-xl border text-xs disabled:opacity-60 ${normalizeCatalogSort(sortBy) === option.value ? 'border-emerald-400 bg-emerald-400/10 text-emerald-200' : 'border-slate-700 text-slate-300 hover:bg-slate-800'}`}>${option.icon} ${option.label}</button> `)}</div>
-                        </details>
+                        <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-3">
+                          <p className="text-xs font-semibold text-slate-100">Ordenação rápida</p>
+                          <div className="mt-2 space-y-1.5">
+                            ${[
+                              { value: 'recent', label: 'Mais recentes', icon: '🆕' },
+                              { value: 'likes', label: 'Mais curtidos', icon: '👍' },
+                              { value: 'downloads', label: 'Mais baixados', icon: '⬇️' },
+                            ].map((option) => html` <button key=${option.value} type="button" onClick=${() => handleCatalogSortSelection(option.value)} disabled=${sortPickerBusy} className=${`w-full h-9 rounded-xl border px-2.5 text-left text-xs transition disabled:opacity-60 ${normalizeCatalogSort(sortBy) === option.value ? 'border-cyan-400/40 bg-cyan-500/14 text-cyan-100' : 'border-slate-700 text-slate-200 hover:bg-slate-800'}`}>${option.icon} ${option.label}</button> `)}
+                          </div>
+                        </div>
 
-                        ${supportInfo?.url ? html` <a href=${supportInfo.url} target="_blank" rel="noreferrer noopener" className="w-full h-9 inline-flex items-center justify-center rounded-xl border border-emerald-500/35 bg-emerald-500/10 text-xs text-emerald-200 hover:bg-emerald-500/20"> 💬 Suporte no WhatsApp </a> ` : null}
+                        <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-3">
+                          <p className="text-xs font-semibold text-slate-100">Categorias</p>
+                          <div className="mt-2 flex flex-wrap gap-1.5">${dynamicCategoryOptions.slice(0, 12).map((item) => html` <button key=${`sidebar-${item.value || 'all'}`} type="button" onClick=${() => handleCategoryChipPress(item.value)} className=${`h-8 rounded-full border px-2.5 text-[11px] transition ${activeCategory === item.value ? 'border-emerald-300 bg-emerald-400 text-slate-900 font-semibold' : 'border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800'}`}>${item.label}</button> `)}</div>
+                        </div>
+
+                        <button type="button" onClick=${openTrendingCatalog} className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-xl border border-cyan-400/35 bg-cyan-500/12 text-xs font-semibold text-cyan-100 hover:bg-cyan-500/22 transition">🔥 Em alta agora</button>
+                        ${supportInfo?.url ? html` <a href=${supportInfo.url} target="_blank" rel="noreferrer noopener" className="inline-flex h-9 w-full items-center justify-center rounded-xl border border-emerald-500/35 bg-emerald-500/10 text-xs text-emerald-200 hover:bg-emerald-500/20 transition"> 💬 Suporte no WhatsApp </a> ` : null}
                       </div>
                     </aside>
 
                     <div className="space-y-3 min-w-0">
-                      <section className="space-y-2 min-w-0">
+                      <section className="space-y-2 min-w-0 rounded-2xl border border-slate-800/80 bg-slate-900/65 px-2.5 py-2 lg:hidden">
                         <div className="relative min-w-0">
                           <div className="absolute left-0 top-0 bottom-0 w-5 bg-gradient-to-r from-slate-950 to-transparent pointer-events-none z-10"></div>
                           <div className="absolute right-0 top-0 bottom-0 w-5 bg-gradient-to-l from-slate-950 to-transparent pointer-events-none z-10"></div>
@@ -3585,7 +3737,7 @@ function StickersApp() {
                       ${packs.length
                         ? html`
                             <section className="space-y-2">
-                              <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-2.5">
+                              <div className="market-glass rounded-2xl p-3">
                                 <div className="flex flex-wrap items-center justify-between gap-2">
                                   <div>
                                     <p className="text-[11px] uppercase tracking-wide text-slate-400">Descobrir</p>
@@ -3713,7 +3865,7 @@ function StickersApp() {
                                 </div>
                               </div>
 
-                              <div className="hidden lg:block rounded-2xl border border-emerald-500/20 bg-gradient-to-r from-emerald-500/10 to-cyan-500/5 p-2.5">
+                              <div className="hidden lg:block rounded-2xl border border-emerald-500/20 bg-gradient-to-r from-emerald-500/10 to-cyan-500/5 p-3">
                                 <div className="flex items-center justify-between gap-3">
                                   <div>
                                     <p className="text-xs font-semibold text-emerald-100">Quer aparecer em destaque?</p>
@@ -3727,28 +3879,28 @@ function StickersApp() {
                         : null}
                       ${packs.length
                         ? html`
-                            <section id="catalog-packs-section" className="space-y-3 min-w-0">
-                              <div className="flex items-end justify-between gap-3">
+                            <section id="catalog-packs-section" className="space-y-3.5 min-w-0">
+                              <div className="flex flex-wrap items-end justify-between gap-3">
                                 <div>
-                                  <h2 className="text-lg sm:text-xl font-bold">Packs</h2>
+                                  <h2 className="text-lg sm:text-xl font-bold">Catálogo de Packs</h2>
                                   <p className="text-xs text-slate-400">Página ${catalogPage} · ${sortedPacks.length} resultados · ${categoryActiveLabel}</p>
                                 </div>
                                 <div className="hidden md:flex items-center gap-2">
                                   <span className="text-xs text-slate-400">Ordenar por</span>
-                                  <button type="button" onClick=${openSortPicker} disabled=${sortPickerBusy} className="inline-flex h-8 items-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-3 text-xs text-slate-200 hover:bg-slate-800 disabled:opacity-60">
+                                  <button type="button" onClick=${openSortPicker} disabled=${sortPickerBusy} className="inline-flex h-8 items-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-3 text-xs text-slate-200 hover:bg-slate-800 disabled:opacity-60 transition">
                                     <span>${catalogSortLabel(sortBy)}</span>
                                     <span className="text-[10px] text-slate-400">▾</span>
                                   </button>
                                 </div>
                               </div>
-                              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2">
+                              <div className="market-glass flex flex-wrap items-center justify-between gap-2 rounded-xl px-3 py-2.5">
                                 <span className="text-xs text-slate-400">Página ${catalogPage}${packHasMore ? ' · há mais resultados' : ' · fim da lista'}</span>
                                 <div className="flex items-center gap-2">
-                                  <button type="button" onClick=${() => goToCatalogPage(catalogPage - 1, { push: true })} disabled=${!canGoCatalogPrev} className="inline-flex h-8 items-center rounded-lg border border-slate-700 px-3 text-xs text-slate-200 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50">Anterior</button>
-                                  <button type="button" onClick=${() => goToCatalogPage(catalogPage + 1, { push: true })} disabled=${!canGoCatalogNext} className="inline-flex h-8 items-center rounded-lg border border-slate-700 px-3 text-xs text-slate-200 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50">Próxima</button>
+                                  <button type="button" onClick=${() => goToCatalogPage(catalogPage - 1, { push: true })} disabled=${!canGoCatalogPrev} className="inline-flex h-8 items-center rounded-lg border border-slate-700 px-3 text-xs text-slate-200 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 transition">Anterior</button>
+                                  <button type="button" onClick=${() => goToCatalogPage(catalogPage + 1, { push: true })} disabled=${!canGoCatalogNext} className="inline-flex h-8 items-center rounded-lg border border-slate-700 px-3 text-xs text-slate-200 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 transition">Próxima</button>
                                 </div>
                               </div>
-                              <div className="grid min-w-0 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2.5 sm:gap-3">
+                              <div className="market-catalog-grid min-w-0">
                                 ${sortedPacks.map(
                                   (pack, index) =>
                                     html`<div key=${pack.pack_key || pack.id} className="fade-card">
@@ -3756,11 +3908,11 @@ function StickersApp() {
                                     </div>`,
                                 )}
                               </div>
-                              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2">
+                              <div className="market-glass flex flex-wrap items-center justify-between gap-2 rounded-xl px-3 py-2.5">
                                 <span className="text-xs text-slate-400">Página ${catalogPage}${packHasMore ? ' · há mais resultados' : ' · fim da lista'}</span>
                                 <div className="flex items-center gap-2">
-                                  <button type="button" onClick=${() => goToCatalogPage(catalogPage - 1, { push: true })} disabled=${!canGoCatalogPrev} className="inline-flex h-8 items-center rounded-lg border border-slate-700 px-3 text-xs text-slate-200 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50">Anterior</button>
-                                  <button type="button" onClick=${() => goToCatalogPage(catalogPage + 1, { push: true })} disabled=${!canGoCatalogNext} className="inline-flex h-8 items-center rounded-lg border border-slate-700 px-3 text-xs text-slate-200 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50">Próxima</button>
+                                  <button type="button" onClick=${() => goToCatalogPage(catalogPage - 1, { push: true })} disabled=${!canGoCatalogPrev} className="inline-flex h-8 items-center rounded-lg border border-slate-700 px-3 text-xs text-slate-200 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 transition">Anterior</button>
+                                  <button type="button" onClick=${() => goToCatalogPage(catalogPage + 1, { push: true })} disabled=${!canGoCatalogNext} className="inline-flex h-8 items-center rounded-lg border border-slate-700 px-3 text-xs text-slate-200 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 transition">Próxima</button>
                                 </div>
                               </div>
                             </section>

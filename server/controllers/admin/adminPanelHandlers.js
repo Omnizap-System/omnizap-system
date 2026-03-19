@@ -200,7 +200,9 @@ export const createStickerCatalogAdminHandlers = ({ executeQuery, tables, logger
       const version = sanitizeText(payload?.version || '', 40, { allowEmpty: true }) || null;
       const commit = sanitizeText(payload?.commit || '', 80, { allowEmpty: true }) || null;
       const database = sanitizeText(payload?.database || '', 30, { allowEmpty: true }) || null;
-      const normalizedDatabase = String(database || '').trim().toLowerCase();
+      const normalizedDatabase = String(database || '')
+        .trim()
+        .toLowerCase();
       const status = !response.ok ? 'offline' : normalizedDatabase === 'ok' ? 'online' : normalizedDatabase ? 'degraded' : 'online';
 
       const snapshot = {

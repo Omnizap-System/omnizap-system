@@ -32,17 +32,7 @@ const HELMET_CSP_ENFORCE = parseEnvBool(process.env.HELMET_CONTENT_SECURITY_POLI
 const BACKEND_BUILD_ID = String(process.env.OMNIZAP_BUILD_ID || '')
   .trim()
   .slice(0, 80);
-const FRAME_SRC_EXTRA = Array.from(
-  new Set(
-    [
-      ...parseEnvList(process.env.HELMET_CSP_FRAME_SRC_EXTRA),
-      process.env.SYSTEM_ADMIN_GRAFANA_URL,
-      process.env.GRAFANA_PUBLIC_URL,
-    ]
-      .map((item) => toHttpOrigin(item))
-      .filter(Boolean),
-  ),
-);
+const FRAME_SRC_EXTRA = Array.from(new Set([...parseEnvList(process.env.HELMET_CSP_FRAME_SRC_EXTRA), process.env.SYSTEM_ADMIN_GRAFANA_URL, process.env.GRAFANA_PUBLIC_URL].map((item) => toHttpOrigin(item)).filter(Boolean)));
 
 const HELMET_CSP_DIRECTIVES = {
   defaultSrc: ["'self'"],

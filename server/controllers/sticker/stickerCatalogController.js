@@ -3199,7 +3199,7 @@ const handleCreatePackRequest = async (req, res) => {
   });
   const manualTags = mergeUniqueTags(Array.isArray(payload?.tags) ? payload.tags : []).slice(0, 8);
   const persistedDescription = buildPackDescriptionWithTags(description, manualTags);
-  const visibility = String(payload?.visibility || 'public')
+  const visibility = String(payload?.visibility || 'private')
     .trim()
     .toLowerCase();
   const googleSession = await resolveGoogleWebSessionFromRequest(req);

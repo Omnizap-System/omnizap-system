@@ -725,7 +725,7 @@ export async function handlePackCommand({ sock, remoteJid, messageInfo, expirati
         const name = normalizePackName(base);
         const publisher = options.publisher || options.pub || options.autor || senderName || 'OmniZap';
         const description = options.desc || options.description || '';
-        const visibility = options.visibility || options.vis || 'public';
+        const visibility = options.visibility || options.vis || 'private';
 
         const created = await stickerPackService.createPack({
           ownerJid,

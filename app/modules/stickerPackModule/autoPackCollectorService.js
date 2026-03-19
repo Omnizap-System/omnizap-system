@@ -5,7 +5,11 @@ import { sanitizeText } from './stickerPackUtils.js';
  * Serviço responsável por direcionar figurinhas recém-criadas para packs automáticos.
  */
 const DEFAULT_AUTO_PACK_NAME = process.env.STICKER_PACK_AUTO_PACK_NAME || 'pack';
-const AUTO_PACK_TARGET_VISIBILITY = 'unlisted';
+const VALID_VISIBILITIES = new Set(['public', 'unlisted', 'private']);
+const AUTO_PACK_TARGET_VISIBILITY_RAW = String(process.env.STICKER_PACK_AUTO_COLLECT_VISIBILITY || process.env.STICKER_AUTO_PACK_BY_TAGS_VISIBILITY || 'public')
+  .trim()
+  .toLowerCase();
+const AUTO_PACK_TARGET_VISIBILITY = VALID_VISIBILITIES.has(AUTO_PACK_TARGET_VISIBILITY_RAW) ? AUTO_PACK_TARGET_VISIBILITY_RAW : 'public';
 const AUTO_COLLECT_ENABLED = process.env.STICKER_PACK_AUTO_COLLECT_ENABLED !== 'false';
 const AUTO_PACK_NAME_MAX_LENGTH = 120;
 const AUTO_PACK_DESCRIPTION_MARKER = '[auto-pack:collector]';
