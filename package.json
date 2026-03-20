@@ -141,7 +141,7 @@
     "music-metadata": {
       "file-type": "21.3.2"
     },
-    "flatted": "3.4.1"
+    "flatted": "3.4.2"
   },
   "engines": {
     "node": ">=18.0.0"
