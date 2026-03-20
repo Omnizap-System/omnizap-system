@@ -1,11 +1,8 @@
 import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
 import { after, test } from 'node:test';
 
-import { __playYtDlpClientTestUtils } from './playCommandYtDlpClient.js';
+import { __playMediaClientTestUtils } from './playCommandMediaClient.js';
 
 const withEnv = async (overrides, fn) => {
   const previous = new Map();
@@ -42,7 +39,7 @@ after(async () => {
 });
 
 test('resolve candidates deduplica URLs e ignora inválidas', () => {
-  const urls = __playYtDlpClientTestUtils.extractCandidateUrlsFromSearchResult({
+  const urls = __playMediaClientTestUtils.extractCandidateUrlsFromSearchResult({
     resultado: { url: 'https://www.youtube.com/watch?v=abc123' },
     resultados: [{ url: 'https://www.youtube.com/watch?v=abc123' }, { url: 'https://youtu.be/xyz987' }, { url: 'not-an-url' }, { url: 'https://www.youtube.com/watch?v=zzz000' }],
   });
@@ -50,138 +47,44 @@ test('resolve candidates deduplica URLs e ignora inválidas', () => {
   assert.deepEqual(urls, ['https://www.youtube.com/watch?v=abc123', 'https://youtu.be/xyz987', 'https://www.youtube.com/watch?v=zzz000']);
 });
 
-test('estratégia de formato gera tentativas de fallback para áudio e vídeo', () => {
-  const link = 'https://www.youtube.com/watch?v=test123';
-  const outputTemplate = '/tmp/play-test.%(ext)s';
-
-  const audioAttempts = __playYtDlpClientTestUtils.buildDownloadAttemptArgsList({
-    type: 'audio',
-    outputTemplate,
-    link,
-  });
-  assert.ok(audioAttempts.length >= 2);
-  assert.ok(audioAttempts[0].includes('-x'));
-  assert.ok(audioAttempts[0].includes('--audio-format'));
-  assert.equal(audioAttempts[0][audioAttempts[0].length - 1], link);
-
-  const videoAttempts = __playYtDlpClientTestUtils.buildDownloadAttemptArgsList({
-    type: 'video',
-    outputTemplate,
-    link,
-  });
-  assert.ok(videoAttempts.length >= 2);
-  assert.ok(videoAttempts[0].includes('--merge-output-format'));
-  assert.equal(videoAttempts[0][videoAttempts[0].length - 1], link);
-});
-
-test('remove argumentos de cookies do yt-dlp sem afetar flags restantes', () => {
-  const args = [
-    '--ignore-config',
-    '--cookies',
-    '/tmp/cookies.txt',
-    '--cookies-from-browser',
-    'firefox',
-    '--cookies=/tmp/cookies-inline.txt',
-    '--cookies-from-browser=chrome',
-    '--no-progress',
-    '-f',
-    'bestaudio/best',
-    'https://www.youtube.com/watch?v=test123',
-  ];
-
-  assert.equal(__playYtDlpClientTestUtils.hasYtDlpCookieArgs(args), true);
-
-  const sanitized = __playYtDlpClientTestUtils.stripYtDlpCookieArgs(args);
-
-  assert.deepEqual(sanitized, ['--ignore-config', '--no-progress', '-f', 'bestaudio/best', 'https://www.youtube.com/watch?v=test123']);
-  assert.equal(__playYtDlpClientTestUtils.hasYtDlpCookieArgs(sanitized), false);
-});
-
-test('detecta erro de formato indisponível mesmo após normalização em meta.cause', () => {
-  const normalizedError = {
-    code: 'EAPI',
-    message: 'Falha ao baixar o arquivo localmente.',
-    meta: {
-      cause: 'ERROR: [youtube] eFcj2MBBWBE: Requested format is not available. Use --list-formats for a list of available formats',
-    },
-  };
-
-  assert.equal(__playYtDlpClientTestUtils.isRequestedFormatUnavailableError(normalizedError), true);
-});
-
-test('fallback ytmp3 só é elegível para áudio de YouTube com erro de formato', () => {
-  const formatError = {
-    meta: {
-      cause: 'Requested format is not available',
-    },
-  };
-
+test('ytmp3 principal é elegível para áudio e vídeo com URL do YouTube', () => {
   assert.equal(
-    __playYtDlpClientTestUtils.isYtmp3FallbackEligible({
+    __playMediaClientTestUtils.isYtmp3PrimaryEligible({
       type: 'audio',
       link: 'https://www.youtube.com/watch?v=test1234567A',
-      error: formatError,
     }),
     true,
   );
 
   assert.equal(
-    __playYtDlpClientTestUtils.isYtmp3FallbackEligible({
+    __playMediaClientTestUtils.isYtmp3PrimaryEligible({
       type: 'video',
       link: 'https://www.youtube.com/watch?v=test1234567A',
-      error: formatError,
     }),
-    false,
+    true,
   );
 
   assert.equal(
-    __playYtDlpClientTestUtils.isYtmp3FallbackEligible({
+    __playMediaClientTestUtils.isYtmp3PrimaryEligible({
       type: 'audio',
       link: 'https://vimeo.com/1234',
-      error: formatError,
     }),
     false,
   );
 });
 
-test('anti-bot: detecta causa e retorna mensagem apropriada conforme cookies', { concurrency: false }, async () => {
+test('anti-bot: detecta causa e retorna mensagem genérica do provedor', { concurrency: false }, async () => {
   assert.equal(
-    __playYtDlpClientTestUtils.isYouTubeBotCheckCause({
+    __playMediaClientTestUtils.isYouTubeBotCheckCause({
       meta: { cause: 'ERROR: [youtube] Sign in to confirm you’re not a bot.' },
     }),
     true,
   );
 
-  await withEnv(
-    {
-      PLAY_YTDLP_COOKIES_PATH: '/tmp/cookies-inexistente.txt',
-      PLAY_YTDLP_COOKIES_FROM_BROWSER: '',
-    },
-    async () => {
-      const message = __playYtDlpClientTestUtils.buildYouTubeBotCheckUserMessage();
-      assert.match(message, /PLAY_YTDLP_COOKIES_PATH/);
-    },
-  );
-
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'play-cookies-'));
-  const cookiesPath = path.join(tempDir, 'cookies.txt');
-  fs.writeFileSync(cookiesPath, '.youtube.com\tTRUE\t/\tFALSE\t2147483647\tSID\ttest-cookie\n', 'utf8');
-
-  try {
-    await withEnv(
-      {
-        PLAY_YTDLP_COOKIES_PATH: cookiesPath,
-        PLAY_YTDLP_COOKIES_FROM_BROWSER: '',
-      },
-      async () => {
-        const message = __playYtDlpClientTestUtils.buildYouTubeBotCheckUserMessage();
-        assert.match(message, /cookies\.txt/i);
-        assert.ok(!message.includes('PLAY_YTDLP_COOKIES_PATH'));
-      },
-    );
-  } finally {
-    fs.rmSync(tempDir, { recursive: true, force: true });
-  }
+  const message = __playMediaClientTestUtils.buildYouTubeBotCheckUserMessage();
+  assert.match(message, /anti-bot/i);
+  assert.ok(!message.includes('PLAY_'));
+  assert.ok(!message.toLowerCase().includes('cookies_path'));
 });
 
 test('notifyFailure: envia admin só para erro técnico e deduplica alertas', { concurrency: false }, async () => {

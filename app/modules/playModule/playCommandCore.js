@@ -5,7 +5,7 @@ import { sendAndStore } from '../../services/messaging/messagePersistenceService
 import { getAdminJid } from '../../config/index.js';
 import { getPlayOperationalLimits, getPlayText, getPlayUsageFallbackText, getPlayUsageText, getPlayWaitText } from './playConfigRuntime.js';
 import { DEFAULT_COMMAND_PREFIX, ERROR_CODES, KNOWN_ERROR_CODES, TYPE_CONFIG, YTDLS_ENDPOINTS } from './playCommandConstants.js';
-import { createError, withErrorMeta, normalizePlayError, truncateText, ytdlsClient, formatters, fileUtils, isYouTubeBotCheckCause, buildYouTubeBotCheckUserMessage } from './playCommandYtDlpClient.js';
+import { createError, withErrorMeta, normalizePlayError, truncateText, playMediaClient, formatters, fileUtils, isYouTubeBotCheckCause, buildYouTubeBotCheckUserMessage } from './playCommandMediaClient.js';
 
 const adminJid = getAdminJid();
 const adminAlertDedupCache = new Map();
@@ -113,7 +113,7 @@ const processPlayRequest = async ({ sock, remoteJid, messageInfo, expirationMess
   let filePath = null;
 
   try {
-    const candidateLinks = await ytdlsClient.resolveYoutubeCandidates(text);
+    const candidateLinks = await playMediaClient.resolveYoutubeCandidates(text);
     await sendAndStore(sock, remoteJid, { text: getPlayWaitText(type) || config.waitText }, { quoted: messageInfo, ephemeralExpiration: expirationMessage });
 
     let downloadResult = null;
@@ -125,13 +125,12 @@ const processPlayRequest = async ({ sock, remoteJid, messageInfo, expirationMess
       const candidateLink = candidateLinks[index];
       selectedLink = candidateLink;
       try {
-        [downloadResult, videoInfo] = await Promise.all([ytdlsClient.requestDownloadToFile(candidateLink, type, requestId), ytdlsClient.fetchVideoInfo(candidateLink, text)]);
+        [downloadResult, videoInfo] = await Promise.all([playMediaClient.requestDownloadToFile(candidateLink, type, requestId), playMediaClient.fetchVideoInfo(candidateLink, text)]);
         lastDownloadError = null;
         break;
       } catch (error) {
         lastDownloadError = error;
         if (isYouTubeBotCheckCause(error)) {
-          const cookiesPath = ytdlsClient.resolveYtDlpCookiesPath();
           logger.warn('Play download: bloqueio anti-bot detectado; abortando novas tentativas de candidato.', {
             requestId,
             remoteJid,
@@ -139,7 +138,6 @@ const processPlayRequest = async ({ sock, remoteJid, messageInfo, expirationMess
             endpoint: error?.meta?.endpoint || YTDLS_ENDPOINTS.download,
             attempt: index + 1,
             candidateLink,
-            cookiesPath: cookiesPath || null,
             cause: truncateText(error?.meta?.cause || error?.message || ''),
           });
           throw withErrorMeta(createError(ERROR_CODES.API, buildYouTubeBotCheckUserMessage()), {
@@ -197,7 +195,7 @@ const processPlayRequest = async ({ sock, remoteJid, messageInfo, expirationMess
 
       if (thumbUrl) {
         try {
-          thumbBuffer = await ytdlsClient.fetchThumbnailBuffer(thumbUrl);
+          thumbBuffer = await playMediaClient.fetchThumbnailBuffer(thumbUrl);
         } catch (error) {
           logger.warn('Falha ao baixar thumbnail.', {
             requestId,

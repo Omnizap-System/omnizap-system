@@ -16,7 +16,7 @@ Este arquivo e destinado a agentes de IA para gerar respostas no contexto dos co
 - playCommand.js
 - playCommandHandlers.js
 - playCommandCore.js
-- playCommandYtDlpClient.js
+- playCommandMediaClient.js
 - playCommandConstants.js
 - playConfigRuntime.js
 - total_commands: `2`
@@ -124,10 +124,10 @@ Este arquivo e destinado a agentes de IA para gerar respostas no contexto dos co
 - texto do comando e argumentos
 - contexto da mensagem (citacao e mencoes, quando existir)
 - link ou termo de busca enviado no comando
-- metadados de busca/download retornados pelo yt-dlp local
+- metadados de busca/download retornados pelo provedor de midia
 - informacoes de tamanho do arquivo para validacao de limite
 - dependencias_externas:
-- yt-dlp local (binario gerenciado pelo modulo)
+- provedor de midia local (ytmp3 via API)
 - ffmpeg
 - ffprobe
 - efeitos_colaterais:
@@ -249,10 +249,10 @@ Este arquivo e destinado a agentes de IA para gerar respostas no contexto dos co
 - texto do comando e argumentos
 - contexto da mensagem (citacao e mencoes, quando existir)
 - link ou termo de busca enviado no comando
-- metadados de busca/download retornados pelo yt-dlp local
+- metadados de busca/download retornados pelo provedor de midia
 - informacoes de tamanho e formato de video para validacao
 - dependencias_externas:
-- yt-dlp local (binario gerenciado pelo modulo)
+- provedor de midia local (ytmp3 via API)
 - ffmpeg
 - ffprobe
 - efeitos_colaterais:

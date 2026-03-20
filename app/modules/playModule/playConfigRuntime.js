@@ -22,14 +22,14 @@ const DEFAULT_TEXTS = {
   ready_title_video: '🎬 Vídeo pronto!',
   video_fallback_to_audio: '⚠️ Este link retornou somente áudio. Enviando no formato de áudio.',
   anti_bot_with_cookies: 'YouTube solicitou verificação anti-bot. Atualize o arquivo .secrets/cookies.txt e tente novamente.',
-  anti_bot_with_browser_profile: 'YouTube solicitou verificação anti-bot. Verifique o perfil informado em PLAY_YTDLP_COOKIES_FROM_BROWSER e tente novamente.',
-  anti_bot_without_cookies: 'YouTube solicitou verificação anti-bot. Configure PLAY_YTDLP_COOKIES_PATH com um cookies.txt válido e tente novamente.',
+  anti_bot_with_browser_profile: 'YouTube solicitou verificação anti-bot no provedor de mídia. Verifique suas credenciais e tente novamente.',
+  anti_bot_without_cookies: 'YouTube solicitou verificação anti-bot no provedor de mídia. Tente novamente em alguns minutos.',
   usage_fallback_audio: '🎵 Uso: <prefix>play <link do YouTube ou termo de busca>',
   usage_fallback_video: '🎬 Uso: <prefix>playvid <link do YouTube ou termo de busca>',
   invalid_media_type: 'Tipo de mídia inválido.',
   binary_exec_failed: 'Falha ao executar <command>.',
-  ytdlp_error_generic: 'Falha ao processar mídia com yt-dlp.',
-  ytdlp_timeout_generic: 'Timeout ao processar mídia com yt-dlp.',
+  provider_error_generic: 'Falha ao processar mídia no provedor.',
+  provider_timeout_generic: 'Timeout ao processar mídia no provedor.',
   search_invalid_input: 'Você precisa informar um link do YouTube ou termo de busca.',
   search_not_found: 'Nenhum resultado encontrado para a busca.',
   search_timeout: 'Timeout ao buscar metadados do vídeo.',
@@ -73,7 +73,6 @@ const DEFAULT_OPERATIONAL_LIMITS = {
 };
 
 const DEFAULT_EXECUTION_OPTIONS = {
-  ytdlp_base_args: ['--ignore-config', '--no-playlist', '--no-warnings', '--js-runtimes', 'node', '--extractor-args', 'youtube:player_client=android,web'],
   estrategias_formato: {
     audio: ['bestaudio/best', 'best'],
     video: ['bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/best', 'bestvideo*+bestaudio/best', 'best'],
@@ -136,7 +135,6 @@ const normalizeExecutionOptions = (raw) => {
   const rawAudioExtract = rawFormat.audio_extract && typeof rawFormat.audio_extract === 'object' ? rawFormat.audio_extract : {};
 
   return {
-    ytdlp_base_args: normalizeStringArray(source.ytdlp_base_args, DEFAULT_EXECUTION_OPTIONS.ytdlp_base_args),
     estrategias_formato: {
       audio: normalizeStringArray(rawFormat.audio, defaultFormat.audio),
       video: normalizeStringArray(rawFormat.video, defaultFormat.video),

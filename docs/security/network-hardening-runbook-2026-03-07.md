@@ -133,13 +133,13 @@ Resultado esperado:
 
 Objetivo: eliminar soft-404 e alinhar headers de seguranca em rotas estaticas servidas direto pelo Nginx (`/`, `/comandos/`, `/login/`, etc.).
 
-1) Publicar snippet de headers estaticos:
+1. Publicar snippet de headers estaticos:
 
 ```bash
 sudo install -D -m 0644 docs/security/omnizap-static-security-headers.conf /etc/nginx/snippets/omnizap-static-security-headers.conf
 ```
 
-2) No `server { ... }` de producao, garantir que rotas proxy (`/api/`, `/stickers/`, `/data/`) venham antes do fallback estatico e aplicar:
+2. No `server { ... }` de producao, garantir que rotas proxy (`/api/`, `/stickers/`, `/data/`) venham antes do fallback estatico e aplicar:
 
 ```nginx
 # Nao permitir dotfiles sensiveis
@@ -154,14 +154,14 @@ location / {
 }
 ```
 
-3) Validar e recarregar:
+3. Validar e recarregar:
 
 ```bash
 sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-4) Validacao rapida manual:
+4. Validacao rapida manual:
 
 ```bash
 curl -I https://omnizap.shop/
@@ -170,7 +170,7 @@ curl -I https://omnizap.shop/.env
 curl -I https://omnizap.shop/__security_probe_nonexistent_omnizap__.txt
 ```
 
-5) Validacao automatizada (repositorio):
+5. Validacao automatizada (repositorio):
 
 ```bash
 npm run security:web-surface

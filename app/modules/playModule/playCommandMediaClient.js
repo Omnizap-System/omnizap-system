@@ -7,42 +7,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import logger from '#logger';
-import { installYtDlpBinary } from './local/ytDlpInstaller.js';
 import { getPlayExecutionOptions, getPlayOperationalLimits, getPlayReadyTitle, getPlayText } from './playConfigRuntime.js';
-import {
-  DEFAULT_TIMEOUT_MS,
-  DOWNLOAD_TIMEOUT_MS,
-  YTDLP_INFO_TIMEOUT_MS,
-  YTDLP_BINARY_PATH,
-  YTDLP_COOKIES_FROM_BROWSER,
-  PLAY_YTMP3_ENABLED,
-  PLAY_YTMP3_API_BASE_URL,
-  PLAY_YTMP3_API_DOWNLOAD_PATH,
-  PLAY_YTMP3_POLL_INTERVAL_MS,
-  PROJECT_ROOT_DIR,
-  DEFAULT_COOKIES_PATH,
-  MAX_SEARCH_RESULTS,
-  MAX_MEDIA_BYTES,
-  MAX_MEDIA_MB_LABEL,
-  THUMBNAIL_TIMEOUT_MS,
-  MAX_THUMB_BYTES,
-  VIDEO_PROCESS_TIMEOUT_MS,
-  VIDEO_FORCE_TRANSCODE,
-  FFMPEG_BIN,
-  FFPROBE_BIN,
-  SEARCH_CACHE_TTL_MS,
-  MAX_SEARCH_CACHE_ENTRIES,
-  MAX_REDIRECTS,
-  MAX_ERROR_BODY_BYTES,
-  MAX_META_BODY_CHARS,
-  TRANSIENT_HTTP_STATUSES,
-  TRANSIENT_NETWORK_CODES,
-  YTDLS_ENDPOINTS,
-  ERROR_CODES,
-  KNOWN_ERROR_CODES,
-  TYPE_CONFIG,
-  PLAY_DOWNLOADS_DIR,
-} from './playCommandConstants.js';
+import { DEFAULT_TIMEOUT_MS, DOWNLOAD_TIMEOUT_MS, MEDIA_INFO_TIMEOUT_MS, PLAY_YTMP3_ENABLED, PLAY_YTMP3_API_BASE_URL, PLAY_YTMP3_API_DOWNLOAD_PATH, PLAY_YTMP3_POLL_INTERVAL_MS, PLAY_YTMP3_SEARCH_BASE_URL, PLAY_YTMP3_SEARCH_PATH, PLAY_YTMP3_VIDEO_DEFAULT_QUALITY, MAX_SEARCH_RESULTS, MAX_MEDIA_BYTES, MAX_MEDIA_MB_LABEL, THUMBNAIL_TIMEOUT_MS, MAX_THUMB_BYTES, VIDEO_PROCESS_TIMEOUT_MS, VIDEO_FORCE_TRANSCODE, FFMPEG_BIN, FFPROBE_BIN, SEARCH_CACHE_TTL_MS, MAX_SEARCH_CACHE_ENTRIES, MAX_REDIRECTS, MAX_ERROR_BODY_BYTES, MAX_META_BODY_CHARS, TRANSIENT_HTTP_STATUSES, TRANSIENT_NETWORK_CODES, YTDLS_ENDPOINTS, ERROR_CODES, KNOWN_ERROR_CODES, TYPE_CONFIG, PLAY_DOWNLOADS_DIR } from './playCommandConstants.js';
 
 const createError = (code, message, meta) => {
   const error = new Error(message);
@@ -556,19 +522,7 @@ const readResponseBuffer = async (stream, { maxBytes = Infinity, tooBigMessage }
   return Buffer.concat(chunks, total);
 };
 
-const httpRequest = ({
-  url,
-  method = 'GET',
-  headers = {},
-  body = null,
-  timeoutMs = DEFAULT_TIMEOUT_MS,
-  maxRedirects = 0,
-  redirectCount = 0,
-  endpoint = 'unknown',
-  timeoutMessage = playText('http_timeout', 'Timeout na requisição HTTP.'),
-  fallbackMessage = playText('http_failed', 'Falha na requisição HTTP.'),
-  onResponse,
-}) =>
+const httpRequest = ({ url, method = 'GET', headers = {}, body = null, timeoutMs = DEFAULT_TIMEOUT_MS, maxRedirects = 0, redirectCount = 0, endpoint = 'unknown', timeoutMessage = playText('http_timeout', 'Timeout na requisição HTTP.'), fallbackMessage = playText('http_failed', 'Falha na requisição HTTP.'), onResponse }) =>
   new Promise((resolve, reject) => {
     const urlObj = new URL(url);
     const httpModule = resolveHttpModule(urlObj);
@@ -669,18 +623,28 @@ const httpRequest = ({
     req.end();
   });
 
-const requestJson = async ({
-  url,
-  method = 'GET',
-  data = null,
-  headers = {},
-  timeoutMs = DEFAULT_TIMEOUT_MS,
-  maxRedirects = getLimits().max_redirects ?? MAX_REDIRECTS,
-  endpoint = 'unknown',
-  timeoutMessage = playText('http_timeout', 'Timeout na requisição HTTP.'),
-  fallbackMessage = playText('http_failed', 'Falha na requisição HTTP.'),
-}) => {
-  const body = data === null || data === undefined ? null : JSON.stringify(data);
+const requestJson = async ({ url, method = 'GET', data = null, headers = {}, timeoutMs = DEFAULT_TIMEOUT_MS, maxRedirects = getLimits().max_redirects ?? MAX_REDIRECTS, endpoint = 'unknown', timeoutMessage = playText('http_timeout', 'Timeout na requisição HTTP.'), fallbackMessage = playText('http_failed', 'Falha na requisição HTTP.') }) => {
+  const normalizedMethod = String(method || 'GET').toUpperCase();
+  let finalUrl = url;
+  let body = null;
+
+  const isGetLike = normalizedMethod === 'GET' || normalizedMethod === 'HEAD';
+  if (isGetLike && data && typeof data === 'object') {
+    const searchParams = new URLSearchParams();
+    for (const [key, value] of Object.entries(data)) {
+      if (value === null || value === undefined || value === '') continue;
+      searchParams.append(key, String(value));
+    }
+
+    const query = searchParams.toString();
+    if (query) {
+      const delimiter = finalUrl.includes('?') ? '&' : '?';
+      finalUrl = `${finalUrl}${delimiter}${query}`;
+    }
+  } else if (data !== null && data !== undefined) {
+    body = JSON.stringify(data);
+  }
+
   const requestHeaders = {
     Accept: 'application/json',
     ...(headers && typeof headers === 'object' ? headers : {}),
@@ -690,8 +654,8 @@ const requestJson = async ({
   }
 
   return httpRequest({
-    url,
-    method,
+    url: finalUrl,
+    method: normalizedMethod,
     headers: requestHeaders,
     body,
     timeoutMs,
@@ -730,15 +694,7 @@ const requestJson = async ({
   });
 };
 
-const requestFile = async ({
-  url,
-  filePath,
-  timeoutMs = DOWNLOAD_TIMEOUT_MS,
-  maxBytes = MAX_MEDIA_BYTES,
-  endpoint = YTDLS_ENDPOINTS.download,
-  timeoutMessage = playText('download_timeout', 'Timeout ao baixar o arquivo.'),
-  fallbackMessage = playText('download_failed', 'Falha ao baixar o arquivo localmente.'),
-}) => {
+const requestFile = async ({ url, filePath, timeoutMs = DOWNLOAD_TIMEOUT_MS, maxBytes = MAX_MEDIA_BYTES, endpoint = YTDLS_ENDPOINTS.download, timeoutMessage = playText('download_timeout', 'Timeout ao baixar o arquivo.'), fallbackMessage = playText('download_failed', 'Falha ao baixar o arquivo localmente.') }) => {
   await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
 
   try {
@@ -953,171 +909,8 @@ const setSearchCache = (queryKey, value) => {
   pruneSearchCache();
 };
 
-let ytDlpInstallPromise = null;
-
 const ensurePlayLocalDirs = async () => {
   await fs.promises.mkdir(PLAY_DOWNLOADS_DIR, { recursive: true });
-  await fs.promises.mkdir(path.dirname(YTDLP_BINARY_PATH), { recursive: true });
-};
-
-const hasLocalBinary = async () => {
-  const mode = os.platform() === 'win32' ? fs.constants.F_OK : fs.constants.X_OK;
-  try {
-    await fs.promises.access(YTDLP_BINARY_PATH, mode);
-    return true;
-  } catch {
-    return false;
-  }
-};
-
-const ensureYtDlpReady = async () => {
-  await ensurePlayLocalDirs();
-
-  if (await hasLocalBinary()) {
-    return YTDLP_BINARY_PATH;
-  }
-
-  if (!ytDlpInstallPromise) {
-    ytDlpInstallPromise = installYtDlpBinary({ binaryPath: YTDLP_BINARY_PATH })
-      .then(() => {
-        logger.info('yt-dlp instalado para play local.', {
-          endpoint: YTDLS_ENDPOINTS.install,
-          binaryPath: YTDLP_BINARY_PATH,
-        });
-      })
-      .finally(() => {
-        ytDlpInstallPromise = null;
-      });
-  }
-
-  await ytDlpInstallPromise;
-  return YTDLP_BINARY_PATH;
-};
-
-const YOUTUBE_AUTH_COOKIE_NAMES = new Set(['SID', 'SSID', 'HSID', 'SAPISID', 'APISID', '__Secure-1PSID', '__Secure-3PSID', '__Secure-1PAPISID', '__Secure-3PAPISID']);
-let warnedInvalidCookiesPath = false;
-let warnedMissingCookiesPath = false;
-let warnedWeakCookiesPath = false;
-
-const inspectYtDlpCookiesFile = (cookiePath) => {
-  try {
-    const raw = fs.readFileSync(cookiePath, 'utf8');
-    const lines = raw.split(/\r?\n/);
-    let totalEntries = 0;
-    let authCookieCount = 0;
-    let hasYoutubeDomain = false;
-    let hasGoogleDomain = false;
-
-    for (const line of lines) {
-      if (!line || line.startsWith('#')) continue;
-      const parts = line.split('\t');
-      if (parts.length < 7) continue;
-      totalEntries += 1;
-
-      const domain = String(parts[0] || '').toLowerCase();
-      const cookieName = String(parts[5] || '').trim();
-      if (domain.includes('youtube.com')) hasYoutubeDomain = true;
-      if (domain.includes('google.com')) hasGoogleDomain = true;
-      if (YOUTUBE_AUTH_COOKIE_NAMES.has(cookieName)) authCookieCount += 1;
-    }
-
-    return {
-      ok: true,
-      totalEntries,
-      authCookieCount,
-      hasYoutubeDomain,
-      hasGoogleDomain,
-      isLikelyAuthenticated: totalEntries > 0 && authCookieCount > 0 && hasYoutubeDomain,
-    };
-  } catch (error) {
-    return {
-      ok: false,
-      error: error?.message || 'unknown',
-      totalEntries: 0,
-      authCookieCount: 0,
-      hasYoutubeDomain: false,
-      hasGoogleDomain: false,
-      isLikelyAuthenticated: false,
-    };
-  }
-};
-
-const resolveYtDlpCookiesPath = () => {
-  const configuredPath = (process.env.PLAY_YTDLP_COOKIES_PATH || '').trim();
-  const rawCookiePath = configuredPath || DEFAULT_COOKIES_PATH;
-
-  if (!rawCookiePath) return null;
-  const cookiePath = path.isAbsolute(rawCookiePath) ? rawCookiePath : path.resolve(PROJECT_ROOT_DIR, rawCookiePath);
-  if (!fs.existsSync(cookiePath)) {
-    if (!warnedMissingCookiesPath) {
-      warnedMissingCookiesPath = true;
-      logger.warn('Play local: arquivo de cookies configurado não encontrado.', {
-        endpoint: YTDLS_ENDPOINTS.download,
-        cookiePath,
-        configuredPath: Boolean(configuredPath),
-      });
-    }
-    return null;
-  }
-
-  const cookiesDiagnostics = inspectYtDlpCookiesFile(cookiePath);
-  if (!cookiesDiagnostics.ok && !warnedInvalidCookiesPath) {
-    warnedInvalidCookiesPath = true;
-    logger.warn('Play local: falha ao ler arquivo de cookies do yt-dlp.', {
-      endpoint: YTDLS_ENDPOINTS.download,
-      cookiePath,
-      cause: cookiesDiagnostics.error,
-    });
-  } else if (cookiesDiagnostics.ok && !cookiesDiagnostics.isLikelyAuthenticated && !warnedWeakCookiesPath) {
-    warnedWeakCookiesPath = true;
-    logger.warn('Play local: cookies carregados, mas parecem incompletos para autenticação no YouTube.', {
-      endpoint: YTDLS_ENDPOINTS.download,
-      cookiePath,
-      totalEntries: cookiesDiagnostics.totalEntries,
-      authCookieCount: cookiesDiagnostics.authCookieCount,
-      hasYoutubeDomain: cookiesDiagnostics.hasYoutubeDomain,
-      hasGoogleDomain: cookiesDiagnostics.hasGoogleDomain,
-    });
-  }
-
-  return cookiePath;
-};
-
-const buildYtDlpArgsBase = () => {
-  const executionOptions = getExecutionOptions();
-  const args = [...(Array.isArray(executionOptions?.ytdlp_base_args) ? executionOptions.ytdlp_base_args : [])];
-  const cookiesPath = resolveYtDlpCookiesPath();
-  if (cookiesPath) {
-    args.push('--cookies', cookiesPath);
-  } else if (YTDLP_COOKIES_FROM_BROWSER) {
-    args.push('--cookies-from-browser', YTDLP_COOKIES_FROM_BROWSER);
-  }
-  return args;
-};
-
-const parseJsonOutput = (stdout) => {
-  const text = String(stdout || '').trim();
-  if (!text) return null;
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    const lines = text
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean);
-    for (let index = lines.length - 1; index >= 0; index -= 1) {
-      const line = lines[index];
-      if (!line.startsWith('{') && !line.startsWith('[')) continue;
-      try {
-        return JSON.parse(line);
-      } catch {
-        continue;
-      }
-    }
-  }
-
-  return null;
 };
 
 const normalizeYoutubeWatchUrl = (value) => {
@@ -1135,37 +928,7 @@ const normalizeYoutubeWatchUrl = (value) => {
   return null;
 };
 
-const extractYtDlpEntry = (payload) => {
-  if (!payload || typeof payload !== 'object') return null;
-
-  if (Array.isArray(payload.entries)) {
-    const first = payload.entries.find((entry) => entry && typeof entry === 'object');
-    if (first) return first;
-  }
-
-  return payload;
-};
-
-const normalizeResolvedVideoInfo = (entry, fallbackUrl = null) => {
-  if (!entry || typeof entry !== 'object') return null;
-
-  const resolvedUrl = normalizeYoutubeWatchUrl(entry.webpage_url) || normalizeYoutubeWatchUrl(entry.original_url) || normalizeYoutubeWatchUrl(entry.url) || normalizeYoutubeWatchUrl(entry.id) || normalizeYoutubeWatchUrl(fallbackUrl);
-
-  return {
-    ...entry,
-    id: pickFirstString(entry, ['id', 'video_id', 'videoId']),
-    title: pickFirstString(entry, ['title', 'fulltitle', 'name']) || 'Sem título',
-    channel: pickFirstString(entry, ['channel', 'uploader', 'uploader_id', 'uploader_name']),
-    uploader: pickFirstString(entry, ['uploader', 'channel', 'uploader_name']),
-    duration: toNumberOrNull(entry.duration) ?? entry.duration ?? null,
-    thumbnail: pickFirstString(entry, ['thumbnail']) || null,
-    thumbnails: Array.isArray(entry.thumbnails) ? entry.thumbnails : [],
-    url: resolvedUrl,
-    webpage_url: resolvedUrl || entry.webpage_url || null,
-  };
-};
-
-const normalizeYtDlpError = (error, { endpoint, requestId, input, timeoutMessage, fallbackMessage }) => {
+const normalizeProviderError = (error, { endpoint, requestId, input, timeoutMessage, fallbackMessage }) => {
   if (KNOWN_ERROR_CODES.has(error?.code) && error?.message) return error;
 
   const stderr = String(error?.stderr || '').trim();
@@ -1228,95 +991,6 @@ const normalizeYtDlpError = (error, { endpoint, requestId, input, timeoutMessage
   });
 };
 
-const COOKIE_ARG_FLAGS_WITH_VALUE = new Set(['--cookies', '--cookies-from-browser']);
-const COOKIE_ARG_PREFIXES = ['--cookies=', '--cookies-from-browser='];
-
-const hasYtDlpCookieArgs = (args = []) =>
-  Array.isArray(args) &&
-  args.some((arg) => {
-    const normalized = String(arg || '').trim();
-    if (!normalized) return false;
-    if (COOKIE_ARG_FLAGS_WITH_VALUE.has(normalized)) return true;
-    return COOKIE_ARG_PREFIXES.some((prefix) => normalized.startsWith(prefix));
-  });
-
-const stripYtDlpCookieArgs = (args = []) => {
-  if (!Array.isArray(args)) return [];
-
-  const sanitized = [];
-  for (let index = 0; index < args.length; index += 1) {
-    const current = String(args[index] || '').trim();
-    if (!current) {
-      sanitized.push(args[index]);
-      continue;
-    }
-
-    if (COOKIE_ARG_FLAGS_WITH_VALUE.has(current)) {
-      index += 1;
-      continue;
-    }
-
-    if (COOKIE_ARG_PREFIXES.some((prefix) => current.startsWith(prefix))) {
-      continue;
-    }
-
-    sanitized.push(args[index]);
-  }
-
-  return sanitized;
-};
-
-const isRequestedFormatUnavailableError = (error) => {
-  const stderr = String(error?.stderr || '').trim();
-  const stdout = String(error?.stdout || '').trim();
-  const message = String(error?.message || '').trim();
-  const cause = String(error?.meta?.cause || '').trim();
-  const combined = `${stderr}\n${stdout}\n${message}\n${cause}`.toLowerCase();
-  return combined.includes('requested format is not available');
-};
-
-const runYtDlp = async ({ args, endpoint, requestId, input, timeoutMs = DEFAULT_TIMEOUT_MS, timeoutMessage, fallbackMessage }) => {
-  const binaryPath = await ensureYtDlpReady();
-  const executeYtDlp = (runtimeArgs) =>
-    runWithPlayProcessSlot(() => runBinaryCommand(binaryPath, runtimeArgs, { timeoutMs }), {
-      endpoint,
-      command: path.basename(binaryPath),
-    });
-
-  try {
-    return await executeYtDlp(args);
-  } catch (error) {
-    let resolvedError = error;
-    const shouldRetryWithoutCookies = isRequestedFormatUnavailableError(error) && hasYtDlpCookieArgs(args);
-
-    if (shouldRetryWithoutCookies) {
-      const argsWithoutCookies = stripYtDlpCookieArgs(args);
-      if (argsWithoutCookies.length !== args.length) {
-        logger.warn('Play yt-dlp: formato indisponível com cookies; tentando sem cookies.', {
-          requestId,
-          endpoint,
-          code: error?.code || null,
-          cause: truncateText(error?.stderr || error?.message || ''),
-        });
-
-        try {
-          return await executeYtDlp(argsWithoutCookies);
-        } catch (retryError) {
-          resolvedError = retryError;
-        }
-      }
-    }
-
-    throw normalizeYtDlpError(resolvedError, {
-      endpoint,
-      requestId,
-      input,
-      timeoutMessage: timeoutMessage || playText('ytdlp_timeout_generic', 'Timeout ao processar mídia com yt-dlp.'),
-      fallbackMessage: fallbackMessage || playText('ytdlp_error_generic', 'Falha ao processar mídia com yt-dlp.'),
-    });
-  }
-};
-
 const YTMP3_AUDIO_FORMATS = new Set(['mp3', 'm4a', 'flac', 'ogg', 'wav', 'opus']);
 const YTMP3_AUDIO_BITRATES = new Set(['best', '320', '192', '128', '64']);
 const YTMP3_DEFAULT_AUDIO_FORMAT = 'mp3';
@@ -1327,10 +1001,14 @@ const resolveYtmp3AudioSettings = () => {
   const formatOptions = executionOptions?.estrategias_formato || {};
   const audioExtract = formatOptions.audio_extract && typeof formatOptions.audio_extract === 'object' ? formatOptions.audio_extract : {};
 
-  const extractedFormat = String(audioExtract.format || YTMP3_DEFAULT_AUDIO_FORMAT).trim().toLowerCase();
+  const extractedFormat = String(audioExtract.format || YTMP3_DEFAULT_AUDIO_FORMAT)
+    .trim()
+    .toLowerCase();
   const audioFormat = YTMP3_AUDIO_FORMATS.has(extractedFormat) ? extractedFormat : YTMP3_DEFAULT_AUDIO_FORMAT;
 
-  const rawQuality = String(audioExtract.quality || YTMP3_DEFAULT_AUDIO_BITRATE).trim().toLowerCase();
+  const rawQuality = String(audioExtract.quality || YTMP3_DEFAULT_AUDIO_BITRATE)
+    .trim()
+    .toLowerCase();
   const mappedQuality = rawQuality === '0' ? 'best' : rawQuality.replace(/k$/i, '');
   const audioBitrate = YTMP3_AUDIO_BITRATES.has(mappedQuality) ? mappedQuality : YTMP3_DEFAULT_AUDIO_BITRATE;
 
@@ -1370,15 +1048,15 @@ const normalizeYtmp3StatusPayload = (payload) => {
   }
 
   return {
-    status: String(raw.status || '').trim().toLowerCase(),
+    status: String(raw.status || '')
+      .trim()
+      .toLowerCase(),
     message: pickFirstString(raw, ['jobError', 'message', 'error']),
     progress: toNumberOrNull(raw.progress),
     downloadUrl: resolveHttpUrl(raw.downloadUrl || raw.download_url),
     title: pickFirstString(raw, ['title', 'name']),
   };
 };
-
-const isYtmp3FallbackEligible = ({ type, link, error }) => PLAY_YTMP3_ENABLED && type === 'audio' && isYouTubeUrl(link) && isRequestedFormatUnavailableError(error);
 
 const buildYtmp3DownloadEndpoint = () => {
   const baseUrl = ensureHttpUrl(PLAY_YTMP3_API_BASE_URL);
@@ -1402,27 +1080,34 @@ const buildYtmp3DownloadEndpoint = () => {
   return endpointUrl;
 };
 
-const createYtmp3DownloadTask = async ({ link, requestId, audioFormat, audioBitrate, audioTrack }) => {
+const createYtmp3DownloadTask = async ({ link, type, requestId, audioFormat, audioBitrate, audioTrack, youtubeVideoContainer, videoQuality }) => {
   const endpointUrl = buildYtmp3DownloadEndpoint();
 
+  const downloadType = type === 'video' ? 'video' : 'audio';
   const payload = {
     url: link,
     os: resolveYtmp3RuntimeOs(),
     output: {
-      type: 'audio',
-      format: audioFormat || YTMP3_DEFAULT_AUDIO_FORMAT,
+      type: downloadType,
+      format: downloadType === 'video' ? youtubeVideoContainer || YTMP3_DEFAULT_VIDEO_CONTAINER : audioFormat || YTMP3_DEFAULT_AUDIO_FORMAT,
     },
   };
 
-  const audioPayload = {};
-  if (audioBitrate) {
-    audioPayload.bitrate = `${String(audioBitrate).replace(/k$/i, '')}k`;
+  if (downloadType === 'video' && videoQuality) {
+    payload.output.quality = `${String(videoQuality).replace(/p$/i, '')}p`;
   }
-  if (audioTrack && String(audioTrack).trim() && String(audioTrack).trim().toLowerCase() !== 'origin') {
-    audioPayload.trackId = String(audioTrack).trim();
-  }
-  if (Object.keys(audioPayload).length) {
-    payload.audio = audioPayload;
+
+  if (downloadType === 'audio') {
+    const audioPayload = {};
+    if (audioBitrate && String(audioBitrate).toLowerCase() !== 'best') {
+      audioPayload.bitrate = `${String(audioBitrate).replace(/k$/i, '')}k`;
+    }
+    if (audioTrack && String(audioTrack).trim() && String(audioTrack).trim().toLowerCase() !== 'origin') {
+      audioPayload.trackId = String(audioTrack).trim();
+    }
+    if (Object.keys(audioPayload).length) {
+      payload.audio = audioPayload;
+    }
   }
 
   const response = await httpClient.requestJson({
@@ -1520,19 +1205,46 @@ const pollYtmp3UntilReady = async ({ statusUrl, requestId, input }) => {
   }
 };
 
-const requestYtmp3DownloadToFile = async ({ link, requestId, basePath }) => {
+const YTMP3_VIDEO_CONTAINERS = new Set(['mp4', 'webm', 'mkv']);
+const YTMP3_DEFAULT_VIDEO_CONTAINER = 'mp4';
+
+const resolveYtmp3VideoSettings = () => {
+  const executionOptions = getExecutionOptions();
+  const formatOptions = executionOptions?.estrategias_formato || {};
+  const mergeOutputFormat = String(formatOptions.video_merge_output_format || YTMP3_DEFAULT_VIDEO_CONTAINER)
+    .trim()
+    .toLowerCase();
+  const youtubeVideoContainer = YTMP3_VIDEO_CONTAINERS.has(mergeOutputFormat) ? mergeOutputFormat : YTMP3_DEFAULT_VIDEO_CONTAINER;
+  const rawQuality = String(PLAY_YTMP3_VIDEO_DEFAULT_QUALITY || '720')
+    .trim()
+    .replace(/p$/i, '');
+  const videoQuality = /^\d{3,4}$/.test(rawQuality) ? rawQuality : '720';
+
+  return {
+    youtubeVideoContainer,
+    videoQuality,
+  };
+};
+
+const isYtmp3PrimaryEligible = ({ type, link }) => PLAY_YTMP3_ENABLED && (type === 'audio' || type === 'video') && isYouTubeUrl(link);
+
+const requestYtmp3DownloadToFile = async ({ link, type, requestId, basePath }) => {
   const audioSettings = resolveYtmp3AudioSettings();
-  const targetExt = audioSettings.audioFormat || YTMP3_DEFAULT_AUDIO_FORMAT;
+  const videoSettings = resolveYtmp3VideoSettings();
+  const targetExt = type === 'video' ? videoSettings.youtubeVideoContainer : audioSettings.audioFormat || YTMP3_DEFAULT_AUDIO_FORMAT;
   const targetPath = `${basePath}.${targetExt}`;
 
   return runWithPlayProcessSlot(
     async () => {
       const task = await createYtmp3DownloadTask({
         link,
+        type,
         requestId,
         audioFormat: audioSettings.audioFormat,
         audioBitrate: audioSettings.audioBitrate,
         audioTrack: audioSettings.audioTrack,
+        youtubeVideoContainer: videoSettings.youtubeVideoContainer,
+        videoQuality: videoSettings.videoQuality,
       });
 
       const ready = await pollYtmp3UntilReady({
@@ -1553,8 +1265,8 @@ const requestYtmp3DownloadToFile = async ({ link, requestId, basePath }) => {
       return {
         filePath: targetPath,
         bytes: downloaded.bytes,
-        contentType: resolveMediaMimeType('audio', downloaded.contentType),
-        mediaType: 'audio',
+        contentType: resolveMediaMimeType(type, downloaded.contentType),
+        mediaType: type,
       };
     },
     {
@@ -1562,6 +1274,107 @@ const requestYtmp3DownloadToFile = async ({ link, requestId, basePath }) => {
       command: 'ytmp3',
     },
   );
+};
+
+const buildYtmp3SearchEndpoint = () => {
+  const baseUrl = ensureHttpUrl(PLAY_YTMP3_SEARCH_BASE_URL);
+  if (!baseUrl) {
+    throw createError(ERROR_CODES.API, playText('search_failed', 'Não foi possível buscar o vídeo agora.'), {
+      endpoint: YTDLS_ENDPOINTS.ytmp3Search,
+      cause: `invalid_ytmp3_search_base_url:${PLAY_YTMP3_SEARCH_BASE_URL || 'empty'}`,
+      technical: true,
+    });
+  }
+
+  const endpointUrl = resolveHttpUrl(PLAY_YTMP3_SEARCH_PATH, baseUrl);
+  if (!endpointUrl) {
+    throw createError(ERROR_CODES.API, playText('search_failed', 'Não foi possível buscar o vídeo agora.'), {
+      endpoint: YTDLS_ENDPOINTS.ytmp3Search,
+      cause: `invalid_ytmp3_search_path:${PLAY_YTMP3_SEARCH_PATH || 'empty'}`,
+      technical: true,
+    });
+  }
+
+  return endpointUrl;
+};
+
+const extractYoutubeVideoIdFromUrl = (value) => {
+  const normalized = ensureHttpUrl(value);
+  if (!normalized) return null;
+
+  try {
+    const parsed = new URL(normalized);
+    const hostname = parsed.hostname.toLowerCase();
+    if (hostname === 'youtu.be' || hostname.endsWith('.youtu.be')) {
+      const candidate = parsed.pathname.replace(/^\/+/, '').split('/')[0];
+      if (candidate) return candidate;
+    }
+
+    const v = parsed.searchParams.get('v');
+    if (v) return v;
+
+    const parts = parsed.pathname.split('/').filter(Boolean);
+    if (parts.length >= 2 && ['shorts', 'embed', 'live', 'v'].includes(parts[0].toLowerCase())) {
+      return parts[1];
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+};
+
+const normalizeYtmp3SearchItem = (item) => {
+  if (!item || typeof item !== 'object') return null;
+  if (item.type && item.type !== 'stream') return null;
+
+  const url = normalizeYoutubeWatchUrl(item.id || item.url || item.webpage_url);
+  if (!url || !isYouTubeUrl(url)) return null;
+
+  const thumbnailUrl = resolveHttpUrl(item.thumbnailUrl || item.thumbnail);
+
+  return {
+    id: extractYoutubeVideoIdFromUrl(url) || pickFirstString(item, ['id', 'videoId', 'video_id']),
+    title: pickFirstString(item, ['title', 'name']) || 'Sem título',
+    channel: pickFirstString(item, ['uploaderName', 'channel', 'author', 'uploader']),
+    uploader: pickFirstString(item, ['uploaderName', 'uploader', 'channel', 'author']),
+    duration: toNumberOrNull(item.duration) ?? item.duration ?? null,
+    thumbnail: thumbnailUrl || null,
+    thumbnails: thumbnailUrl ? [{ url: thumbnailUrl }] : [],
+    url,
+    webpage_url: url,
+  };
+};
+
+const fetchYouTubeOEmbedInfo = async (url) => {
+  const oembedEndpoint = 'https://www.youtube.com/oembed';
+  const response = await httpClient.requestJson({
+    url: oembedEndpoint,
+    method: 'GET',
+    data: {
+      url,
+      format: 'json',
+    },
+    endpoint: YTDLS_ENDPOINTS.ytmp3Metadata,
+    timeoutMs: Math.min(15000, MEDIA_INFO_TIMEOUT_MS),
+    timeoutMessage: playText('search_timeout', 'Timeout ao buscar metadados do vídeo.'),
+    fallbackMessage: playText('search_failed', 'Não foi possível buscar o vídeo agora.'),
+  });
+
+  const normalizedUrl = normalizeYoutubeWatchUrl(url);
+  const thumbnailUrl = resolveHttpUrl(response?.thumbnail_url);
+
+  return {
+    id: extractYoutubeVideoIdFromUrl(normalizedUrl),
+    title: pickFirstString(response, ['title']) || 'Sem título',
+    channel: pickFirstString(response, ['author_name']),
+    uploader: pickFirstString(response, ['author_name']),
+    duration: null,
+    thumbnail: thumbnailUrl || null,
+    thumbnails: thumbnailUrl ? [{ url: thumbnailUrl }] : [],
+    url: normalizedUrl,
+    webpage_url: normalizedUrl,
+  };
 };
 
 const fetchSearchResult = async (query) => {
@@ -1582,25 +1395,58 @@ const fetchSearchResult = async (query) => {
   const endpoint = YTDLS_ENDPOINTS.search;
   const isUrlLookup = /^https?:\/\//i.test(normalized);
   const maxSearchResults = getLimits().max_search_results ?? MAX_SEARCH_RESULTS;
-  const lookup = isUrlLookup ? normalized : `ytsearch${maxSearchResults}:${normalized}`;
+  const normalizedUrlLookup = isUrlLookup ? normalizeYoutubeWatchUrl(normalized) : null;
 
   const payload = await retryAsync(
     async () => {
-      const args = isUrlLookup ? [...buildYtDlpArgsBase(), '--dump-single-json', lookup] : [...buildYtDlpArgsBase(), '--flat-playlist', '--ignore-errors', '--dump-single-json', lookup];
+      let normalizedEntries = [];
 
-      const { stdout } = await runYtDlp({
-        args,
-        endpoint,
-        input: normalized,
-        timeoutMs: YTDLP_INFO_TIMEOUT_MS,
-        timeoutMessage: playText('search_timeout', 'Timeout ao buscar metadados do vídeo.'),
-        fallbackMessage: playText('search_failed', 'Não foi possível buscar o vídeo agora.'),
-      });
+      if (isUrlLookup) {
+        if (!normalizedUrlLookup || !isYouTubeUrl(normalizedUrlLookup)) {
+          throw createError(ERROR_CODES.NOT_FOUND, playText('search_not_found', 'Nenhum resultado encontrado para a busca.'), {
+            endpoint,
+            technical: false,
+          });
+        }
 
-      const parsed = parseJsonOutput(stdout);
-      const rawEntries = Array.isArray(parsed?.entries) ? parsed.entries.filter((entry) => entry && typeof entry === 'object') : [];
-      const candidateEntries = isUrlLookup ? [extractYtDlpEntry(parsed)].filter(Boolean) : rawEntries;
-      const normalizedEntries = candidateEntries.map((entry) => normalizeResolvedVideoInfo(entry, isUrlLookup ? normalized : null)).filter((entry) => entry?.url);
+        try {
+          const oembedInfo = await fetchYouTubeOEmbedInfo(normalizedUrlLookup);
+          normalizedEntries = [oembedInfo].filter(Boolean);
+        } catch {
+          normalizedEntries = [
+            {
+              id: extractYoutubeVideoIdFromUrl(normalizedUrlLookup),
+              title: 'Sem título',
+              channel: null,
+              uploader: null,
+              duration: null,
+              thumbnail: null,
+              thumbnails: [],
+              url: normalizedUrlLookup,
+              webpage_url: normalizedUrlLookup,
+            },
+          ];
+        }
+      } else {
+        const searchEndpoint = buildYtmp3SearchEndpoint();
+        const response = await httpClient.requestJson({
+          url: searchEndpoint,
+          method: 'GET',
+          data: {
+            q: normalized,
+            limit: maxSearchResults,
+          },
+          endpoint: YTDLS_ENDPOINTS.ytmp3Search,
+          timeoutMs: Math.min(20000, MEDIA_INFO_TIMEOUT_MS),
+          timeoutMessage: playText('search_timeout', 'Timeout ao buscar metadados do vídeo.'),
+          fallbackMessage: playText('search_failed', 'Não foi possível buscar o vídeo agora.'),
+        });
+
+        const raw = unwrapApiData(response);
+        const items = Array.isArray(raw?.items) ? raw.items : [];
+        normalizedEntries = items.map((item) => normalizeYtmp3SearchItem(item)).filter((entry) => entry?.url);
+      }
+
       const info = normalizedEntries[0] || null;
 
       if (!info?.url) {
@@ -1645,7 +1491,14 @@ const resolveYoutubeLink = async (query) => {
   }
 
   if (/^https?:\/\//i.test(normalized)) {
-    return normalized;
+    const direct = normalizeYoutubeWatchUrl(normalized);
+    if (!direct || !isYouTubeUrl(direct)) {
+      throw createError(ERROR_CODES.NOT_FOUND, playText('search_not_found', 'Nenhum resultado encontrado para a busca.'), {
+        endpoint: YTDLS_ENDPOINTS.search,
+        technical: false,
+      });
+    }
+    return direct;
   }
 
   const searchResult = await fetchSearchResult(normalized);
@@ -1695,7 +1548,14 @@ const resolveYoutubeCandidates = async (query) => {
   }
 
   if (/^https?:\/\//i.test(normalized)) {
-    return [normalized];
+    const direct = normalizeYoutubeWatchUrl(normalized);
+    if (!direct || !isYouTubeUrl(direct)) {
+      throw createError(ERROR_CODES.NOT_FOUND, playText('search_not_found', 'Nenhum resultado encontrado para a busca.'), {
+        endpoint: YTDLS_ENDPOINTS.search,
+        technical: false,
+      });
+    }
+    return [direct];
   }
 
   const searchResult = await fetchSearchResult(normalized);
@@ -1718,14 +1578,7 @@ const isYouTubeBotCheckCause = (error) => {
 };
 
 const buildYouTubeBotCheckUserMessage = () => {
-  const cookiesPath = resolveYtDlpCookiesPath();
-  if (cookiesPath) {
-    return getPlayText('anti_bot_with_cookies', 'YouTube solicitou verificação anti-bot. Atualize o arquivo .secrets/cookies.txt e tente novamente.');
-  }
-  if (YTDLP_COOKIES_FROM_BROWSER) {
-    return getPlayText('anti_bot_with_browser_profile', 'YouTube solicitou verificação anti-bot. Verifique o perfil informado em PLAY_YTDLP_COOKIES_FROM_BROWSER e tente novamente.');
-  }
-  return getPlayText('anti_bot_without_cookies', 'YouTube solicitou verificação anti-bot. Configure PLAY_YTDLP_COOKIES_PATH com um cookies.txt válido e tente novamente.');
+  return getPlayText('anti_bot_without_cookies', 'YouTube solicitou verificação anti-bot no provedor de mídia. Tente novamente em alguns minutos.');
 };
 
 const fetchVideoInfo = async (query, fallback) => {
@@ -1829,124 +1682,42 @@ const cleanupDownloadedArtifacts = async (basePath) => {
   await Promise.allSettled(targets.map((name) => safeUnlink(path.join(dir, name))));
 };
 
-const buildDownloadAttemptArgsList = ({ type, outputTemplate, link }) => {
-  const executionOptions = getExecutionOptions();
-  const formatOptions = executionOptions?.estrategias_formato || {};
-  const audioFormats = Array.isArray(formatOptions.audio) ? formatOptions.audio.filter(Boolean) : [];
-  const videoFormats = Array.isArray(formatOptions.video) ? formatOptions.video.filter(Boolean) : [];
-  const audioExtract = formatOptions.audio_extract && typeof formatOptions.audio_extract === 'object' ? formatOptions.audio_extract : {};
-  const mergeOutputFormat = String(formatOptions.video_merge_output_format || '').trim();
-
-  if (type === 'audio') {
-    return audioFormats.map((format) => {
-      const args = ['--no-progress', '-o', outputTemplate, '-f', format];
-      if (audioExtract.enabled !== false) {
-        args.push('-x');
-        if (audioExtract.format) {
-          args.push('--audio-format', String(audioExtract.format));
-        }
-        if (audioExtract.quality) {
-          args.push('--audio-quality', String(audioExtract.quality));
-        }
-      }
-      args.push(link);
-      return args;
-    });
-  }
-
-  return videoFormats.map((format) => {
-    const args = ['--no-progress', '-o', outputTemplate, '-f', format];
-    if (mergeOutputFormat) {
-      args.push('--merge-output-format', mergeOutputFormat);
-    }
-    args.push(link);
-    return args;
-  });
-};
-
 const requestDownloadToFile = async (link, type, requestId) => {
-  const endpoint = YTDLS_ENDPOINTS.download;
+  const endpoint = YTDLS_ENDPOINTS.ytmp3Download;
   const safeId = String(requestId || 'req')
     .replace(/[^a-z0-9-_]+/gi, '')
     .slice(0, 48);
   const basePath = path.join(PLAY_DOWNLOADS_DIR, `play-${safeId}-${__timeNowMs()}`);
-  const outputTemplate = `${basePath}.%(ext)s`;
-  const preferredExt = type === 'audio' ? 'mp3' : 'mp4';
   let filePath = null;
-  let fallbackResult = null;
-  const attemptArgsList = buildDownloadAttemptArgsList({ type, outputTemplate, link });
+  let providerResult = null;
 
   try {
-    let downloadCompleted = false;
-    let lastError = null;
+    await ensurePlayLocalDirs();
 
-    for (let index = 0; index < attemptArgsList.length; index += 1) {
-      const attemptArgs = attemptArgsList[index];
-      try {
-        if (index > 0) {
-          await cleanupDownloadedArtifacts(basePath);
-        }
-
-        await runYtDlp({
-          args: [...buildYtDlpArgsBase(), ...attemptArgs],
-          endpoint,
-          requestId,
-          input: link,
-          timeoutMs: DOWNLOAD_TIMEOUT_MS,
-          timeoutMessage: playText('download_timeout', 'Timeout ao baixar o arquivo.'),
-          fallbackMessage: playText('download_failed', 'Falha ao baixar o arquivo localmente.'),
-        });
-        downloadCompleted = true;
-        lastError = null;
-        break;
-      } catch (error) {
-        lastError = error;
-        const shouldRetryWithFallback = isRequestedFormatUnavailableError(error) && index < attemptArgsList.length - 1;
-
-        if (!shouldRetryWithFallback) {
-          break;
-        }
-
-        logger.warn('Play download: formato indisponível, tentando fallback.', {
-          requestId,
-          endpoint,
-          type,
-          attempt: index + 1,
-          nextAttempt: index + 2,
-          code: error?.code || null,
-          cause: truncateText(error?.meta?.cause || error?.message || ''),
-        });
-      }
+    if (!isYtmp3PrimaryEligible({ type, link })) {
+      throw createError(ERROR_CODES.NOT_FOUND, playText('search_not_found', 'Nenhum resultado encontrado para a busca.'), {
+        endpoint: YTDLS_ENDPOINTS.ytmp3Download,
+        requestId,
+        input: truncateText(link || ''),
+        technical: false,
+      });
     }
 
-    if (!downloadCompleted && lastError) {
-      if (isYtmp3FallbackEligible({ type, link, error: lastError })) {
-        logger.warn('Play download: formato indisponível no yt-dlp; tentando fallback via ytmp3.', {
-          requestId,
-          endpoint,
-          type,
-          cause: truncateText(lastError?.meta?.cause || lastError?.message || ''),
-        });
+    providerResult = await requestYtmp3DownloadToFile({
+      link,
+      type,
+      requestId,
+      basePath,
+    });
 
-        fallbackResult = await requestYtmp3DownloadToFile({
-          link,
-          requestId,
-          basePath,
-        });
-        downloadCompleted = true;
+    logger.info('Play download: ytmp3 concluído.', {
+      requestId,
+      endpoint: YTDLS_ENDPOINTS.ytmp3Download,
+      type,
+      bytes: providerResult?.bytes || 0,
+    });
 
-        logger.info('Play download: fallback via ytmp3 concluído.', {
-          requestId,
-          endpoint: YTDLS_ENDPOINTS.ytmp3Download,
-          type,
-          bytes: fallbackResult?.bytes || 0,
-        });
-      } else {
-        throw lastError;
-      }
-    }
-
-    filePath = fallbackResult?.filePath || (await findDownloadedFileByBase(basePath, preferredExt));
+    filePath = providerResult?.filePath || (await findDownloadedFileByBase(basePath, type === 'audio' ? 'mp3' : 'mp4'));
     if (!filePath) {
       throw createError(ERROR_CODES.API, playText('download_file_not_found', 'Não foi possível localizar o arquivo baixado.'), {
         endpoint,
@@ -1957,8 +1728,8 @@ const requestDownloadToFile = async (link, type, requestId) => {
 
     let stat = await fs.promises.stat(filePath);
     let finalBytes = Number(stat?.size || 0);
-    let finalMimeType = fallbackResult?.contentType || inferMimeFromFilePath(filePath, type);
-    let finalMediaType = fallbackResult?.mediaType || type;
+    let finalMimeType = providerResult?.contentType || inferMimeFromFilePath(filePath, type);
+    let finalMediaType = providerResult?.mediaType || type;
 
     if (finalBytes <= 0) {
       throw createError(ERROR_CODES.API, playText('download_invalid_media', 'Falha ao baixar mídia válida.'), {
@@ -2033,14 +1804,14 @@ const requestDownloadToFile = async (link, type, requestId) => {
     const normalized =
       KNOWN_ERROR_CODES.has(error?.code) && error?.message
         ? error
-        : normalizeYtDlpError(error, {
+        : normalizeProviderError(error, {
             endpoint,
             requestId,
             input: link,
             timeoutMessage: playText('download_timeout', 'Timeout ao baixar o arquivo.'),
             fallbackMessage: playText('download_failed', 'Falha ao baixar o arquivo localmente.'),
           });
-    throw withErrorMeta(normalized, { endpoint: normalized?.meta?.endpoint || endpoint, filePath });
+    throw withErrorMeta(normalized, { endpoint: normalized?.meta?.endpoint || endpoint, filePath, provider: 'ytmp3' });
   }
 };
 
@@ -2067,10 +1838,9 @@ const fetchThumbnailBuffer = async (url) =>
     },
   );
 
-const ytdlsClient = {
+const playMediaClient = {
   resolveYoutubeLink,
   resolveYoutubeCandidates,
-  resolveYtDlpCookiesPath,
   fetchVideoInfo,
   fetchQueueStatus,
   requestDownloadToFile,
@@ -2091,16 +1861,12 @@ const fileUtils = {
   safeUnlink,
 };
 
-export const __playYtDlpClientTestUtils = {
+export const __playMediaClientTestUtils = {
   extractCandidateUrlsFromSearchResult,
-  buildDownloadAttemptArgsList,
-  hasYtDlpCookieArgs,
-  stripYtDlpCookieArgs,
-  isRequestedFormatUnavailableError,
-  isYtmp3FallbackEligible,
+  isYtmp3PrimaryEligible,
   isYouTubeBotCheckCause,
   buildYouTubeBotCheckUserMessage,
   getProcessLimiterStats: () => playProcessLimiter.stats(),
 };
 
-export { createError, withErrorMeta, normalizePlayError, truncateText, ytdlsClient, formatters, fileUtils, isYouTubeBotCheckCause, buildYouTubeBotCheckUserMessage };
+export { createError, withErrorMeta, normalizePlayError, truncateText, playMediaClient, formatters, fileUtils, isYouTubeBotCheckCause, buildYouTubeBotCheckUserMessage };

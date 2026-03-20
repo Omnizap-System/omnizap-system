@@ -31,23 +31,9 @@ const baseOrigin = toBaseOrigin(rawBaseUrl);
 const PASS = 'PASS';
 const FAIL = 'FAIL';
 
-const STATIC_REQUIRED_HEADERS = [
-  'content-security-policy',
-  'permissions-policy',
-  'strict-transport-security',
-  'x-content-type-options',
-  'x-frame-options',
-];
+const STATIC_REQUIRED_HEADERS = ['content-security-policy', 'permissions-policy', 'strict-transport-security', 'x-content-type-options', 'x-frame-options'];
 
-const API_REQUIRED_HEADERS = [
-  'content-security-policy',
-  'cross-origin-opener-policy',
-  'cross-origin-resource-policy',
-  'permissions-policy',
-  'strict-transport-security',
-  'x-content-type-options',
-  'x-frame-options',
-];
+const API_REQUIRED_HEADERS = ['content-security-policy', 'cross-origin-opener-policy', 'cross-origin-resource-policy', 'permissions-policy', 'strict-transport-security', 'x-content-type-options', 'x-frame-options'];
 
 const checks = [
   {
