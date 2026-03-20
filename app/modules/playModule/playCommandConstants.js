@@ -10,6 +10,10 @@ export const DOWNLOAD_TIMEOUT_MS = Number.parseInt(process.env.PLAY_DOWNLOAD_TIM
 export const YTDLP_INFO_TIMEOUT_MS = Number.parseInt(process.env.PLAY_YTDLP_INFO_TIMEOUT_MS || '120000', 10);
 export const YTDLP_BINARY_PATH = (process.env.PLAY_YTDLP_BINARY_PATH || DEFAULT_YTDLP_BINARY_PATH).trim();
 export const YTDLP_COOKIES_FROM_BROWSER = (process.env.PLAY_YTDLP_COOKIES_FROM_BROWSER || '').trim();
+export const PLAY_YTMP3_ENABLED = String(process.env.PLAY_YTMP3_ENABLED || 'true').toLowerCase() !== 'false';
+export const PLAY_YTMP3_API_BASE_URL = (process.env.PLAY_YTMP3_API_BASE_URL || 'https://hub.ytconvert.org').trim();
+export const PLAY_YTMP3_API_DOWNLOAD_PATH = (process.env.PLAY_YTMP3_API_DOWNLOAD_PATH || '/api/download').trim() || '/api/download';
+export const PLAY_YTMP3_POLL_INTERVAL_MS = Math.max(500, Number.parseInt(process.env.PLAY_YTMP3_POLL_INTERVAL_MS || '2000', 10) || 2000);
 
 const PLAY_MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
 export const PLAY_LOCAL_DIR = path.join(PLAY_MODULE_DIR, 'local');
@@ -44,6 +48,9 @@ export const YTDLS_ENDPOINTS = {
   download: 'local:download',
   install: 'local:install',
   thumbnail: 'thumbnail',
+  ytmp3Create: 'ytmp3:create',
+  ytmp3Poll: 'ytmp3:poll',
+  ytmp3Download: 'ytmp3:download',
 };
 
 export const ERROR_CODES = {

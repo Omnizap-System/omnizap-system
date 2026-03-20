@@ -9,7 +9,40 @@ import { spawn } from 'node:child_process';
 import logger from '#logger';
 import { installYtDlpBinary } from './local/ytDlpInstaller.js';
 import { getPlayExecutionOptions, getPlayOperationalLimits, getPlayReadyTitle, getPlayText } from './playConfigRuntime.js';
-import { DEFAULT_TIMEOUT_MS, DOWNLOAD_TIMEOUT_MS, YTDLP_INFO_TIMEOUT_MS, YTDLP_BINARY_PATH, YTDLP_COOKIES_FROM_BROWSER, PROJECT_ROOT_DIR, DEFAULT_COOKIES_PATH, MAX_SEARCH_RESULTS, MAX_MEDIA_BYTES, MAX_MEDIA_MB_LABEL, THUMBNAIL_TIMEOUT_MS, MAX_THUMB_BYTES, VIDEO_PROCESS_TIMEOUT_MS, VIDEO_FORCE_TRANSCODE, FFMPEG_BIN, FFPROBE_BIN, SEARCH_CACHE_TTL_MS, MAX_SEARCH_CACHE_ENTRIES, MAX_REDIRECTS, MAX_ERROR_BODY_BYTES, MAX_META_BODY_CHARS, TRANSIENT_HTTP_STATUSES, TRANSIENT_NETWORK_CODES, YTDLS_ENDPOINTS, ERROR_CODES, KNOWN_ERROR_CODES, TYPE_CONFIG, PLAY_DOWNLOADS_DIR } from './playCommandConstants.js';
+import {
+  DEFAULT_TIMEOUT_MS,
+  DOWNLOAD_TIMEOUT_MS,
+  YTDLP_INFO_TIMEOUT_MS,
+  YTDLP_BINARY_PATH,
+  YTDLP_COOKIES_FROM_BROWSER,
+  PLAY_YTMP3_ENABLED,
+  PLAY_YTMP3_API_BASE_URL,
+  PLAY_YTMP3_API_DOWNLOAD_PATH,
+  PLAY_YTMP3_POLL_INTERVAL_MS,
+  PROJECT_ROOT_DIR,
+  DEFAULT_COOKIES_PATH,
+  MAX_SEARCH_RESULTS,
+  MAX_MEDIA_BYTES,
+  MAX_MEDIA_MB_LABEL,
+  THUMBNAIL_TIMEOUT_MS,
+  MAX_THUMB_BYTES,
+  VIDEO_PROCESS_TIMEOUT_MS,
+  VIDEO_FORCE_TRANSCODE,
+  FFMPEG_BIN,
+  FFPROBE_BIN,
+  SEARCH_CACHE_TTL_MS,
+  MAX_SEARCH_CACHE_ENTRIES,
+  MAX_REDIRECTS,
+  MAX_ERROR_BODY_BYTES,
+  MAX_META_BODY_CHARS,
+  TRANSIENT_HTTP_STATUSES,
+  TRANSIENT_NETWORK_CODES,
+  YTDLS_ENDPOINTS,
+  ERROR_CODES,
+  KNOWN_ERROR_CODES,
+  TYPE_CONFIG,
+  PLAY_DOWNLOADS_DIR,
+} from './playCommandConstants.js';
 
 const createError = (code, message, meta) => {
   const error = new Error(message);
@@ -154,6 +187,30 @@ const ensureHttpUrl = (value) => {
     return null;
   } catch {
     return null;
+  }
+};
+
+const resolveHttpUrl = (value, baseUrl = null) => {
+  if (!value || typeof value !== 'string') return null;
+  try {
+    const resolved = baseUrl ? new URL(value.trim(), baseUrl) : new URL(value.trim());
+    if (resolved.protocol === 'http:' || resolved.protocol === 'https:') {
+      return resolved.toString();
+    }
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+const isYouTubeUrl = (value) => {
+  const normalized = ensureHttpUrl(value);
+  if (!normalized) return false;
+  try {
+    const hostname = new URL(normalized).hostname.toLowerCase();
+    return hostname === 'youtube.com' || hostname.endsWith('.youtube.com') || hostname === 'youtu.be' || hostname.endsWith('.youtu.be') || hostname === 'youtubekids.com' || hostname.endsWith('.youtubekids.com');
+  } catch {
+    return false;
   }
 };
 
@@ -499,11 +556,24 @@ const readResponseBuffer = async (stream, { maxBytes = Infinity, tooBigMessage }
   return Buffer.concat(chunks, total);
 };
 
-const httpRequest = ({ url, timeoutMs = DEFAULT_TIMEOUT_MS, maxRedirects = 0, redirectCount = 0, endpoint = 'unknown', timeoutMessage = playText('http_timeout', 'Timeout na requisição HTTP.'), fallbackMessage = playText('http_failed', 'Falha na requisição HTTP.'), onResponse }) =>
+const httpRequest = ({
+  url,
+  method = 'GET',
+  headers = {},
+  body = null,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+  maxRedirects = 0,
+  redirectCount = 0,
+  endpoint = 'unknown',
+  timeoutMessage = playText('http_timeout', 'Timeout na requisição HTTP.'),
+  fallbackMessage = playText('http_failed', 'Falha na requisição HTTP.'),
+  onResponse,
+}) =>
   new Promise((resolve, reject) => {
     const urlObj = new URL(url);
     const httpModule = resolveHttpModule(urlObj);
     const { signal, cleanup } = createAbortSignal(timeoutMs);
+    const normalizedMethod = String(method || 'GET').toUpperCase();
 
     let settled = false;
     const settle = (fn) => {
@@ -519,8 +589,11 @@ const httpRequest = ({ url, timeoutMs = DEFAULT_TIMEOUT_MS, maxRedirects = 0, re
     const req = httpModule.request(
       urlObj,
       {
-        method: 'GET',
-        headers: { Accept: '*/*' },
+        method: normalizedMethod,
+        headers: {
+          Accept: '*/*',
+          ...(headers && typeof headers === 'object' ? headers : {}),
+        },
         signal,
       },
       (res) => {
@@ -546,6 +619,9 @@ const httpRequest = ({ url, timeoutMs = DEFAULT_TIMEOUT_MS, maxRedirects = 0, re
           settleResolve(
             httpRequest({
               url: nextUrl,
+              method: normalizedMethod,
+              headers,
+              body,
               timeoutMs,
               maxRedirects,
               redirectCount: redirectCount + 1,
@@ -586,12 +662,183 @@ const httpRequest = ({ url, timeoutMs = DEFAULT_TIMEOUT_MS, maxRedirects = 0, re
       settleReject(withErrorMeta(normalized, { endpoint }));
     });
 
+    if (body !== null && body !== undefined) {
+      req.write(body);
+    }
+
     req.end();
   });
+
+const requestJson = async ({
+  url,
+  method = 'GET',
+  data = null,
+  headers = {},
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+  maxRedirects = getLimits().max_redirects ?? MAX_REDIRECTS,
+  endpoint = 'unknown',
+  timeoutMessage = playText('http_timeout', 'Timeout na requisição HTTP.'),
+  fallbackMessage = playText('http_failed', 'Falha na requisição HTTP.'),
+}) => {
+  const body = data === null || data === undefined ? null : JSON.stringify(data);
+  const requestHeaders = {
+    Accept: 'application/json',
+    ...(headers && typeof headers === 'object' ? headers : {}),
+  };
+  if (body !== null && body !== undefined) {
+    requestHeaders['Content-Type'] = requestHeaders['Content-Type'] || 'application/json';
+  }
+
+  return httpRequest({
+    url,
+    method,
+    headers: requestHeaders,
+    body,
+    timeoutMs,
+    endpoint,
+    maxRedirects,
+    timeoutMessage,
+    fallbackMessage,
+    onResponse: async ({ res, status, endpoint: currentEndpoint }) => {
+      const bodyBuffer = await readResponseBuffer(res, {
+        maxBytes: (getLimits().max_error_body_bytes ?? MAX_ERROR_BODY_BYTES) * 4,
+      });
+      const rawText = bodyBuffer.toString('utf-8').trim();
+
+      if (status < 200 || status >= 300) {
+        throw createError(ERROR_CODES.API, fallbackMessage, {
+          endpoint: currentEndpoint,
+          status,
+          cause: truncateText(rawText || 'http_non_success'),
+          technical: true,
+        });
+      }
+
+      if (!rawText) return {};
+
+      try {
+        return JSON.parse(rawText);
+      } catch {
+        throw createError(ERROR_CODES.API, fallbackMessage, {
+          endpoint: currentEndpoint,
+          status,
+          cause: truncateText(rawText || 'invalid_json'),
+          technical: true,
+        });
+      }
+    },
+  });
+};
+
+const requestFile = async ({
+  url,
+  filePath,
+  timeoutMs = DOWNLOAD_TIMEOUT_MS,
+  maxBytes = MAX_MEDIA_BYTES,
+  endpoint = YTDLS_ENDPOINTS.download,
+  timeoutMessage = playText('download_timeout', 'Timeout ao baixar o arquivo.'),
+  fallbackMessage = playText('download_failed', 'Falha ao baixar o arquivo localmente.'),
+}) => {
+  await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
+
+  try {
+    return await httpRequest({
+      url,
+      timeoutMs,
+      endpoint,
+      maxRedirects: getLimits().max_redirects ?? MAX_REDIRECTS,
+      timeoutMessage,
+      fallbackMessage,
+      onResponse: async ({ res, status, headers, endpoint: currentEndpoint }) => {
+        if (status < 200 || status >= 300) {
+          const responseBody = await readResponseBuffer(res, {
+            maxBytes: getLimits().max_error_body_bytes ?? MAX_ERROR_BODY_BYTES,
+          });
+          throw createError(ERROR_CODES.API, fallbackMessage, {
+            endpoint: currentEndpoint,
+            status,
+            cause: truncateText(responseBody.toString('utf-8')),
+            technical: true,
+          });
+        }
+
+        const contentLength = toNumberOrNull(getHeaderValue(headers, 'content-length'));
+        if (contentLength !== null && contentLength > maxBytes) {
+          res.resume();
+          throw createError(ERROR_CODES.TOO_BIG, playText('media_too_big', `O arquivo excede o limite permitido de ${MAX_MEDIA_MB_LABEL} MB.`, { max_mb: MAX_MEDIA_MB_LABEL }), {
+            endpoint: currentEndpoint,
+            status,
+            bytes: contentLength,
+            technical: false,
+          });
+        }
+
+        const writeStream = fs.createWriteStream(filePath, { flags: 'w' });
+        let bytes = 0;
+
+        await new Promise((resolve, reject) => {
+          let settled = false;
+
+          const settleReject = (error) => {
+            if (settled) return;
+            settled = true;
+            writeStream.destroy();
+            res.destroy();
+            reject(error);
+          };
+
+          const settleResolve = () => {
+            if (settled) return;
+            settled = true;
+            resolve(null);
+          };
+
+          res.on('data', (chunk) => {
+            bytes += Buffer.isBuffer(chunk) ? chunk.length : Buffer.byteLength(String(chunk || ''));
+            if (bytes > maxBytes) {
+              settleReject(
+                createError(ERROR_CODES.TOO_BIG, playText('media_too_big', `O arquivo excede o limite permitido de ${MAX_MEDIA_MB_LABEL} MB.`, { max_mb: MAX_MEDIA_MB_LABEL }), {
+                  endpoint: currentEndpoint,
+                  status,
+                  bytes,
+                  technical: false,
+                }),
+              );
+            }
+          });
+
+          res.on('error', settleReject);
+          writeStream.on('error', settleReject);
+          writeStream.on('finish', settleResolve);
+          res.pipe(writeStream);
+        });
+
+        if (bytes <= 0) {
+          throw createError(ERROR_CODES.API, playText('download_invalid_media', 'Falha ao baixar mídia válida.'), {
+            endpoint: currentEndpoint,
+            status,
+            bytes,
+            filePath,
+            technical: true,
+          });
+        }
+
+        return {
+          bytes,
+          contentType: normalizeMimeType(getHeaderValue(headers, 'content-type')),
+        };
+      },
+    });
+  } catch (error) {
+    await safeUnlink(filePath);
+    throw error;
+  }
+};
 
 const requestBuffer = async ({ url, timeoutMs = getLimits().thumbnail_timeout_ms ?? THUMBNAIL_TIMEOUT_MS, maxBytes = getLimits().max_thumb_bytes ?? MAX_THUMB_BYTES, endpoint = YTDLS_ENDPOINTS.thumbnail }) =>
   httpRequest({
     url,
+    method: 'GET',
     timeoutMs,
     endpoint,
     maxRedirects: getLimits().max_redirects ?? MAX_REDIRECTS,
@@ -627,6 +874,8 @@ const requestBuffer = async ({ url, timeoutMs = getLimits().thumbnail_timeout_ms
 
 const httpClient = {
   requestBuffer,
+  requestJson,
+  requestFile,
 };
 
 const isTransientError = (error) => {
@@ -979,24 +1228,86 @@ const normalizeYtDlpError = (error, { endpoint, requestId, input, timeoutMessage
   });
 };
 
+const COOKIE_ARG_FLAGS_WITH_VALUE = new Set(['--cookies', '--cookies-from-browser']);
+const COOKIE_ARG_PREFIXES = ['--cookies=', '--cookies-from-browser='];
+
+const hasYtDlpCookieArgs = (args = []) =>
+  Array.isArray(args) &&
+  args.some((arg) => {
+    const normalized = String(arg || '').trim();
+    if (!normalized) return false;
+    if (COOKIE_ARG_FLAGS_WITH_VALUE.has(normalized)) return true;
+    return COOKIE_ARG_PREFIXES.some((prefix) => normalized.startsWith(prefix));
+  });
+
+const stripYtDlpCookieArgs = (args = []) => {
+  if (!Array.isArray(args)) return [];
+
+  const sanitized = [];
+  for (let index = 0; index < args.length; index += 1) {
+    const current = String(args[index] || '').trim();
+    if (!current) {
+      sanitized.push(args[index]);
+      continue;
+    }
+
+    if (COOKIE_ARG_FLAGS_WITH_VALUE.has(current)) {
+      index += 1;
+      continue;
+    }
+
+    if (COOKIE_ARG_PREFIXES.some((prefix) => current.startsWith(prefix))) {
+      continue;
+    }
+
+    sanitized.push(args[index]);
+  }
+
+  return sanitized;
+};
+
 const isRequestedFormatUnavailableError = (error) => {
   const stderr = String(error?.stderr || '').trim();
   const stdout = String(error?.stdout || '').trim();
   const message = String(error?.message || '').trim();
-  const combined = `${stderr}\n${stdout}\n${message}`.toLowerCase();
+  const cause = String(error?.meta?.cause || '').trim();
+  const combined = `${stderr}\n${stdout}\n${message}\n${cause}`.toLowerCase();
   return combined.includes('requested format is not available');
 };
 
 const runYtDlp = async ({ args, endpoint, requestId, input, timeoutMs = DEFAULT_TIMEOUT_MS, timeoutMessage, fallbackMessage }) => {
   const binaryPath = await ensureYtDlpReady();
-
-  try {
-    return await runWithPlayProcessSlot(() => runBinaryCommand(binaryPath, args, { timeoutMs }), {
+  const executeYtDlp = (runtimeArgs) =>
+    runWithPlayProcessSlot(() => runBinaryCommand(binaryPath, runtimeArgs, { timeoutMs }), {
       endpoint,
       command: path.basename(binaryPath),
     });
+
+  try {
+    return await executeYtDlp(args);
   } catch (error) {
-    throw normalizeYtDlpError(error, {
+    let resolvedError = error;
+    const shouldRetryWithoutCookies = isRequestedFormatUnavailableError(error) && hasYtDlpCookieArgs(args);
+
+    if (shouldRetryWithoutCookies) {
+      const argsWithoutCookies = stripYtDlpCookieArgs(args);
+      if (argsWithoutCookies.length !== args.length) {
+        logger.warn('Play yt-dlp: formato indisponível com cookies; tentando sem cookies.', {
+          requestId,
+          endpoint,
+          code: error?.code || null,
+          cause: truncateText(error?.stderr || error?.message || ''),
+        });
+
+        try {
+          return await executeYtDlp(argsWithoutCookies);
+        } catch (retryError) {
+          resolvedError = retryError;
+        }
+      }
+    }
+
+    throw normalizeYtDlpError(resolvedError, {
       endpoint,
       requestId,
       input,
@@ -1004,6 +1315,253 @@ const runYtDlp = async ({ args, endpoint, requestId, input, timeoutMs = DEFAULT_
       fallbackMessage: fallbackMessage || playText('ytdlp_error_generic', 'Falha ao processar mídia com yt-dlp.'),
     });
   }
+};
+
+const YTMP3_AUDIO_FORMATS = new Set(['mp3', 'm4a', 'flac', 'ogg', 'wav', 'opus']);
+const YTMP3_AUDIO_BITRATES = new Set(['best', '320', '192', '128', '64']);
+const YTMP3_DEFAULT_AUDIO_FORMAT = 'mp3';
+const YTMP3_DEFAULT_AUDIO_BITRATE = '128';
+
+const resolveYtmp3AudioSettings = () => {
+  const executionOptions = getExecutionOptions();
+  const formatOptions = executionOptions?.estrategias_formato || {};
+  const audioExtract = formatOptions.audio_extract && typeof formatOptions.audio_extract === 'object' ? formatOptions.audio_extract : {};
+
+  const extractedFormat = String(audioExtract.format || YTMP3_DEFAULT_AUDIO_FORMAT).trim().toLowerCase();
+  const audioFormat = YTMP3_AUDIO_FORMATS.has(extractedFormat) ? extractedFormat : YTMP3_DEFAULT_AUDIO_FORMAT;
+
+  const rawQuality = String(audioExtract.quality || YTMP3_DEFAULT_AUDIO_BITRATE).trim().toLowerCase();
+  const mappedQuality = rawQuality === '0' ? 'best' : rawQuality.replace(/k$/i, '');
+  const audioBitrate = YTMP3_AUDIO_BITRATES.has(mappedQuality) ? mappedQuality : YTMP3_DEFAULT_AUDIO_BITRATE;
+
+  return {
+    audioFormat,
+    audioBitrate,
+    audioTrack: 'origin',
+  };
+};
+
+const resolveYtmp3RuntimeOs = () => {
+  const platform = String(os.platform() || '').toLowerCase();
+  if (platform === 'darwin') return 'macos';
+  if (platform === 'win32') return 'windows';
+  if (platform === 'android') return 'android';
+  if (platform === 'linux') return 'linux';
+  return 'windows';
+};
+
+const unwrapApiData = (payload) => {
+  if (payload && typeof payload === 'object' && payload.data && typeof payload.data === 'object') {
+    return payload.data;
+  }
+  return payload;
+};
+
+const normalizeYtmp3StatusPayload = (payload) => {
+  const raw = unwrapApiData(payload);
+  if (!raw || typeof raw !== 'object') {
+    return {
+      status: '',
+      message: null,
+      progress: null,
+      downloadUrl: null,
+      title: null,
+    };
+  }
+
+  return {
+    status: String(raw.status || '').trim().toLowerCase(),
+    message: pickFirstString(raw, ['jobError', 'message', 'error']),
+    progress: toNumberOrNull(raw.progress),
+    downloadUrl: resolveHttpUrl(raw.downloadUrl || raw.download_url),
+    title: pickFirstString(raw, ['title', 'name']),
+  };
+};
+
+const isYtmp3FallbackEligible = ({ type, link, error }) => PLAY_YTMP3_ENABLED && type === 'audio' && isYouTubeUrl(link) && isRequestedFormatUnavailableError(error);
+
+const buildYtmp3DownloadEndpoint = () => {
+  const baseUrl = ensureHttpUrl(PLAY_YTMP3_API_BASE_URL);
+  if (!baseUrl) {
+    throw createError(ERROR_CODES.API, playText('download_failed', 'Falha ao baixar o arquivo localmente.'), {
+      endpoint: YTDLS_ENDPOINTS.ytmp3Create,
+      cause: `invalid_ytmp3_base_url:${PLAY_YTMP3_API_BASE_URL || 'empty'}`,
+      technical: true,
+    });
+  }
+
+  const endpointUrl = resolveHttpUrl(PLAY_YTMP3_API_DOWNLOAD_PATH, baseUrl);
+  if (!endpointUrl) {
+    throw createError(ERROR_CODES.API, playText('download_failed', 'Falha ao baixar o arquivo localmente.'), {
+      endpoint: YTDLS_ENDPOINTS.ytmp3Create,
+      cause: `invalid_ytmp3_download_path:${PLAY_YTMP3_API_DOWNLOAD_PATH || 'empty'}`,
+      technical: true,
+    });
+  }
+
+  return endpointUrl;
+};
+
+const createYtmp3DownloadTask = async ({ link, requestId, audioFormat, audioBitrate, audioTrack }) => {
+  const endpointUrl = buildYtmp3DownloadEndpoint();
+
+  const payload = {
+    url: link,
+    os: resolveYtmp3RuntimeOs(),
+    output: {
+      type: 'audio',
+      format: audioFormat || YTMP3_DEFAULT_AUDIO_FORMAT,
+    },
+  };
+
+  const audioPayload = {};
+  if (audioBitrate) {
+    audioPayload.bitrate = `${String(audioBitrate).replace(/k$/i, '')}k`;
+  }
+  if (audioTrack && String(audioTrack).trim() && String(audioTrack).trim().toLowerCase() !== 'origin') {
+    audioPayload.trackId = String(audioTrack).trim();
+  }
+  if (Object.keys(audioPayload).length) {
+    payload.audio = audioPayload;
+  }
+
+  const response = await httpClient.requestJson({
+    url: endpointUrl,
+    method: 'POST',
+    data: payload,
+    endpoint: YTDLS_ENDPOINTS.ytmp3Create,
+    timeoutMs: Math.min(DOWNLOAD_TIMEOUT_MS, 60000),
+    timeoutMessage: playText('download_timeout', 'Timeout ao baixar o arquivo.'),
+    fallbackMessage: playText('download_failed', 'Falha ao baixar o arquivo localmente.'),
+  });
+  const normalized = unwrapApiData(response);
+  const statusUrl = resolveHttpUrl(normalized?.statusUrl || normalized?.status_url, endpointUrl);
+
+  if (!statusUrl) {
+    throw createError(ERROR_CODES.API, playText('download_failed', 'Falha ao baixar o arquivo localmente.'), {
+      endpoint: YTDLS_ENDPOINTS.ytmp3Create,
+      requestId,
+      input: truncateText(link || ''),
+      cause: truncateText(JSON.stringify(normalized || {})),
+      technical: true,
+    });
+  }
+
+  return {
+    statusUrl,
+    title: pickFirstString(normalized, ['title', 'name']),
+  };
+};
+
+const pollYtmp3UntilReady = async ({ statusUrl, requestId, input }) => {
+  const timeoutMs = Math.max(15000, DOWNLOAD_TIMEOUT_MS);
+  const pollIntervalMs = Math.max(500, Number(getLimits().ytmp3_poll_interval_ms ?? PLAY_YTMP3_POLL_INTERVAL_MS));
+  const startedAt = __timeNowMs();
+
+  while (true) {
+    const elapsedMs = __timeNowMs() - startedAt;
+    if (elapsedMs >= timeoutMs) {
+      throw createError(ERROR_CODES.TIMEOUT, playText('download_timeout', 'Timeout ao baixar o arquivo.'), {
+        endpoint: YTDLS_ENDPOINTS.ytmp3Poll,
+        requestId,
+        input: truncateText(input || ''),
+        statusUrl: truncateText(statusUrl, 400),
+        technical: true,
+      });
+    }
+
+    const payload = await httpClient.requestJson({
+      url: statusUrl,
+      method: 'GET',
+      endpoint: YTDLS_ENDPOINTS.ytmp3Poll,
+      timeoutMs: Math.max(1000, Math.min(15000, timeoutMs - elapsedMs)),
+      timeoutMessage: playText('download_timeout', 'Timeout ao baixar o arquivo.'),
+      fallbackMessage: playText('download_failed', 'Falha ao baixar o arquivo localmente.'),
+    });
+    const status = normalizeYtmp3StatusPayload(payload);
+
+    if (status.downloadUrl && (!status.status || status.status === 'completed')) {
+      return {
+        downloadUrl: status.downloadUrl,
+        title: status.title,
+      };
+    }
+
+    if (status.status === 'completed') {
+      if (!status.downloadUrl) {
+        throw createError(ERROR_CODES.API, playText('download_failed', 'Falha ao baixar o arquivo localmente.'), {
+          endpoint: YTDLS_ENDPOINTS.ytmp3Poll,
+          requestId,
+          input: truncateText(input || ''),
+          status: status.status,
+          cause: status.message || 'missing_download_url',
+          technical: true,
+        });
+      }
+
+      return {
+        downloadUrl: status.downloadUrl,
+        title: status.title,
+      };
+    }
+
+    if (status.status === 'failed' || status.status === 'error' || status.status === 'not_found') {
+      throw createError(ERROR_CODES.API, playText('download_failed', 'Falha ao baixar o arquivo localmente.'), {
+        endpoint: YTDLS_ENDPOINTS.ytmp3Poll,
+        requestId,
+        input: truncateText(input || ''),
+        status: status.status,
+        cause: truncateText(status.message || 'ytmp3_failed'),
+        technical: true,
+      });
+    }
+
+    await delay(pollIntervalMs);
+  }
+};
+
+const requestYtmp3DownloadToFile = async ({ link, requestId, basePath }) => {
+  const audioSettings = resolveYtmp3AudioSettings();
+  const targetExt = audioSettings.audioFormat || YTMP3_DEFAULT_AUDIO_FORMAT;
+  const targetPath = `${basePath}.${targetExt}`;
+
+  return runWithPlayProcessSlot(
+    async () => {
+      const task = await createYtmp3DownloadTask({
+        link,
+        requestId,
+        audioFormat: audioSettings.audioFormat,
+        audioBitrate: audioSettings.audioBitrate,
+        audioTrack: audioSettings.audioTrack,
+      });
+
+      const ready = await pollYtmp3UntilReady({
+        statusUrl: task.statusUrl,
+        requestId,
+        input: link,
+      });
+
+      const downloaded = await httpClient.requestFile({
+        url: ready.downloadUrl,
+        filePath: targetPath,
+        endpoint: YTDLS_ENDPOINTS.ytmp3Download,
+        timeoutMs: DOWNLOAD_TIMEOUT_MS,
+        timeoutMessage: playText('download_timeout', 'Timeout ao baixar o arquivo.'),
+        fallbackMessage: playText('download_failed', 'Falha ao baixar o arquivo localmente.'),
+      });
+
+      return {
+        filePath: targetPath,
+        bytes: downloaded.bytes,
+        contentType: resolveMediaMimeType('audio', downloaded.contentType),
+        mediaType: 'audio',
+      };
+    },
+    {
+      endpoint: YTDLS_ENDPOINTS.ytmp3Create,
+      command: 'ytmp3',
+    },
+  );
 };
 
 const fetchSearchResult = async (query) => {
@@ -1315,6 +1873,7 @@ const requestDownloadToFile = async (link, type, requestId) => {
   const outputTemplate = `${basePath}.%(ext)s`;
   const preferredExt = type === 'audio' ? 'mp3' : 'mp4';
   let filePath = null;
+  let fallbackResult = null;
   const attemptArgsList = buildDownloadAttemptArgsList({ type, outputTemplate, link });
 
   try {
@@ -1345,7 +1904,7 @@ const requestDownloadToFile = async (link, type, requestId) => {
         const shouldRetryWithFallback = isRequestedFormatUnavailableError(error) && index < attemptArgsList.length - 1;
 
         if (!shouldRetryWithFallback) {
-          throw error;
+          break;
         }
 
         logger.warn('Play download: formato indisponível, tentando fallback.', {
@@ -1361,10 +1920,33 @@ const requestDownloadToFile = async (link, type, requestId) => {
     }
 
     if (!downloadCompleted && lastError) {
-      throw lastError;
+      if (isYtmp3FallbackEligible({ type, link, error: lastError })) {
+        logger.warn('Play download: formato indisponível no yt-dlp; tentando fallback via ytmp3.', {
+          requestId,
+          endpoint,
+          type,
+          cause: truncateText(lastError?.meta?.cause || lastError?.message || ''),
+        });
+
+        fallbackResult = await requestYtmp3DownloadToFile({
+          link,
+          requestId,
+          basePath,
+        });
+        downloadCompleted = true;
+
+        logger.info('Play download: fallback via ytmp3 concluído.', {
+          requestId,
+          endpoint: YTDLS_ENDPOINTS.ytmp3Download,
+          type,
+          bytes: fallbackResult?.bytes || 0,
+        });
+      } else {
+        throw lastError;
+      }
     }
 
-    filePath = await findDownloadedFileByBase(basePath, preferredExt);
+    filePath = fallbackResult?.filePath || (await findDownloadedFileByBase(basePath, preferredExt));
     if (!filePath) {
       throw createError(ERROR_CODES.API, playText('download_file_not_found', 'Não foi possível localizar o arquivo baixado.'), {
         endpoint,
@@ -1375,8 +1957,8 @@ const requestDownloadToFile = async (link, type, requestId) => {
 
     let stat = await fs.promises.stat(filePath);
     let finalBytes = Number(stat?.size || 0);
-    let finalMimeType = inferMimeFromFilePath(filePath, type);
-    let finalMediaType = type;
+    let finalMimeType = fallbackResult?.contentType || inferMimeFromFilePath(filePath, type);
+    let finalMediaType = fallbackResult?.mediaType || type;
 
     if (finalBytes <= 0) {
       throw createError(ERROR_CODES.API, playText('download_invalid_media', 'Falha ao baixar mídia válida.'), {
@@ -1458,7 +2040,7 @@ const requestDownloadToFile = async (link, type, requestId) => {
             timeoutMessage: playText('download_timeout', 'Timeout ao baixar o arquivo.'),
             fallbackMessage: playText('download_failed', 'Falha ao baixar o arquivo localmente.'),
           });
-    throw withErrorMeta(normalized, { endpoint, filePath });
+    throw withErrorMeta(normalized, { endpoint: normalized?.meta?.endpoint || endpoint, filePath });
   }
 };
 
@@ -1512,6 +2094,10 @@ const fileUtils = {
 export const __playYtDlpClientTestUtils = {
   extractCandidateUrlsFromSearchResult,
   buildDownloadAttemptArgsList,
+  hasYtDlpCookieArgs,
+  stripYtDlpCookieArgs,
+  isRequestedFormatUnavailableError,
+  isYtmp3FallbackEligible,
   isYouTubeBotCheckCause,
   buildYouTubeBotCheckUserMessage,
   getProcessLimiterStats: () => playProcessLimiter.stats(),

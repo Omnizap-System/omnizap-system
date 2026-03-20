@@ -69,6 +69,7 @@ const DEFAULT_OPERATIONAL_LIMITS = {
   thumbnail_timeout_ms: 15000,
   max_thumb_bytes: 5 * 1024 * 1024,
   admin_alert_dedupe_window_ms: 120000,
+  ytmp3_poll_interval_ms: 2000,
 };
 
 const DEFAULT_EXECUTION_OPTIONS = {

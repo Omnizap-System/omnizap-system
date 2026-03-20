@@ -74,6 +74,76 @@ test('estratégia de formato gera tentativas de fallback para áudio e vídeo', 
   assert.equal(videoAttempts[0][videoAttempts[0].length - 1], link);
 });
 
+test('remove argumentos de cookies do yt-dlp sem afetar flags restantes', () => {
+  const args = [
+    '--ignore-config',
+    '--cookies',
+    '/tmp/cookies.txt',
+    '--cookies-from-browser',
+    'firefox',
+    '--cookies=/tmp/cookies-inline.txt',
+    '--cookies-from-browser=chrome',
+    '--no-progress',
+    '-f',
+    'bestaudio/best',
+    'https://www.youtube.com/watch?v=test123',
+  ];
+
+  assert.equal(__playYtDlpClientTestUtils.hasYtDlpCookieArgs(args), true);
+
+  const sanitized = __playYtDlpClientTestUtils.stripYtDlpCookieArgs(args);
+
+  assert.deepEqual(sanitized, ['--ignore-config', '--no-progress', '-f', 'bestaudio/best', 'https://www.youtube.com/watch?v=test123']);
+  assert.equal(__playYtDlpClientTestUtils.hasYtDlpCookieArgs(sanitized), false);
+});
+
+test('detecta erro de formato indisponível mesmo após normalização em meta.cause', () => {
+  const normalizedError = {
+    code: 'EAPI',
+    message: 'Falha ao baixar o arquivo localmente.',
+    meta: {
+      cause: 'ERROR: [youtube] eFcj2MBBWBE: Requested format is not available. Use --list-formats for a list of available formats',
+    },
+  };
+
+  assert.equal(__playYtDlpClientTestUtils.isRequestedFormatUnavailableError(normalizedError), true);
+});
+
+test('fallback ytmp3 só é elegível para áudio de YouTube com erro de formato', () => {
+  const formatError = {
+    meta: {
+      cause: 'Requested format is not available',
+    },
+  };
+
+  assert.equal(
+    __playYtDlpClientTestUtils.isYtmp3FallbackEligible({
+      type: 'audio',
+      link: 'https://www.youtube.com/watch?v=test1234567A',
+      error: formatError,
+    }),
+    true,
+  );
+
+  assert.equal(
+    __playYtDlpClientTestUtils.isYtmp3FallbackEligible({
+      type: 'video',
+      link: 'https://www.youtube.com/watch?v=test1234567A',
+      error: formatError,
+    }),
+    false,
+  );
+
+  assert.equal(
+    __playYtDlpClientTestUtils.isYtmp3FallbackEligible({
+      type: 'audio',
+      link: 'https://vimeo.com/1234',
+      error: formatError,
+    }),
+    false,
+  );
+});
+
 test('anti-bot: detecta causa e retorna mensagem apropriada conforme cookies', { concurrency: false }, async () => {
   assert.equal(
     __playYtDlpClientTestUtils.isYouTubeBotCheckCause({
