@@ -129,6 +129,59 @@ Resultado esperado:
 - `22`, `80`, `443` abertos;
 - `3001` e `8007` filtrados/fechados externamente.
 
+## 8) Hardening da superficie web estatica (ZAP issue #103)
+
+Objetivo: eliminar soft-404 e alinhar headers de seguranca em rotas estaticas servidas direto pelo Nginx (`/`, `/comandos/`, `/login/`, etc.).
+
+1) Publicar snippet de headers estaticos:
+
+```bash
+sudo install -D -m 0644 docs/security/omnizap-static-security-headers.conf /etc/nginx/snippets/omnizap-static-security-headers.conf
+```
+
+2) No `server { ... }` de producao, garantir que rotas proxy (`/api/`, `/stickers/`, `/data/`) venham antes do fallback estatico e aplicar:
+
+```nginx
+# Nao permitir dotfiles sensiveis
+location ~* (^|/)\.(?!well-known/) {
+  return 404;
+}
+
+# Fallback estatico sem soft-404 (nao retorna home para caminho inexistente)
+location / {
+  try_files $uri $uri/ =404;
+  include /etc/nginx/snippets/omnizap-static-security-headers.conf;
+}
+```
+
+3) Validar e recarregar:
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+4) Validacao rapida manual:
+
+```bash
+curl -I https://omnizap.shop/
+curl -I https://omnizap.shop/notice-and-takedown/
+curl -I https://omnizap.shop/.env
+curl -I https://omnizap.shop/__security_probe_nonexistent_omnizap__.txt
+```
+
+5) Validacao automatizada (repositorio):
+
+```bash
+npm run security:web-surface
+```
+
+Resultado esperado:
+
+- rotas estaticas com `Content-Security-Policy`, `X-Frame-Options`, `Strict-Transport-Security`, `X-Content-Type-Options`, `Permissions-Policy`;
+- `/.env` sem `200`;
+- caminho inexistente sem fallback `200` para a home.
+
 ## Referências
 
 - Nginx admin guide: https://nginx.org/en/docs/

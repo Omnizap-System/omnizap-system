@@ -11,6 +11,9 @@ RESTART_PM2="${DEPLOY_RESTART_PM2:-1}"
 PM2_APP_NAME="${DEPLOY_PM2_APP_NAME:-omnizap-production}"
 BUILD_ID="${DEPLOY_BUILD_ID:-$(date -u +%Y%m%d%H%M%S)}"
 VERIFY_URL="${DEPLOY_VERIFY_URL:-https://omnizap.shop/}"
+WEB_SURFACE_VERIFY_ENABLED="${DEPLOY_VERIFY_WEB_SECURITY_SURFACE:-1}"
+WEB_SURFACE_VERIFY_BASE_URL="${DEPLOY_VERIFY_WEB_SECURITY_SURFACE_BASE_URL:-$VERIFY_URL}"
+WEB_SURFACE_VERIFY_REPORT_PATH="${DEPLOY_VERIFY_WEB_SECURITY_SURFACE_REPORT_PATH:-$PROJECT_ROOT/temp/security-web-surface-report.json}"
 DRY_RUN="${DEPLOY_DRY_RUN:-0}"
 GITHUB_NOTIFY="${DEPLOY_GITHUB_NOTIFY:-1}"
 GITHUB_ENVIRONMENT="${DEPLOY_GITHUB_ENVIRONMENT:-production}"
@@ -918,6 +921,13 @@ if command -v curl >/dev/null 2>&1; then
   else
     log "Health check falhou em $VERIFY_URL (deploy concluído, verifique manualmente)."
   fi
+fi
+
+if [ "$WEB_SURFACE_VERIFY_ENABLED" = "1" ]; then
+  log "Executando validacao web de seguranca em $WEB_SURFACE_VERIFY_BASE_URL"
+  SECURITY_WEB_SURFACE_BASE_URL="$WEB_SURFACE_VERIFY_BASE_URL" \
+  SECURITY_WEB_SURFACE_REPORT_PATH="$WEB_SURFACE_VERIFY_REPORT_PATH" \
+  node "$PROJECT_ROOT/scripts/security-web-surface-check.mjs"
 fi
 
 log "Deploy concluído com sucesso."

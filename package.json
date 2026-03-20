@@ -86,7 +86,8 @@
     "ci": "npm run check && npm run build",
     "security:audit": "npm audit --audit-level=high",
     "security:audit:fix": "npm audit fix",
-    "security:codeql": "bash ./scripts/run-codeql-local.sh"
+    "security:codeql": "bash ./scripts/run-codeql-local.sh",
+    "security:web-surface": "node ./scripts/security-web-surface-check.mjs"
   },
   "dependencies": {
     "@hapi/boom": "^10.0.1",
