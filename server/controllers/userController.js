@@ -3,6 +3,7 @@ import path from 'node:path';
 
 import logger from '#logger';
 import { DEFAULT_LEGACY_STICKER_API_BASE_PATH, DEFAULT_USER_API_BASE_PATH, isUserApiPath, normalizeBasePath, resolveLegacyUserApiPath } from '../routes/user/userApiPaths.js';
+import { buildWhatsappUrl, resolvePublicWhatsappNumber } from '../utils/publicContact.js';
 
 const LEGACY_STICKER_API_BASE_PATH = normalizeBasePath(process.env.STICKER_API_BASE_PATH, DEFAULT_LEGACY_STICKER_API_BASE_PATH);
 const USER_API_BASE_PATH = normalizeBasePath(process.env.USER_API_BASE_PATH || process.env.AUTH_API_BASE_PATH, DEFAULT_USER_API_BASE_PATH);
@@ -11,6 +12,8 @@ const USER_PROFILE_WEB_PATH = normalizeBasePath(process.env.USER_PROFILE_WEB_PAT
 const USER_PASSWORD_RESET_WEB_PATH = normalizeBasePath(process.env.USER_PASSWORD_RESET_WEB_PATH, '/user/password-reset');
 const USER_DASHBOARD_TEMPLATE_PATH = path.join(process.cwd(), 'public', 'pages', 'user.html');
 const USER_PASSWORD_RESET_TEMPLATE_PATH = path.join(process.cwd(), 'public', 'pages', 'user-password-reset.html');
+const PUBLIC_WHATSAPP_NUMBER = resolvePublicWhatsappNumber();
+const PUBLIC_WHATSAPP_URL = buildWhatsappUrl(PUBLIC_WHATSAPP_NUMBER);
 
 const hasPathPrefix = (pathname, prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`);
 const escapeHtmlAttribute = (value) =>
@@ -54,6 +57,8 @@ const renderUserDashboardHtml = async ({ passwordReset = false } = {}) => {
     'data-login-path': STICKER_LOGIN_WEB_PATH,
     'data-panel-path': USER_PROFILE_WEB_PATH,
     'data-password-reset-web-path': USER_PASSWORD_RESET_WEB_PATH,
+    'data-support-whatsapp-number': PUBLIC_WHATSAPP_NUMBER,
+    'data-support-whatsapp-url': PUBLIC_WHATSAPP_URL,
   };
 
   let html = template;

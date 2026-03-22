@@ -30,7 +30,7 @@ export const resolveCatalogBotPhone = () => {
     return fromSocket;
   }
 
-  const envCandidates = [process.env.WHATSAPP_BOT_NUMBER, process.env.BOT_NUMBER, process.env.PHONE_NUMBER, process.env.BOT_PHONE_NUMBER, process.env.USER_ADMIN];
+  const envCandidates = [process.env.WHATSAPP_BOT_NUMBER, process.env.WHATSAPP_PUBLIC_CONTACT_NUMBER, process.env.BOT_NUMBER, process.env.PHONE_NUMBER, process.env.BOT_PHONE_NUMBER, process.env.USER_ADMIN];
 
   for (const candidate of envCandidates) {
     const digits = normalizePhoneDigits(candidate || '');
@@ -75,7 +75,7 @@ const resolveSupportAdminPhone = async () => {
   const adminPhone = isPlausibleWhatsAppPhone(getAdminPhone() || '');
   if (adminPhone) return adminPhone;
 
-  const candidates = [process.env.WHATSAPP_SUPPORT_NUMBER, process.env.OWNER_NUMBER, process.env.USER_ADMIN];
+  const candidates = [process.env.WHATSAPP_PUBLIC_CONTACT_NUMBER, process.env.WHATSAPP_SUPPORT_NUMBER, process.env.OWNER_NUMBER, process.env.USER_ADMIN];
 
   for (const candidate of candidates) {
     const digits = isPlausibleWhatsAppPhone(getJidUser(candidate || '') || candidate);

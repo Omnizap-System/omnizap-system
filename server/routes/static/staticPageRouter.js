@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 import logger from '#logger';
+import { buildWhatsappUrl, formatWhatsappDisplay, resolvePublicWhatsappNumber } from '../../utils/publicContact.js';
 
 const normalizeBasePath = (value, fallback) => {
   const raw = String(value || '').trim() || fallback;
@@ -21,6 +22,11 @@ const PUBLIC_PAGES_DIR = path.join(process.cwd(), 'public', 'pages');
 const SEO_ROUTE_PREFIX = '/seo/';
 const SEO_SLUG_REGEX = /^[a-z0-9-]+$/;
 const INDEX_FILE_SUFFIX = '/index.html';
+const LGPD_DEFAULT_TEXT = 'Olá, gostaria de exercer meus direitos de titular de dados (LGPD).';
+const PUBLIC_WHATSAPP_NUMBER = resolvePublicWhatsappNumber();
+const PUBLIC_WHATSAPP_URL = buildWhatsappUrl(PUBLIC_WHATSAPP_NUMBER);
+const PUBLIC_WHATSAPP_URL_LGPD = buildWhatsappUrl(PUBLIC_WHATSAPP_NUMBER, process.env.WHATSAPP_SUPPORT_LGPD_TEXT || LGPD_DEFAULT_TEXT);
+const PUBLIC_WHATSAPP_DISPLAY = formatWhatsappDisplay(PUBLIC_WHATSAPP_NUMBER);
 
 const STATIC_PAGE_ROUTE_TO_FILE = new Map(
   [
@@ -89,6 +95,22 @@ const sendJson = (req, res, statusCode, payload) => {
   res.end(body);
 };
 
+const injectStaticTemplateTokens = (html) => {
+  let rendered = String(html || '');
+  const replacements = {
+    __WHATSAPP_PUBLIC_CONTACT_NUMBER__: PUBLIC_WHATSAPP_NUMBER,
+    __WHATSAPP_PUBLIC_CONTACT_URL__: PUBLIC_WHATSAPP_URL,
+    __WHATSAPP_PUBLIC_CONTACT_URL_LGPD__: PUBLIC_WHATSAPP_URL_LGPD,
+    __WHATSAPP_PUBLIC_CONTACT_DISPLAY__: PUBLIC_WHATSAPP_DISPLAY,
+  };
+
+  for (const [token, value] of Object.entries(replacements)) {
+    rendered = rendered.replaceAll(token, String(value || ''));
+  }
+
+  return rendered;
+};
+
 export const shouldHandleStaticPagePath = (pathname) => Boolean(resolveStaticTemplateName(pathname));
 
 export const maybeHandleStaticPageRequest = async (req, res, { pathname } = {}) => {
@@ -116,7 +138,7 @@ export const maybeHandleStaticPageRequest = async (req, res, { pathname } = {}) 
   const templatePath = path.join(PUBLIC_PAGES_DIR, templateName);
   try {
     const html = await fs.readFile(templatePath, 'utf8');
-    sendHtml(req, res, html);
+    sendHtml(req, res, injectStaticTemplateTokens(html));
   } catch (error) {
     if (error?.code === 'ENOENT') {
       sendJson(req, res, 404, { error: 'Template da pagina nao encontrado.' });

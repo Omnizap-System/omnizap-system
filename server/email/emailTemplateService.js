@@ -77,7 +77,7 @@ const resolveBrandConfig = (payload = {}) => {
   const supportFallback = `${siteOrigin}/termos-de-uso/`;
   const replyToAddress = normalizeEmailAddress(payload?.replyTo || process.env.SMTP_REPLY_TO || process.env.EMAIL_REPLY_TO || process.env.MAIL_REPLY_TO || '');
   const fromAddress = normalizeEmailAddress(process.env.SMTP_FROM || process.env.EMAIL_FROM || process.env.MAIL_FROM || process.env.SMTP_USER || process.env.EMAIL_USER || process.env.MAIL_USER || '');
-  const supportPhoneCandidate = normalizePhoneDigits(payload?.supportPhone || process.env.EMAIL_BRAND_SUPPORT_PHONE || process.env.WHATSAPP_SUPPORT_NUMBER || process.env.OWNER_NUMBER || '', 20);
+  const supportPhoneCandidate = normalizePhoneDigits(payload?.supportPhone || process.env.WHATSAPP_PUBLIC_CONTACT_NUMBER || process.env.EMAIL_BRAND_SUPPORT_PHONE || process.env.WHATSAPP_SUPPORT_NUMBER || process.env.OWNER_NUMBER || '', 20);
   const supportPhoneDigits = isLikelyPhoneDigits(supportPhoneCandidate) ? supportPhoneCandidate : '';
   const supportPhonePn = formatPhonePn(supportPhoneDigits);
   const supportWhatsappUrl = supportPhoneDigits ? `https://wa.me/${supportPhoneDigits}` : '';
@@ -216,7 +216,7 @@ const resolveNavigationLinks = (payload = {}) => {
 };
 
 const resolveWelcomeBotWhatsApp = (payload = {}) => {
-  const botPhoneCandidate = normalizePhoneDigits(payload?.botPhone || payload?.botNumber || process.env.EMAIL_WELCOME_BOT_PHONE || process.env.WHATSAPP_BOT_NUMBER || process.env.BOT_NUMBER || process.env.BOT_PHONE_NUMBER || process.env.PHONE_NUMBER || process.env.EMAIL_BRAND_SUPPORT_PHONE || '', 20);
+  const botPhoneCandidate = normalizePhoneDigits(payload?.botPhone || payload?.botNumber || process.env.EMAIL_WELCOME_BOT_PHONE || process.env.WHATSAPP_PUBLIC_CONTACT_NUMBER || process.env.WHATSAPP_BOT_NUMBER || process.env.BOT_NUMBER || process.env.BOT_PHONE_NUMBER || process.env.PHONE_NUMBER || process.env.EMAIL_BRAND_SUPPORT_PHONE || '', 20);
   const botPhoneDigits = isLikelyPhoneDigits(botPhoneCandidate) ? botPhoneCandidate : '';
   const botPhonePn = formatPhonePn(botPhoneDigits);
   const botWhatsAppUrl = botPhoneDigits ? `https://wa.me/${botPhoneDigits}` : '';
