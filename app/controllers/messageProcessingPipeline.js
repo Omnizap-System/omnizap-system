@@ -41,6 +41,7 @@ const MESSAGE_REPLY_PRESENCE_BEFORE = normalizeWAPresence(process.env.MESSAGE_RE
 const MESSAGE_REPLY_PRESENCE_AFTER = normalizeWAPresence(process.env.MESSAGE_REPLY_PRESENCE_AFTER, 'paused');
 const MESSAGE_REPLY_PRESENCE_DELAY_MS = parseEnvInt(process.env.MESSAGE_REPLY_PRESENCE_DELAY_MS, 280, 0, 3_000);
 const MESSAGE_REPLY_PRESENCE_SUBSCRIBE = parseEnvBool(process.env.MESSAGE_REPLY_PRESENCE_SUBSCRIBE, true);
+const CONVERSATIONAL_AUTO_REPLY_ENABLED = parseEnvBool(process.env.CONVERSATIONAL_AUTO_REPLY_ENABLED, false);
 const WHATSAPP_COMMAND_REQUIRES_GOOGLE_LOGIN = parseEnvBool(process.env.WHATSAPP_COMMAND_REQUIRES_GOOGLE_LOGIN, true);
 const SITE_ORIGIN =
   String(process.env.SITE_ORIGIN || process.env.WHATSAPP_LOGIN_BASE_URL || 'https://omnizap.shop')
@@ -605,6 +606,7 @@ const routeConversationMiddleware = createConversationMiddleware({
   sendReply,
   routeConversationMessage,
   stopMessagePipeline,
+  conversationAutoReplyEnabled: CONVERSATIONAL_AUTO_REPLY_ENABLED,
 });
 
 const executeCommandMiddleware = createCommandMiddleware({

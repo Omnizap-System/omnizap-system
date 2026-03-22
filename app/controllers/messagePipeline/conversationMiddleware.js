@@ -1,4 +1,4 @@
-export const createConversationMiddleware = ({ logger, resolveSenderAdminForContext, resolveSenderOwnerForContext, resolveHasGoogleLoginForContext, isUserAdmin, isAdminSenderAsync, resolveCanonicalSenderJidForContext, isWhatsAppUserLinkedToGoogleWebAccount, WHATSAPP_COMMAND_REQUIRES_GOOGLE_LOGIN, ensureUserHasGoogleWebLoginForCommand, executeMessageCommandRoute, isAdminCommand, runCommand, sendReply, routeConversationMessage, stopMessagePipeline }) => {
+export const createConversationMiddleware = ({ logger, resolveSenderAdminForContext, resolveSenderOwnerForContext, resolveHasGoogleLoginForContext, isUserAdmin, isAdminSenderAsync, resolveCanonicalSenderJidForContext, isWhatsAppUserLinkedToGoogleWebAccount, WHATSAPP_COMMAND_REQUIRES_GOOGLE_LOGIN, ensureUserHasGoogleWebLoginForCommand, executeMessageCommandRoute, isAdminCommand, runCommand, sendReply, routeConversationMessage, stopMessagePipeline, conversationAutoReplyEnabled = true }) => {
   const resolveToolSecurityContextForConversation = async (ctx) => {
     if (ctx.memo.toolSecurityContext) return ctx.memo.toolSecurityContext;
 
@@ -133,6 +133,7 @@ export const createConversationMiddleware = ({ logger, resolveSenderAdminForCont
   };
 
   return async (ctx) => {
+    if (!conversationAutoReplyEnabled) return null;
     if (ctx.isCommandMessage || ctx.isMessageFromBot || !ctx.isNotifyUpsert) return null;
 
     try {
