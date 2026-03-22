@@ -8,7 +8,7 @@ Padronizar resposta para direitos do titular: acesso, correção, exclusão, opo
 
 ## 2) Canais de entrada
 
-- WhatsApp oficial: `https://wa.me/<WHATSAPP_PUBLIC_CONTACT_NUMBER>`
+- WhatsApp oficial: `https://wa.me/<WHATSAPP_SUPPORT_NUMBER>`
 - Canal interno de compliance (registro em ticket obrigatório)
 
 ## 3) Papéis e responsáveis

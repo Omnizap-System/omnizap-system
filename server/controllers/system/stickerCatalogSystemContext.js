@@ -1,5 +1,6 @@
 import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import { withTimeout } from '../../http/httpRequestUtils.js';
+import { resolveBotPhoneFromEnv } from '../../../utils/whatsapp/contactEnv.js';
 
 export const createStickerCatalogSystemContext = ({ executeQuery, tables, logger, getSystemMetrics, getActiveSocket, resolveSocketReadyState, resolveActiveSocketBotJid, resolveCatalogBotPhone, fetchPrometheusSummary, metricsEndpoint, systemSummaryCache, systemSummaryCacheSeconds, readmeSummaryCache, readmeSummaryCacheSeconds, readmeMessageTypeSampleLimit, readmeCommandPrefix, buildMenuCaption, buildStickerMenu, buildMediaMenu, buildQuoteMenu, buildAnimeMenu, buildAiMenu, buildStatsMenu, buildAdminMenu, profilePictureUrlFromActiveSocket, normalizeJid, getJidUser, globalRankCache, globalRankRefreshSeconds, marketplaceGlobalStatsCache, marketplaceGlobalStatsCacheSeconds }) => {
   let globalRankRefreshTimer = null;
@@ -358,12 +359,8 @@ export const createStickerCatalogSystemContext = ({ executeQuery, tables, logger
     const botPhoneFromCatalog = String(resolveCatalogBotPhone() || '').replace(/\D+/g, '');
     if (botPhoneFromCatalog) candidates.add(botPhoneFromCatalog);
 
-    const envCandidates = [process.env.WHATSAPP_BOT_NUMBER, process.env.BOT_NUMBER, process.env.PHONE_NUMBER, process.env.BOT_PHONE_NUMBER];
-
-    for (const candidate of envCandidates) {
-      const digits = String(candidate || '').replace(/\D+/g, '');
-      if (digits) candidates.add(digits);
-    }
+    const configuredBotPhone = String(resolveBotPhoneFromEnv({ fallback: '' }) || '').replace(/\D+/g, '');
+    if (configuredBotPhone) candidates.add(configuredBotPhone);
 
     return Array.from(candidates).filter((value) => value.length >= 8);
   };

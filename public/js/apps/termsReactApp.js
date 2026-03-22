@@ -45,7 +45,7 @@ const resolveSupportLinks = (root) => {
   const rawSupportDisplay = String(dataset.whatsappSupportDisplay || '').trim();
   const supportUrl = (isValidWhatsappUrl(rawSupportUrl) ? rawSupportUrl : buildWhatsappUrl(supportNumber)) || DEFAULT_SUPPORT_WHATSAPP_URL;
   const supportLgpdUrl = (isValidWhatsappUrl(rawSupportLgpdUrl) ? rawSupportLgpdUrl : buildWhatsappUrl(supportNumber, DEFAULT_SUPPORT_LGPD_TEXT)) || supportUrl;
-  const supportDisplay = rawSupportDisplay && !/__WHATSAPP_PUBLIC_CONTACT_/i.test(rawSupportDisplay) ? rawSupportDisplay : formatWhatsappDisplay(supportNumber);
+  const supportDisplay = rawSupportDisplay && !/__WHATSAPP_(?:PUBLIC_CONTACT|SUPPORT)_/i.test(rawSupportDisplay) ? rawSupportDisplay : formatWhatsappDisplay(supportNumber);
   return {
     supportUrl,
     supportLgpdUrl,

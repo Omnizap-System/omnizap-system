@@ -32,4 +32,4 @@ Definir usos permitidos e proibidos na plataforma OmniZap para reduzir risco jur
 ## 5) Canal de denúncia
 
 - Página formal: `/notice-and-takedown/`.
-- Contato oficial: `https://wa.me/<WHATSAPP_PUBLIC_CONTACT_NUMBER>`.
+- Contato oficial: `https://wa.me/<WHATSAPP_SUPPORT_NUMBER>`.

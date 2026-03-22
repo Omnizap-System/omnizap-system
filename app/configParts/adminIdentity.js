@@ -1,11 +1,8 @@
 import { encodeJid, getJidUser, isSameJidUser, normalizeJid } from './baileysConfig.js';
 import { extractUserIdInfo, resolveUserId, resolveUserIdCached } from './baileysConfig.js';
+import { normalizePhoneDigits, resolveAdminIdentityRawFromEnv, resolveAdminPhoneFromEnv } from '../../utils/whatsapp/contactEnv.js';
 
-const ADMIN_ENV_KEY = 'USER_ADMIN';
-
-const normalizePhoneDigits = (value) => String(value || '').replace(/\D+/g, '');
-
-export const getAdminRawValue = () => String(process.env[ADMIN_ENV_KEY] || '').trim();
+export const getAdminRawValue = () => resolveAdminIdentityRawFromEnv();
 
 export const getAdminJid = () => {
   const raw = getAdminRawValue();
@@ -28,6 +25,9 @@ export const getAdminJid = () => {
 };
 
 export const getAdminPhone = () => {
+  const explicitAdminPhone = resolveAdminPhoneFromEnv({ fallback: '' });
+  if (explicitAdminPhone) return explicitAdminPhone;
+
   const adminJid = getAdminJid();
   if (!adminJid) return null;
 

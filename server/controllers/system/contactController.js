@@ -1,13 +1,12 @@
 import logger from '#logger';
 import { getActiveSocket, getAdminPhone, getAdminRawValue, getJidUser, resolveAdminJid, resolveBotJid, extractUserIdInfo, resolveUserId } from '../../../app/config/index.js';
+import { isLikelyWhatsAppPhone, normalizePhoneDigits, resolveAdminPhoneFromEnv, resolveBotPhoneFromEnv, resolveSupportPhoneFromEnv } from '../../../utils/whatsapp/contactEnv.js';
 
 const PACK_COMMAND_PREFIX = String(process.env.COMMAND_PREFIX || '/').trim() || '/';
 
-const normalizePhoneDigits = (value) => String(value || '').replace(/\D+/g, '');
-
 const isPlausibleWhatsAppPhone = (value) => {
   const digits = normalizePhoneDigits(value);
-  return digits.length >= 10 && digits.length <= 15 ? digits : '';
+  return isLikelyWhatsAppPhone(digits) ? digits : '';
 };
 
 const resolveActiveSocketBotJid = (activeSocket) => {
@@ -26,18 +25,12 @@ export const resolveCatalogBotPhone = () => {
   const jidUser = botJid ? getJidUser(botJid) : null;
   const fromSocket = normalizePhoneDigits(jidUser || '');
 
-  if (fromSocket && fromSocket.length >= 10) {
+  if (isLikelyWhatsAppPhone(fromSocket)) {
     return fromSocket;
   }
 
-  const envCandidates = [process.env.WHATSAPP_BOT_NUMBER, process.env.WHATSAPP_PUBLIC_CONTACT_NUMBER, process.env.BOT_NUMBER, process.env.PHONE_NUMBER, process.env.BOT_PHONE_NUMBER, process.env.USER_ADMIN];
-
-  for (const candidate of envCandidates) {
-    const digits = normalizePhoneDigits(candidate || '');
-    if (digits && digits.length >= 10 && digits.length <= 15) {
-      return digits;
-    }
-  }
+  const fromEnv = resolveBotPhoneFromEnv({ fallback: '' });
+  if (fromEnv) return fromEnv;
 
   logger.warn('Nao foi possivel resolver o numero do bot para contato.', {
     action: 'resolve_bot_phone_failed',
@@ -75,12 +68,11 @@ const resolveSupportAdminPhone = async () => {
   const adminPhone = isPlausibleWhatsAppPhone(getAdminPhone() || '');
   if (adminPhone) return adminPhone;
 
-  const candidates = [process.env.WHATSAPP_PUBLIC_CONTACT_NUMBER, process.env.WHATSAPP_SUPPORT_NUMBER, process.env.OWNER_NUMBER, process.env.USER_ADMIN];
+  const configuredAdminPhone = resolveAdminPhoneFromEnv({ fallback: '' });
+  if (configuredAdminPhone) return configuredAdminPhone;
 
-  for (const candidate of candidates) {
-    const digits = isPlausibleWhatsAppPhone(getJidUser(candidate || '') || candidate);
-    if (digits) return digits;
-  }
+  const configuredSupportPhone = resolveSupportPhoneFromEnv({ fallback: '' });
+  if (configuredSupportPhone) return configuredSupportPhone;
 
   return '';
 };

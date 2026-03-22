@@ -12,14 +12,14 @@ Escopo: site, login web, painel, API e operação de automação do Omnizap.
 ## 1) Controlador e contato
 
 - Controlador: 59.034.123 KAIKY BRITO RIBEIRO (CNPJ 59.034.123/0001-96).
-- Contato de privacidade: `https://wa.me/<WHATSAPP_PUBLIC_CONTACT_NUMBER>`
+- Contato de privacidade: `https://wa.me/<WHATSAPP_SUPPORT_NUMBER>`
 - Canal para titulares (LGPD): mensagem com assunto "DSAR LGPD" no contato oficial.
 - Para serviços de terceiros baseados em fork/self-host, o contato de privacidade deve ser solicitado diretamente ao operador da respectiva instância.
 
 ## 1.1) Encarregado pelo tratamento (LGPD art. 41)
 
 - Encarregado (DPO): Kaiky Brito Ribeiro (59.034.123 KAIKY BRITO RIBEIRO, CNPJ 59.034.123/0001-96).
-- Contato do encarregado: `https://wa.me/<WHATSAPP_PUBLIC_CONTACT_NUMBER>` (assunto recomendado: "ENCARREGADO LGPD").
+- Contato do encarregado: `https://wa.me/<WHATSAPP_SUPPORT_NUMBER>` (assunto recomendado: "ENCARREGADO LGPD").
 - Divulgação pública mantida para transparência regulatória.
 
 ## 2) Tabela de tratamento de dados
