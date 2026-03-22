@@ -3,6 +3,57 @@ import { createRoot } from 'react-dom/client';
 import htm from 'htm';
 
 const html = htm.bind(React.createElement);
+const rootElement = document.getElementById('terms-react-root');
+
+const DEFAULT_SUPPORT_WHATSAPP_NUMBER = '';
+const DEFAULT_SUPPORT_WHATSAPP_URL = '#';
+const DEFAULT_SUPPORT_WHATSAPP_DISPLAY = 'Canal oficial';
+const DEFAULT_SUPPORT_LGPD_TEXT = 'Olá, gostaria de exercer meus direitos de titular de dados (LGPD).';
+
+const normalizePhoneDigits = (value) =>
+  String(value || '')
+    .replace(/\D+/g, '')
+    .slice(0, 15);
+
+const formatWhatsappDisplay = (value) => {
+  const digits = normalizePhoneDigits(value);
+  if (!digits) return DEFAULT_SUPPORT_WHATSAPP_DISPLAY;
+  if (digits.startsWith('55') && digits.length === 12) {
+    return `+55 ${digits.slice(2, 4)} ${digits.slice(4, 8)}-${digits.slice(8)}`;
+  }
+  if (digits.startsWith('55') && digits.length === 13) {
+    return `+55 ${digits.slice(2, 4)} ${digits.slice(4, 9)}-${digits.slice(9)}`;
+  }
+  return `+${digits}`;
+};
+
+const buildWhatsappUrl = (value, text = '') => {
+  const digits = normalizePhoneDigits(value);
+  if (!digits) return '';
+  const normalizedText = String(text || '').trim();
+  if (!normalizedText) return `https://wa.me/${digits}`;
+  return `https://wa.me/${digits}?text=${encodeURIComponent(normalizedText)}`;
+};
+
+const isValidWhatsappUrl = (value) => /^https?:\/\/wa\.me\/\d{8,15}(?:\?.*)?$/i.test(String(value || '').trim());
+
+const resolveSupportLinks = (root) => {
+  const dataset = root?.dataset || {};
+  const supportNumber = normalizePhoneDigits(dataset.whatsappSupportNumber) || DEFAULT_SUPPORT_WHATSAPP_NUMBER;
+  const rawSupportUrl = String(dataset.whatsappSupportUrl || '').trim();
+  const rawSupportLgpdUrl = String(dataset.whatsappSupportLgpdUrl || '').trim();
+  const rawSupportDisplay = String(dataset.whatsappSupportDisplay || '').trim();
+  const supportUrl = (isValidWhatsappUrl(rawSupportUrl) ? rawSupportUrl : buildWhatsappUrl(supportNumber)) || DEFAULT_SUPPORT_WHATSAPP_URL;
+  const supportLgpdUrl = (isValidWhatsappUrl(rawSupportLgpdUrl) ? rawSupportLgpdUrl : buildWhatsappUrl(supportNumber, DEFAULT_SUPPORT_LGPD_TEXT)) || supportUrl;
+  const supportDisplay = rawSupportDisplay && !/__WHATSAPP_PUBLIC_CONTACT_/i.test(rawSupportDisplay) ? rawSupportDisplay : formatWhatsappDisplay(supportNumber);
+  return {
+    supportUrl,
+    supportLgpdUrl,
+    supportDisplay: supportDisplay || DEFAULT_SUPPORT_WHATSAPP_DISPLAY,
+  };
+};
+
+const { supportUrl: SUPPORT_WHATSAPP_URL, supportLgpdUrl: SUPPORT_WHATSAPP_LGPD_URL, supportDisplay: SUPPORT_WHATSAPP_DISPLAY } = resolveSupportLinks(rootElement);
 
 const TERMS_CONTENT_HTML = String.raw`
       <section class="terms-card" style="border-bottom: 4px solid hsla(142, 71%, 45%, 0.3)">
@@ -10,7 +61,7 @@ const TERMS_CONTENT_HTML = String.raw`
         <span class="updated">Última atualização: 07/03/2026</span>
         <p>Este instrumento regula o acesso e uso do site, API, painel e funcionalidades de automação disponibilizadas pelo Omnizap.</p>
         <div class="flex flex-wrap gap-3 mt-6">
-          <a class="contact-btn wa" href="https://wa.me/559591122954" target="_blank">WhatsApp Oficial</a>
+          <a class="contact-btn wa" href="${SUPPORT_WHATSAPP_URL}" target="_blank">WhatsApp Oficial</a>
           <a class="contact-btn ig" href="https://www.instagram.com/kaikybrofc/" target="_blank">Instagram</a>
         </div>
       </section>
@@ -22,7 +73,7 @@ const TERMS_CONTENT_HTML = String.raw`
           <li>Nome empresarial: <strong>59.034.123 KAIKY BRITO RIBEIRO</strong>.</li>
           <li>CNPJ: <strong>59.034.123/0001-96</strong>.</li>
           <li>UF do registro: <strong>RR</strong>.</li>
-          <li>Canal de contato principal: <a href="https://wa.me/559591122954" target="_blank" class="accent">https://wa.me/559591122954</a>.</li>
+          <li>Canal de contato principal: <a href="${SUPPORT_WHATSAPP_URL}" target="_blank" class="accent">${SUPPORT_WHATSAPP_URL}</a>.</li>
         </ul>
       </section>
 
@@ -152,7 +203,7 @@ const TERMS_CONTENT_HTML = String.raw`
         <p>Quando aplicável, o atendimento observará resposta simplificada imediata e declaração clara/completa em até 15 (quinze) dias, conforme LGPD art. 19.</p>
         <p>Para exercício de direitos e demandas de privacidade:</p>
         <div class="flex flex-wrap gap-3 mt-4">
-          <a class="contact-btn wa" href="https://wa.me/559591122954?text=Ol%C3%A1%2C%20gostaria%20de%20exercer%20meus%20direitos%20de%20titular%20de%20dados%20(LGPD)." target="_blank">Solicitar via WhatsApp</a>
+          <a class="contact-btn wa" href="${SUPPORT_WHATSAPP_LGPD_URL}" target="_blank">Solicitar via WhatsApp</a>
           <a class="contact-btn ig" href="https://www.instagram.com/kaikybrofc/" target="_blank">Contato no Instagram</a>
         </div>
       </section>
@@ -253,12 +304,12 @@ const TERMS_CONTENT_HTML = String.raw`
         <h2>20. Contato e foro</h2>
         <p>Para questões contratuais, privacidade e proteção de dados, utilize os canais oficiais abaixo.</p>
         <div class="flex flex-wrap gap-3 mt-4">
-          <a class="contact-btn wa" href="https://wa.me/559591122954" target="_blank">WhatsApp oficial</a>
+          <a class="contact-btn wa" href="${SUPPORT_WHATSAPP_URL}" target="_blank">WhatsApp oficial</a>
           <a class="contact-btn ig" href="https://www.instagram.com/kaikybrofc/" target="_blank">Instagram oficial</a>
         </div>
         <ul class="mt-6">
-          <li>WhatsApp oficial: <strong>+55 95 9112-2954</strong>.</li>
-          <li>Link direto: <a href="https://wa.me/559591122954" target="_blank" class="accent">https://wa.me/559591122954</a>.</li>
+          <li>WhatsApp oficial: <strong>${SUPPORT_WHATSAPP_DISPLAY}</strong>.</li>
+          <li>Link direto: <a href="${SUPPORT_WHATSAPP_URL}" target="_blank" class="accent">${SUPPORT_WHATSAPP_URL}</a>.</li>
           <li>Instagram oficial: <a href="https://www.instagram.com/kaikybrofc/" target="_blank" class="accent">https://www.instagram.com/kaikybrofc/</a>.</li>
           <li>Contato complementar para notificações formais: privacidade@omnizap.shop.</li>
           <li>Encarregado (LGPD art. 41): Kaiky Brito Ribeiro, contato pelo canal oficial de privacidade.</li>
@@ -519,8 +570,6 @@ const TermsReactAppWithEffects = () => {
   useRevealEffect();
   return html`<${TermsReactApp} />`;
 };
-
-const rootElement = document.getElementById('terms-react-root');
 
 if (rootElement) {
   const root = createRoot(rootElement);

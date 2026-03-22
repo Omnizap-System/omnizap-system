@@ -10,6 +10,8 @@ const DEFAULT_API_BASE_PATH = '/api';
 const DEFAULT_LOGIN_PATH = '/login';
 const DEFAULT_PASSWORD_RESET_WEB_PATH = '/user/password-reset';
 const DEFAULT_FALLBACK_AVATAR = '/assets/images/brand-logo-128.webp';
+const DEFAULT_SUPPORT_WHATSAPP_NUMBER = '';
+const DEFAULT_SUPPORT_WHATSAPP_URL = '/termos-de-uso/';
 
 const TABS = [
   { key: 'summary', label: 'Estatísticas', icon: '📊' },
@@ -30,6 +32,23 @@ const normalizeRoutePath = (value, fallback) => {
   if (!raw.startsWith('/')) return fallback;
   if (/^\/\//.test(raw)) return fallback;
   return raw;
+};
+
+const normalizePhoneDigits = (value) =>
+  String(value || '')
+    .replace(/\D+/g, '')
+    .slice(0, 15);
+
+const buildWhatsappUrl = (value) => {
+  const digits = normalizePhoneDigits(value);
+  if (!digits) return '';
+  return `https://wa.me/${digits}`;
+};
+
+const resolveSupportWhatsappUrl = (config) => {
+  const explicitUrl = String(config?.supportWhatsappUrl || '').trim();
+  if (/^https?:\/\/wa\.me\/\d{8,15}(?:\?.*)?$/i.test(explicitUrl)) return explicitUrl;
+  return buildWhatsappUrl(config?.supportWhatsappNumber) || DEFAULT_SUPPORT_WHATSAPP_URL;
 };
 
 const UserApp = ({ config }) => {
@@ -114,6 +133,7 @@ const UserApp = ({ config }) => {
 
   const rpgInfo = useMemo(() => summary?.rpg || { level: 1, xp: 0, gold: 0, karma: { score: 0, positive: 0, negative: 0 }, pvp: { matches: 0, wins: 0, losses: 0 }, inventory_count: 0, total_pokemons: 0 }, [summary]);
   const usageInfo = useMemo(() => summary?.usage || { messages: 0, packs: 0, stickers: 0, activity_chart: [], insights: {}, first_message_at: null, last_message_at: null }, [summary]);
+  const supportWhatsappUrl = useMemo(() => resolveSupportWhatsappUrl(config), [config.supportWhatsappNumber, config.supportWhatsappUrl]);
 
   const daysMember = useMemo(() => {
     if (!rpgInfo.member_since) return 0;
@@ -567,7 +587,7 @@ const UserApp = ({ config }) => {
                             </div>
                             <h3 className="text-3xl font-black tracking-tighter mb-4">Central de Atendimento</h3>
                             <p className="text-white/40 font-medium leading-relaxed mb-10 text-lg">Dúvidas sobre o sistema, planos ou bugs? Fale diretamente com nossa equipe técnica.</p>
-                            <a href="https://wa.me/559591122954" target="_blank" className="btn btn-primary btn-lg btn-block rounded-[2rem] font-black uppercase text-xs tracking-widest h-16 shadow-2xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all">Iniciar Chat Suporte</a>
+                            <a href=${supportWhatsappUrl} target="_blank" className="btn btn-primary btn-lg btn-block rounded-[2rem] font-black uppercase text-xs tracking-widest h-16 shadow-2xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all">Iniciar Chat Suporte</a>
                           </div>
                         `}
                       </div>
@@ -595,6 +615,8 @@ if (rootElement) {
     loginPath: rootElement.dataset.loginPath || DEFAULT_LOGIN_PATH,
     passwordResetWebPath: normalizeRoutePath(rootElement.dataset.passwordResetWebPath, DEFAULT_PASSWORD_RESET_WEB_PATH),
     fallbackAvatar: DEFAULT_FALLBACK_AVATAR,
+    supportWhatsappNumber: rootElement.dataset.supportWhatsappNumber || DEFAULT_SUPPORT_WHATSAPP_NUMBER,
+    supportWhatsappUrl: rootElement.dataset.supportWhatsappUrl || DEFAULT_SUPPORT_WHATSAPP_URL,
   };
   createRoot(rootElement).render(html`<${UserApp} config=${config} />`);
 }
