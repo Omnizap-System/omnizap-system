@@ -36,7 +36,10 @@ const sanitizeMetadata = (value) => {
   }
 };
 
+let messageAnalysisSessionColumnSupported = true;
+
 export async function createMessageAnalysisEvent(payload = {}, connection = null) {
+  const sessionId = sanitizeText(payload.sessionId || payload.session_id, 64) || 'default';
   const messageId = sanitizeText(payload.messageId, 255);
   const chatId = sanitizeText(payload.chatId, 255);
   const senderId = sanitizeText(payload.senderId, 255);
@@ -50,8 +53,36 @@ export async function createMessageAnalysisEvent(payload = {}, connection = null
   const errorCode = sanitizeText(payload.errorCode, 96);
   const metadata = sanitizeMetadata(payload.metadata);
 
-  await executeQuery(
-    `INSERT INTO ${TABLES.MESSAGE_ANALYSIS_EVENT}
+  const valuesWithSession = [sessionId, messageId, chatId, senderId, senderName, upsertType, source, sanitizeBool(payload.isGroup), sanitizeBool(payload.isFromBot), sanitizeBool(payload.isCommand), commandName, clampInt(payload.commandArgsCount, 0, 0, 64), payload.commandKnown === null || payload.commandKnown === undefined ? null : sanitizeBool(payload.commandKnown), commandPrefix, messageKind, sanitizeBool(payload.hasMedia), clampInt(payload.mediaCount, 0, 0, 25), clampInt(payload.textLength, 0, 0, 16_000), processingResult, errorCode, metadata];
+  const valuesWithoutSession = valuesWithSession.slice(1);
+
+  const sqlWithSession = `INSERT INTO ${TABLES.MESSAGE_ANALYSIS_EVENT}
+      (
+        session_id,
+        message_id,
+        chat_id,
+        sender_id,
+        sender_name,
+        upsert_type,
+        source,
+        is_group,
+        is_from_bot,
+        is_command,
+        command_name,
+        command_args_count,
+        command_known,
+        command_prefix,
+        message_kind,
+        has_media,
+        media_count,
+        text_length,
+        processing_result,
+        error_code,
+        metadata
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+  const sqlWithoutSession = `INSERT INTO ${TABLES.MESSAGE_ANALYSIS_EVENT}
       (
         message_id,
         chat_id,
@@ -74,10 +105,21 @@ export async function createMessageAnalysisEvent(payload = {}, connection = null
         error_code,
         metadata
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [messageId, chatId, senderId, senderName, upsertType, source, sanitizeBool(payload.isGroup), sanitizeBool(payload.isFromBot), sanitizeBool(payload.isCommand), commandName, clampInt(payload.commandArgsCount, 0, 0, 64), payload.commandKnown === null || payload.commandKnown === undefined ? null : sanitizeBool(payload.commandKnown), commandPrefix, messageKind, sanitizeBool(payload.hasMedia), clampInt(payload.mediaCount, 0, 0, 25), clampInt(payload.textLength, 0, 0, 16_000), processingResult, errorCode, metadata],
-    connection,
-  );
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+  if (messageAnalysisSessionColumnSupported) {
+    try {
+      await executeQuery(sqlWithSession, valuesWithSession, connection);
+      return true;
+    } catch (error) {
+      if (error?.code !== 'ER_BAD_FIELD_ERROR') {
+        throw error;
+      }
+      messageAnalysisSessionColumnSupported = false;
+    }
+  }
+
+  await executeQuery(sqlWithoutSession, valuesWithoutSession, connection);
 
   return true;
 }

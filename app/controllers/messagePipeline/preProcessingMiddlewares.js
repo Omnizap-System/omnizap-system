@@ -1,4 +1,9 @@
-export const createPreProcessingMiddlewares = ({ executeQuery, TABLES, isStatusJid, stopMessagePipeline, handleAntiLink, ensureCommandPrefixForContext, resolveCaptchaByMessage, maybeHandleStartLoginMessage, mergeAnalysisMetadata, ensureGroupConfigForContext, resolveStickerFocusState, resolveStickerFocusMessageClassification, resolveSenderAdminForContext, isUserAdmin, canSendMessageInStickerFocus, registerMessageUsageInStickerFocus, shouldSendStickerFocusWarning, sendReply, formatStickerFocusRuleLabel, formatRemainingMinutesLabel, logger }) => {
+export const createPreProcessingMiddlewares = ({ executeQuery, TABLES, isStatusJid, stopMessagePipeline, handleAntiLink, ensureCommandPrefixForContext, resolveCaptchaByMessage, maybeHandleStartLoginMessage, mergeAnalysisMetadata, ensureGroupConfigForContext, resolveStickerFocusState, resolveStickerFocusMessageClassification, resolveGroupOwnerForContext, ownerEnforcementMode = 'off', primarySessionId = 'default', resolveSenderAdminForContext, isUserAdmin, canSendMessageInStickerFocus, registerMessageUsageInStickerFocus, shouldSendStickerFocusWarning, sendReply, formatStickerFocusRuleLabel, formatRemainingMinutesLabel, logger }) => {
+  const normalizedOwnerEnforcementMode = String(ownerEnforcementMode || 'off')
+    .trim()
+    .toLowerCase();
+  const effectiveOwnerEnforcementMode = normalizedOwnerEnforcementMode === 'enforce' || normalizedOwnerEnforcementMode === 'shadow' ? normalizedOwnerEnforcementMode : 'off';
+
   const touchSenderLastSeenMiddleware = async (ctx) => {
     if (!ctx.senderJid || isStatusJid(ctx.remoteJid)) return;
 
@@ -19,6 +24,78 @@ export const createPreProcessingMiddlewares = ({ executeQuery, TABLES, isStatusJ
     return stopMessagePipeline(ctx, 'ignored_unprocessable', {
       ignored_reason: isStatusBroadcast ? 'status_broadcast' : isStubMessage ? 'stub_message' : isProtocolMessage ? 'protocol_message' : 'missing_message_node',
     });
+  };
+
+  const enforceGroupOwnerMiddleware = async (ctx) => {
+    if (!ctx.isGroupMessage) return null;
+
+    mergeAnalysisMetadata(ctx.analysisPayload, {
+      owner_enforcement_mode: effectiveOwnerEnforcementMode,
+      processing_session_id: ctx.sessionId,
+    });
+
+    if (effectiveOwnerEnforcementMode === 'off') return null;
+
+    if (typeof resolveGroupOwnerForContext !== 'function') {
+      logger.warn('Middleware de owner enforcement sem resolver de owner configurado.', {
+        action: 'group_owner_enforcement_missing_resolver',
+        sessionId: ctx.sessionId,
+        groupId: ctx.remoteJid,
+      });
+      return null;
+    }
+
+    const ownerState = await resolveGroupOwnerForContext(ctx);
+    const ownerSessionId = String(ctx.ownerSessionId || ownerState?.ownerSessionId || '').trim() || null;
+    ctx.ownerSessionId = ownerSessionId;
+
+    mergeAnalysisMetadata(ctx.analysisPayload, {
+      owner_session_id: ownerSessionId,
+    });
+
+    if (!ownerSessionId) {
+      mergeAnalysisMetadata(ctx.analysisPayload, {
+        owner_enforcement_result: 'owner_not_found',
+      });
+      return null;
+    }
+
+    const currentSessionId = String(ctx.sessionId || '').trim() || primarySessionId;
+    const isOwnerSession = ownerSessionId === currentSessionId;
+    if (isOwnerSession) {
+      mergeAnalysisMetadata(ctx.analysisPayload, {
+        owner_enforcement_result: 'owner_match',
+      });
+      return null;
+    }
+
+    if (effectiveOwnerEnforcementMode === 'shadow') {
+      mergeAnalysisMetadata(ctx.analysisPayload, {
+        owner_enforcement_result: 'shadow_non_owner',
+      });
+      logger.info('Owner enforcement (shadow): sessao nao-owner detectada no grupo.', {
+        action: 'group_owner_enforcement_shadow_non_owner',
+        groupId: ctx.remoteJid,
+        sessionId: currentSessionId,
+        ownerSessionId,
+        messageId: ctx.key?.id || null,
+      });
+      return null;
+    }
+
+    mergeAnalysisMetadata(ctx.analysisPayload, {
+      owner_enforcement_result: 'blocked_non_owner',
+      blocked_by: 'group_owner_enforcement',
+    });
+    logger.info('Owner enforcement: mensagem bloqueada em sessao nao-owner.', {
+      action: 'group_owner_enforcement_blocked_non_owner',
+      groupId: ctx.remoteJid,
+      sessionId: currentSessionId,
+      ownerSessionId,
+      messageId: ctx.key?.id || null,
+      isCommand: ctx.isCommandMessage,
+    });
+    return stopMessagePipeline(ctx, 'blocked_group_owner_enforcement');
   };
 
   const applyGroupPolicyMiddleware = async (ctx) => {
@@ -157,6 +234,7 @@ export const createPreProcessingMiddlewares = ({ executeQuery, TABLES, isStatusJ
   return {
     touchSenderLastSeenMiddleware,
     ignoreUnprocessableMessageMiddleware,
+    enforceGroupOwnerMiddleware,
     applyGroupPolicyMiddleware,
     resolveCaptchaMiddleware,
     handleStartLoginTriggerMiddleware,

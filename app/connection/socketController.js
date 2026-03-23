@@ -1543,7 +1543,7 @@ export async function connectToWhatsApp(sessionId = BAILEYS_PRIMARY_SESSION_ID) 
           });
           recordError('messages_upsert');
         });
-        const handlePromise = handleMessages(update, sock).catch((error) => {
+        const handlePromise = handleMessages(update, sock, { sessionId: safeSessionId }).catch((error) => {
           recordError('messages_upsert');
           throw error;
         });

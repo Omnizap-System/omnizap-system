@@ -4,7 +4,7 @@ import 'dotenv/config';
 import { isAdminCommand } from '../modules/adminModule/groupCommandHandlers.js';
 import { explicarComandoGlobal, registerGlobalHelpCommandExecution } from '../services/ai/globalModuleAiHelpService.js';
 import { extractSupportedStickerMediaDetails, processSticker } from '../modules/stickerModule/stickerCommand.js';
-import { detectAllMediaTypes, extractMessageContent, getExpiration, getJidServer, isGroupJid, isStatusJid, isSameJidUser, normalizeJid, normalizeWAPresence, resolveBotJid, extractSenderInfoFromMessage, resolveUserId, resolveAddressingModeFromMessageKey, resolveCanonicalWhatsAppJid, parseEnvBool, parseEnvInt } from '../config/index.js';
+import { detectAllMediaTypes, extractMessageContent, getExpiration, getJidServer, isGroupJid, isStatusJid, isSameJidUser, normalizeJid, normalizeWAPresence, resolveBotJid, extractSenderInfoFromMessage, resolveUserId, resolveAddressingModeFromMessageKey, resolveCanonicalWhatsAppJid, parseEnvBool, parseEnvInt, getMultiSessionRuntimeConfig } from '../config/index.js';
 import { isUserAdmin } from '../config/index.js';
 import { isAdminSenderAsync } from '../config/index.js';
 import { executeQuery, TABLES } from '../../database/index.js';
@@ -20,6 +20,7 @@ import { createMessageAnalysisEvent } from '../modules/analyticsModule/messageAn
 import { routeConversationMessage } from '../services/ai/conversationRouterService.js';
 import { executeMessageCommandRoute, isKnownNonAdminCommand } from '../services/ai/messageCommandExecutionService.js';
 import { canSendMessageInStickerFocus, registerMessageUsageInStickerFocus, resolveStickerFocusMessageClassification, resolveStickerFocusState, shouldSendStickerFocusWarning } from '../services/sticker/stickerFocusService.js';
+import { getOwner as getGroupOwner } from '../services/multiSession/groupOwnershipService.js';
 import { createPreProcessingMiddlewares } from './messagePipeline/preProcessingMiddlewares.js';
 import { createConversationMiddleware } from './messagePipeline/conversationMiddleware.js';
 import { createCommandMiddleware } from './messagePipeline/commandMiddleware.js';
@@ -49,6 +50,19 @@ const SITE_ORIGIN =
     .replace(/\/+$/, '') || 'https://omnizap.shop';
 const SITE_LOGIN_URL = `${SITE_ORIGIN}/login/`;
 const SITE_GROUP_LOGIN_URL = `${SITE_ORIGIN}/login`;
+const MULTI_SESSION_RUNTIME_CONFIG = getMultiSessionRuntimeConfig();
+const PRIMARY_SESSION_ID = String(MULTI_SESSION_RUNTIME_CONFIG?.primarySessionId || 'default').trim() || 'default';
+const VALID_SESSION_IDS = new Set(Array.isArray(MULTI_SESSION_RUNTIME_CONFIG?.sessionIds) ? MULTI_SESSION_RUNTIME_CONFIG.sessionIds : [PRIMARY_SESSION_ID]);
+const GROUP_OWNER_ENFORCEMENT_MODE = String(MULTI_SESSION_RUNTIME_CONFIG?.ownerEnforcementMode || 'off')
+  .trim()
+  .toLowerCase();
+
+const normalizeSessionId = (sessionId) => {
+  const normalized = String(sessionId || '').trim();
+  if (!normalized) return PRIMARY_SESSION_ID;
+  if (VALID_SESSION_IDS.has(normalized)) return normalized;
+  return PRIMARY_SESSION_ID;
+};
 
 let messageAnalyticsTableMissingLogged = false;
 const recentCommandExecutions = new Map();
@@ -460,6 +474,43 @@ const resolveSenderOwnerForContext = async (ctx) => {
   return ctx.memo.senderOwnerPromise;
 };
 
+const resolveGroupOwnerForContext = async (ctx, { bypassCache = false } = {}) => {
+  if (!ctx.isGroupMessage) return null;
+
+  if (!bypassCache && ctx.memo.groupOwnerPromise) {
+    return ctx.memo.groupOwnerPromise;
+  }
+
+  const fetchOwnerPromise = (async () => {
+    try {
+      const ownerState = await getGroupOwner(ctx.remoteJid, { bypassCache });
+      const ownerSessionId = String(ownerState?.ownerSessionId || '').trim() || null;
+      ctx.ownerSessionId = ownerSessionId;
+      mergeAnalysisMetadata(ctx.analysisPayload, {
+        owner_session_id: ownerSessionId,
+      });
+      return ownerState;
+    } catch (error) {
+      logger.warn('Falha ao resolver owner de grupo para roteamento de sessão.', {
+        action: 'group_owner_resolution_failed',
+        sessionId: ctx.sessionId,
+        groupId: ctx.remoteJid,
+        error: error?.message,
+      });
+      ctx.ownerSessionId = null;
+      mergeAnalysisMetadata(ctx.analysisPayload, {
+        owner_resolution_error: String(error?.code || error?.name || 'lookup_failed')
+          .trim()
+          .toLowerCase(),
+      });
+      return null;
+    }
+  })();
+
+  ctx.memo.groupOwnerPromise = fetchOwnerPromise;
+  return fetchOwnerPromise;
+};
+
 const resolveHasGoogleLoginForContext = async (ctx) => {
   if (ctx.isMessageFromBot || !WHATSAPP_COMMAND_REQUIRES_GOOGLE_LOGIN) {
     return undefined;
@@ -477,10 +528,11 @@ const resolveHasGoogleLoginForContext = async (ctx) => {
   return ctx.memo.hasGoogleLoginPromise;
 };
 
-const createMessagePipelineContext = async ({ messageInfo, upsertType, isNotifyUpsert, sock }) => {
+const createMessagePipelineContext = async ({ messageInfo, upsertType, isNotifyUpsert, sock, sessionId }) => {
   const key = messageInfo?.key || {};
   const remoteJid = key?.remoteJid;
   if (!remoteJid) return null;
+  const normalizedSessionId = normalizeSessionId(sessionId);
 
   const isGroupMessage = isGroupJid(remoteJid);
   const extractedText = extractMessageContent(messageInfo);
@@ -506,6 +558,7 @@ const createMessagePipelineContext = async ({ messageInfo, upsertType, isNotifyU
     .slice(0, 10);
 
   const analysisPayload = {
+    sessionId: normalizedSessionId,
     messageId: key?.id || null,
     chatId: remoteJid || null,
     senderId: senderJid || null,
@@ -531,6 +584,8 @@ const createMessagePipelineContext = async ({ messageInfo, upsertType, isNotifyU
       upsert_type: upsertType,
       is_notify_upsert: isNotifyUpsert,
       is_history_append: upsertType === 'append',
+      session_id: normalizedSessionId,
+      owner_session_id: null,
       addressing_mode: addressingMode || null,
       participant_alt: key?.participantAlt || null,
       remote_jid_alt: key?.remoteJidAlt || null,
@@ -551,6 +606,8 @@ const createMessagePipelineContext = async ({ messageInfo, upsertType, isNotifyU
     botJidCandidates,
     botJid,
     isMessageFromBot,
+    sessionId: normalizedSessionId,
+    ownerSessionId: null,
     commandPrefix: DEFAULT_COMMAND_PREFIX,
     groupConfig: null,
     groupConfigLoaded: false,
@@ -565,7 +622,7 @@ const createMessagePipelineContext = async ({ messageInfo, upsertType, isNotifyU
   };
 };
 
-const { touchSenderLastSeenMiddleware, ignoreUnprocessableMessageMiddleware, applyGroupPolicyMiddleware, resolveCaptchaMiddleware, handleStartLoginTriggerMiddleware, detectCommandIntentMiddleware, applyStickerFocusMiddleware } = createPreProcessingMiddlewares({
+const { touchSenderLastSeenMiddleware, ignoreUnprocessableMessageMiddleware, enforceGroupOwnerMiddleware, applyGroupPolicyMiddleware, resolveCaptchaMiddleware, handleStartLoginTriggerMiddleware, detectCommandIntentMiddleware, applyStickerFocusMiddleware } = createPreProcessingMiddlewares({
   executeQuery,
   TABLES,
   isStatusJid,
@@ -578,6 +635,9 @@ const { touchSenderLastSeenMiddleware, ignoreUnprocessableMessageMiddleware, app
   ensureGroupConfigForContext,
   resolveStickerFocusState,
   resolveStickerFocusMessageClassification,
+  resolveGroupOwnerForContext,
+  ownerEnforcementMode: GROUP_OWNER_ENFORCEMENT_MODE,
+  primarySessionId: PRIMARY_SESSION_ID,
   resolveSenderAdminForContext,
   isUserAdmin,
   canSendMessageInStickerFocus,
@@ -644,7 +704,7 @@ const runPostProcessingMiddleware = createPostProcessingMiddleware({
   normalizeAnalysisErrorCode,
 });
 
-const MESSAGE_PIPELINE_MIDDLEWARES = [touchSenderLastSeenMiddleware, ignoreUnprocessableMessageMiddleware, applyGroupPolicyMiddleware, resolveCaptchaMiddleware, handleStartLoginTriggerMiddleware, detectCommandIntentMiddleware, applyStickerFocusMiddleware, routeConversationMiddleware, executeCommandMiddleware, runPostProcessingMiddleware];
+const MESSAGE_PIPELINE_MIDDLEWARES = [touchSenderLastSeenMiddleware, ignoreUnprocessableMessageMiddleware, enforceGroupOwnerMiddleware, applyGroupPolicyMiddleware, resolveCaptchaMiddleware, handleStartLoginTriggerMiddleware, detectCommandIntentMiddleware, applyStickerFocusMiddleware, routeConversationMiddleware, executeCommandMiddleware, runPostProcessingMiddleware];
 
 const runMessagePipeline = async (ctx) => {
   for (const middleware of MESSAGE_PIPELINE_MIDDLEWARES) {
@@ -659,7 +719,8 @@ const runMessagePipeline = async (ctx) => {
  *
  * @param {Object} update - Objeto contendo a atualização do WhatsApp.
  */
-export const handleMessagesThroughPipeline = async (update, sock) => {
+export const handleMessagesThroughPipeline = async (update, sock, options = {}) => {
+  const sessionId = normalizeSessionId(options?.sessionId);
   if (update.messages && Array.isArray(update.messages)) {
     try {
       const upsertType = update?.type || null;
@@ -671,6 +732,7 @@ export const handleMessagesThroughPipeline = async (update, sock) => {
           upsertType,
           isNotifyUpsert,
           sock,
+          sessionId,
         });
         if (!context) continue;
 
@@ -680,19 +742,34 @@ export const handleMessagesThroughPipeline = async (update, sock) => {
           context.analysisPayload.processingResult = 'error';
           context.analysisPayload.errorCode = normalizeAnalysisErrorCode(messageError);
           logger.error('Erro ao processar mensagem individual:', {
+            sessionId,
+            ownerSessionId: context.ownerSessionId || null,
             error: messageError?.message,
             messageId: context.key?.id || null,
             remoteJid: context.remoteJid,
           });
         } finally {
+          logger.debug('Mensagem processada pelo pipeline.', {
+            action: 'message_pipeline_processed',
+            sessionId: context.sessionId,
+            ownerSessionId: context.ownerSessionId || null,
+            messageId: context.key?.id || null,
+            remoteJid: context.remoteJid,
+            result: context.analysisPayload.processingResult,
+            isCommand: context.analysisPayload.isCommand,
+          });
           persistMessageAnalysisEvent(context.analysisPayload);
         }
       }
     } catch (error) {
-      logger.error('Erro ao processar mensagens:', error?.message);
+      logger.error('Erro ao processar mensagens:', {
+        sessionId,
+        error: error?.message,
+      });
     }
   } else {
     logger.info('🔄 Processando evento recebido:', {
+      sessionId,
       eventType: update?.type || 'unknown',
       eventData: update,
     });

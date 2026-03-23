@@ -26,6 +26,8 @@ const createBaseContext = (overrides = {}) => ({
   mediaEntries: [],
   upsertType: 'notify',
   isNotifyUpsert: true,
+  sessionId: 'session-default',
+  ownerSessionId: null,
   isCommandMessage: false,
   hasCommandPrefix: false,
   analysisPayload: {
@@ -164,6 +166,108 @@ test('pre-processing trata trigger de iniciar login', async () => {
   assert.deepEqual(result, { stop: true });
   assert.equal(stopSpy.calls[0].processingResult, 'handled_start_login');
   assert.equal(stopSpy.calls[0].metadataPatch.flow, 'whatsapp_google_login');
+});
+
+test('pre-processing owner gate bloqueia sessao nao-owner em modo enforce', async () => {
+  const stopSpy = createStopSpy();
+
+  const middlewares = createPreProcessingMiddlewares({
+    executeQuery: async () => [],
+    TABLES: { RPG_PLAYER: 'rpg_player' },
+    isStatusJid: () => false,
+    stopMessagePipeline: stopSpy.stopMessagePipeline,
+    handleAntiLink: async () => false,
+    ensureCommandPrefixForContext: async () => '/',
+    resolveCaptchaByMessage: async () => {},
+    maybeHandleStartLoginMessage: async () => false,
+    mergeAnalysisMetadata: (analysisPayload, patch) => {
+      analysisPayload.metadata = {
+        ...(analysisPayload.metadata || {}),
+        ...(patch || {}),
+      };
+    },
+    ensureGroupConfigForContext: async () => ({}),
+    resolveStickerFocusState: () => ({ enabled: false }),
+    resolveStickerFocusMessageClassification: () => ({ isThrottleCandidate: false }),
+    resolveGroupOwnerForContext: async (ctx) => {
+      ctx.ownerSessionId = 'session-owner';
+      return { ownerSessionId: 'session-owner' };
+    },
+    ownerEnforcementMode: 'enforce',
+    primarySessionId: 'session-primary',
+    isUserAdmin: async () => false,
+    canSendMessageInStickerFocus: () => ({ allowed: true, remainingMs: 0 }),
+    registerMessageUsageInStickerFocus: () => {},
+    shouldSendStickerFocusWarning: () => false,
+    sendReply: async () => {},
+    formatStickerFocusRuleLabel: () => '',
+    formatRemainingMinutesLabel: () => 1,
+    logger: { warn: () => {}, info: () => {} },
+  });
+
+  const ctx = createBaseContext({
+    sessionId: 'session-worker',
+    isGroupMessage: true,
+    remoteJid: '120363111111111111@g.us',
+  });
+  const result = await middlewares.enforceGroupOwnerMiddleware(ctx);
+
+  assert.deepEqual(result, { stop: true });
+  assert.equal(stopSpy.calls.length, 1);
+  assert.equal(stopSpy.calls[0].processingResult, 'blocked_group_owner_enforcement');
+  assert.equal(ctx.analysisPayload.metadata.owner_enforcement_result, 'blocked_non_owner');
+  assert.equal(ctx.analysisPayload.metadata.owner_session_id, 'session-owner');
+});
+
+test('pre-processing owner gate apenas loga em modo shadow para sessao nao-owner', async () => {
+  const stopSpy = createStopSpy();
+  const infoLogs = [];
+
+  const middlewares = createPreProcessingMiddlewares({
+    executeQuery: async () => [],
+    TABLES: { RPG_PLAYER: 'rpg_player' },
+    isStatusJid: () => false,
+    stopMessagePipeline: stopSpy.stopMessagePipeline,
+    handleAntiLink: async () => false,
+    ensureCommandPrefixForContext: async () => '/',
+    resolveCaptchaByMessage: async () => {},
+    maybeHandleStartLoginMessage: async () => false,
+    mergeAnalysisMetadata: (analysisPayload, patch) => {
+      analysisPayload.metadata = {
+        ...(analysisPayload.metadata || {}),
+        ...(patch || {}),
+      };
+    },
+    ensureGroupConfigForContext: async () => ({}),
+    resolveStickerFocusState: () => ({ enabled: false }),
+    resolveStickerFocusMessageClassification: () => ({ isThrottleCandidate: false }),
+    resolveGroupOwnerForContext: async (ctx) => {
+      ctx.ownerSessionId = 'session-owner';
+      return { ownerSessionId: 'session-owner' };
+    },
+    ownerEnforcementMode: 'shadow',
+    primarySessionId: 'session-primary',
+    isUserAdmin: async () => false,
+    canSendMessageInStickerFocus: () => ({ allowed: true, remainingMs: 0 }),
+    registerMessageUsageInStickerFocus: () => {},
+    shouldSendStickerFocusWarning: () => false,
+    sendReply: async () => {},
+    formatStickerFocusRuleLabel: () => '',
+    formatRemainingMinutesLabel: () => 1,
+    logger: { warn: () => {}, info: (msg, payload) => infoLogs.push({ msg, payload }) },
+  });
+
+  const ctx = createBaseContext({
+    sessionId: 'session-worker',
+    isGroupMessage: true,
+  });
+  const result = await middlewares.enforceGroupOwnerMiddleware(ctx);
+
+  assert.equal(result, null);
+  assert.equal(stopSpy.calls.length, 0);
+  assert.equal(ctx.pipelineStopped, false);
+  assert.equal(ctx.analysisPayload.metadata.owner_enforcement_result, 'shadow_non_owner');
+  assert.equal(infoLogs.length, 1);
 });
 
 test('conversation middleware responde e interrompe pipeline', async () => {
