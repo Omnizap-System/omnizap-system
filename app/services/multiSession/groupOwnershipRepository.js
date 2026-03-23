@@ -63,9 +63,7 @@ export const normalizeSessionId = (value) => {
 
 export const normalizeReason = (value) => {
   if (value === undefined || value === null) return null;
-  const normalized = String(value)
-    .trim()
-    .slice(0, MAX_REASON_LENGTH);
+  const normalized = String(value).trim().slice(0, MAX_REASON_LENGTH);
   return normalized || null;
 };
 
@@ -143,15 +141,7 @@ export const getAssignmentForUpdate = async (groupJid, connection) => {
   return normalizeAssignmentRow(rows?.[0] || null);
 };
 
-export const listAssignments = async (
-  {
-    groupJid = null,
-    ownerSessionId = null,
-    includeExpired = true,
-    limit = 200,
-  } = {},
-  connection = null,
-) => {
+export const listAssignments = async ({ groupJid = null, ownerSessionId = null, includeExpired = true, limit = 200 } = {}, connection = null) => {
   const safeGroupJid = normalizeGroupJid(groupJid);
   const safeOwnerSessionId = normalizeSessionId(ownerSessionId);
   const safeLimit = clampLimit(limit, 200, 1, 5_000);
@@ -184,15 +174,10 @@ export const listAssignments = async (
     connection,
   );
 
-  return (Array.isArray(rows) ? rows : [])
-    .map((row) => normalizeAssignmentRow(row))
-    .filter(Boolean);
+  return (Array.isArray(rows) ? rows : []).map((row) => normalizeAssignmentRow(row)).filter(Boolean);
 };
 
-export const createAssignment = async (
-  { groupJid, ownerSessionId, leaseExpiresAt, cooldownUntil = null, pinned = false, reason = null, assignmentVersion = 1 } = {},
-  connection = null,
-) => {
+export const createAssignment = async ({ groupJid, ownerSessionId, leaseExpiresAt, cooldownUntil = null, pinned = false, reason = null, assignmentVersion = 1 } = {}, connection = null) => {
   const safeGroupJid = normalizeGroupJid(groupJid);
   const safeOwnerSessionId = normalizeSessionId(ownerSessionId);
   const safeLeaseExpiresAt = toDateOrNull(leaseExpiresAt);
@@ -211,10 +196,7 @@ export const createAssignment = async (
   return getAssignment(safeGroupJid, connection);
 };
 
-export const updateAssignmentOwner = async (
-  { groupJid, ownerSessionId, leaseExpiresAt, reason = null, bumpVersion = true, cooldownUntil = undefined, pinned = undefined } = {},
-  connection = null,
-) => {
+export const updateAssignmentOwner = async ({ groupJid, ownerSessionId, leaseExpiresAt, reason = null, bumpVersion = true, cooldownUntil = undefined, pinned = undefined } = {}, connection = null) => {
   const safeGroupJid = normalizeGroupJid(groupJid);
   const safeOwnerSessionId = normalizeSessionId(ownerSessionId);
   const safeLeaseExpiresAt = toDateOrNull(leaseExpiresAt);
@@ -252,10 +234,7 @@ export const updateAssignmentOwner = async (
   return getAssignment(safeGroupJid, connection);
 };
 
-export const updateAssignmentLease = async (
-  { groupJid, ownerSessionId, leaseExpiresAt, reason = undefined } = {},
-  connection = null,
-) => {
+export const updateAssignmentLease = async ({ groupJid, ownerSessionId, leaseExpiresAt, reason = undefined } = {}, connection = null) => {
   const safeGroupJid = normalizeGroupJid(groupJid);
   const safeOwnerSessionId = normalizeSessionId(ownerSessionId);
   const safeLeaseExpiresAt = toDateOrNull(leaseExpiresAt);
@@ -283,10 +262,7 @@ export const updateAssignmentLease = async (
   return getAssignment(safeGroupJid, connection);
 };
 
-export const expireAssignment = async (
-  { groupJid, ownerSessionId = null, reason = null, bumpVersion = true, leaseExpiresAt = new Date() } = {},
-  connection = null,
-) => {
+export const expireAssignment = async ({ groupJid, ownerSessionId = null, reason = null, bumpVersion = true, leaseExpiresAt = new Date() } = {}, connection = null) => {
   const safeGroupJid = normalizeGroupJid(groupJid);
   if (!safeGroupJid) {
     throw new Error('expireAssignment requer groupJid valido.');
@@ -317,15 +293,7 @@ export const expireAssignment = async (
   return getAssignment(safeGroupJid, connection);
 };
 
-export const renewLeasesByOwner = async (
-  {
-    ownerSessionId,
-    leaseExpiresAt,
-    reason = null,
-    now = undefined,
-  } = {},
-  connection = null,
-) => {
+export const renewLeasesByOwner = async ({ ownerSessionId, leaseExpiresAt, reason = null, now = undefined } = {}, connection = null) => {
   const safeOwnerSessionId = normalizeSessionId(ownerSessionId);
   const safeLeaseExpiresAt = toDateOrNull(leaseExpiresAt);
   const safeNow = now === undefined ? new Date() : toDateOrNull(now) || new Date();
@@ -346,10 +314,7 @@ export const renewLeasesByOwner = async (
   return Number(result?.affectedRows || 0);
 };
 
-export const insertAssignmentHistory = async (
-  { groupJid, previousSessionId = null, newSessionId, changeReason = null, changedBy = 'system', assignmentVersion = 1, metadata = null } = {},
-  connection = null,
-) => {
+export const insertAssignmentHistory = async ({ groupJid, previousSessionId = null, newSessionId, changeReason = null, changedBy = 'system', assignmentVersion = 1, metadata = null } = {}, connection = null) => {
   const safeGroupJid = normalizeGroupJid(groupJid);
   const safePreviousSessionId = normalizeSessionId(previousSessionId);
   const safeNewSessionId = normalizeSessionId(newSessionId) || safePreviousSessionId;

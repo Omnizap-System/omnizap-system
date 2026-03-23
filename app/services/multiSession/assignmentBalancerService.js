@@ -282,12 +282,7 @@ export const runGroupAssignmentBalancerCycle = async () => {
       };
     }
 
-    const [groupCounts, messageRates, errorCounts, assignments] = await Promise.all([
-      fetchGroupCountsBySession(onlineSessionIds),
-      fetchMessagesPerMinuteBySession(onlineSessionIds),
-      fetchRecentErrorsBySession(onlineSessionIds),
-      fetchCandidateAssignments(onlineSessionIds),
-    ]);
+    const [groupCounts, messageRates, errorCounts, assignments] = await Promise.all([fetchGroupCountsBySession(onlineSessionIds), fetchMessagesPerMinuteBySession(onlineSessionIds), fetchRecentErrorsBySession(onlineSessionIds), fetchCandidateAssignments(onlineSessionIds)]);
 
     const nowMs = Date.now();
     const sessionStats = new Map();

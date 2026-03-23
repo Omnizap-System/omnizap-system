@@ -4,27 +4,9 @@ export const normalizeAssignmentVersion = (value) => {
   return parsed;
 };
 
-export const createGroupOwnerWriteStateResolver = ({
-  buildCacheKeyImpl,
-  getOwnerImpl,
-  tryAcquireImpl,
-  cacheImpl,
-  isGroupJidImpl,
-  normalizeSessionIdImpl,
-  loggerImpl,
-  defaultAllowClaim = true,
-} = {}) =>
-  async (
-    groupJid,
-    sessionId,
-    {
-      allowClaim = defaultAllowClaim,
-      bypassCache = false,
-      source = 'unknown',
-      expectedAssignmentVersion = null,
-      enforceFence = true,
-    } = {},
-  ) => {
+export const createGroupOwnerWriteStateResolver =
+  ({ buildCacheKeyImpl, getOwnerImpl, tryAcquireImpl, cacheImpl, isGroupJidImpl, normalizeSessionIdImpl, loggerImpl, defaultAllowClaim = true } = {}) =>
+  async (groupJid, sessionId, { allowClaim = defaultAllowClaim, bypassCache = false, source = 'unknown', expectedAssignmentVersion = null, enforceFence = true } = {}) => {
     const safeGroupJid = String(groupJid || '').trim();
     const safeSessionId = normalizeSessionIdImpl(sessionId);
     if (!safeGroupJid || !isGroupJidImpl(safeGroupJid)) {

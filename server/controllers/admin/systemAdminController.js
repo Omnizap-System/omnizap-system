@@ -4,14 +4,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { URL } from 'node:url';
 
 import logger from '#logger';
-import {
-  forceSystemAdminGroupFailover,
-  listSystemAdminAssignmentHistory,
-  listSystemAdminAssignments,
-  listSystemAdminSessions,
-  setSystemAdminGroupPin,
-  triggerSystemAdminManualRebalance,
-} from '../system/systemController.js';
+import { forceSystemAdminGroupFailover, listSystemAdminAssignmentHistory, listSystemAdminAssignments, listSystemAdminSessions, setSystemAdminGroupPin, triggerSystemAdminManualRebalance } from '../system/systemController.js';
 
 const parseEnvBool = (value, fallback) => {
   if (value === undefined || value === null || value === '') return fallback;
@@ -48,9 +41,7 @@ const SITE_ORIGIN = String(process.env.SITE_ORIGIN || 'https://omnizap.shop')
 
 const USER_SYSTEMADM_TEMPLATE_PATH = path.join(process.cwd(), 'public', 'pages', 'user-systemadm.html');
 const LEGACY_STICKER_ADMIN_TEMPLATE_PATH = path.join(process.cwd(), 'public', 'pages', 'stickers-admin.html');
-const SYSTEM_ADMIN_OPS_TOKEN = String(
-  process.env.SYSTEM_ADMIN_OPS_TOKEN || process.env.USER_INTERNAL_API_TOKEN || process.env.ADMIN_TOKEN || process.env.ADMIN_API_TOKEN || '',
-).trim();
+const SYSTEM_ADMIN_OPS_TOKEN = String(process.env.SYSTEM_ADMIN_OPS_TOKEN || process.env.USER_INTERNAL_API_TOKEN || process.env.ADMIN_TOKEN || process.env.ADMIN_API_TOKEN || '').trim();
 
 let stickerCatalogControllerPromise = null;
 const loadStickerCatalogController = async () => {
@@ -151,9 +142,7 @@ const extractBearerToken = (req) => {
   return authHeader.slice(7).trim();
 };
 
-const resolveOpsTokenFromRequest = (req) =>
-  String(req?.headers?.['x-system-admin-token'] || req?.headers?.['x-internal-api-token'] || req?.headers?.['x-admin-token'] || '').trim() ||
-  extractBearerToken(req);
+const resolveOpsTokenFromRequest = (req) => String(req?.headers?.['x-system-admin-token'] || req?.headers?.['x-internal-api-token'] || req?.headers?.['x-admin-token'] || '').trim() || extractBearerToken(req);
 
 const hasValidOpsToken = (req) => {
   if (!SYSTEM_ADMIN_OPS_TOKEN) return true;
@@ -247,9 +236,7 @@ const requireSystemAdminOpsAccess = (req, res) => {
 const normalizeMultiSessionSubPath = (value) => {
   const raw = String(value || '/').trim();
   if (!raw || raw === '/') return '/';
-  return `/${raw
-    .replace(/^\/+/g, '')
-    .replace(/\/+$/g, '')}`;
+  return `/${raw.replace(/^\/+/g, '').replace(/\/+$/g, '')}`;
 };
 
 const handleMultiSessionOpsRequest = async (req, res, { pathname, url }) => {

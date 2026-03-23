@@ -38,10 +38,7 @@ const normalizeStatus = (value, fallback = DEFAULT_STATUS) => {
 const normalizeBotJid = (value) => {
   if (value === undefined) return undefined;
   if (value === null) return null;
-  const normalized = String(value)
-    .trim()
-    .toLowerCase()
-    .slice(0, MAX_BOT_JID_LENGTH);
+  const normalized = String(value).trim().toLowerCase().slice(0, MAX_BOT_JID_LENGTH);
   return normalized || null;
 };
 
@@ -138,20 +135,7 @@ export const listSessions = async ({ status = null, limit = 100, connection = nu
   return (Array.isArray(rows) ? rows : []).map((row) => normalizeSessionRow(row));
 };
 
-export const upsertSession = async (
-  {
-    sessionId,
-    botJid = undefined,
-    status = DEFAULT_STATUS,
-    capacityWeight = DEFAULT_WEIGHT,
-    currentScore = 0,
-    metadata = undefined,
-    heartbeatAt = undefined,
-    connectedAt = undefined,
-    disconnectedAt = undefined,
-  } = {},
-  { connection = null } = {},
-) => {
+export const upsertSession = async ({ sessionId, botJid = undefined, status = DEFAULT_STATUS, capacityWeight = DEFAULT_WEIGHT, currentScore = 0, metadata = undefined, heartbeatAt = undefined, connectedAt = undefined, disconnectedAt = undefined } = {}, { connection = null } = {}) => {
   const safeSessionId = normalizeSessionId(sessionId);
   if (!safeSessionId) {
     throw new Error('upsertSession requer sessionId valido.');
@@ -187,17 +171,7 @@ export const upsertSession = async (
   return getSession(safeSessionId, { connection });
 };
 
-export const ensureSession = async (
-  sessionId,
-  {
-    status = 'online',
-    capacityWeight = DEFAULT_WEIGHT,
-    currentScore = 0,
-    metadata = undefined,
-    botJid = undefined,
-    connection = null,
-  } = {},
-) =>
+export const ensureSession = async (sessionId, { status = 'online', capacityWeight = DEFAULT_WEIGHT, currentScore = 0, metadata = undefined, botJid = undefined, connection = null } = {}) =>
   upsertSession(
     {
       sessionId,
@@ -210,17 +184,7 @@ export const ensureSession = async (
     { connection },
   );
 
-export const heartbeatSession = async (
-  sessionId,
-  {
-    status = 'online',
-    currentScore = 0,
-    metadata = undefined,
-    botJid = undefined,
-    capacityWeight = DEFAULT_WEIGHT,
-    connection = null,
-  } = {},
-) =>
+export const heartbeatSession = async (sessionId, { status = 'online', currentScore = 0, metadata = undefined, botJid = undefined, capacityWeight = DEFAULT_WEIGHT, connection = null } = {}) =>
   upsertSession(
     {
       sessionId,
@@ -234,16 +198,7 @@ export const heartbeatSession = async (
     { connection },
   );
 
-export const markSessionConnected = async (
-  sessionId,
-  {
-    botJid = undefined,
-    currentScore = 0,
-    metadata = undefined,
-    capacityWeight = DEFAULT_WEIGHT,
-    connection = null,
-  } = {},
-) =>
+export const markSessionConnected = async (sessionId, { botJid = undefined, currentScore = 0, metadata = undefined, capacityWeight = DEFAULT_WEIGHT, connection = null } = {}) =>
   upsertSession(
     {
       sessionId,
@@ -258,16 +213,7 @@ export const markSessionConnected = async (
     { connection },
   );
 
-export const markSessionDisconnected = async (
-  sessionId,
-  {
-    status = 'offline',
-    currentScore = 0,
-    metadata = undefined,
-    capacityWeight = DEFAULT_WEIGHT,
-    connection = null,
-  } = {},
-) =>
+export const markSessionDisconnected = async (sessionId, { status = 'offline', currentScore = 0, metadata = undefined, capacityWeight = DEFAULT_WEIGHT, connection = null } = {}) =>
   upsertSession(
     {
       sessionId,

@@ -33,7 +33,11 @@ const escapeHtml = (value) =>
 const summarizePayloadKeys = (value, maxItems = 24) => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
   return Object.keys(value)
-    .map((key) => String(key || '').trim().slice(0, 64))
+    .map((key) =>
+      String(key || '')
+        .trim()
+        .slice(0, 64),
+    )
     .filter(Boolean)
     .slice(0, maxItems);
 };
@@ -65,10 +69,7 @@ const normalizeEmailAddress = (value) => {
 };
 
 const resolveBrandLogoUrl = ({ siteOrigin = '', payloadLogoUrl = '' } = {}) => {
-  const fallbackLogoUrl = normalizeHttpUrl(
-    `${String(siteOrigin || DEFAULT_SITE_ORIGIN).replace(/\/+$/, '')}${DEFAULT_BRAND_LOGO_PATH}`,
-    `${DEFAULT_SITE_ORIGIN}${DEFAULT_BRAND_LOGO_PATH}`,
-  );
+  const fallbackLogoUrl = normalizeHttpUrl(`${String(siteOrigin || DEFAULT_SITE_ORIGIN).replace(/\/+$/, '')}${DEFAULT_BRAND_LOGO_PATH}`, `${DEFAULT_SITE_ORIGIN}${DEFAULT_BRAND_LOGO_PATH}`);
 
   const explicitLogoUrl = normalizeHttpUrl(payloadLogoUrl || process.env.EMAIL_BRAND_LOGO_URL || '', '');
   if (!explicitLogoUrl) return fallbackLogoUrl;
@@ -149,21 +150,7 @@ const renderParagraphsHtml = (value, { maxParagraphs = 6, maxLength = 8_000 } = 
   return paragraphs.map((paragraph) => `<p style="margin:0 0 12px;color:#334155;font-size:15px;line-height:1.65;">${escapeHtml(paragraph)}</p>`).join('');
 };
 
-const renderEmailLayout = ({
-  payload = {},
-  preheader = '',
-  heading = '',
-  greeting = '',
-  intro = '',
-  body = '',
-  ctaLabel = '',
-  ctaUrl = '',
-  ctaHint = '',
-  secondaryCtaLabel = '',
-  secondaryCtaUrl = '',
-  securityNote = '',
-  footerMessage = '',
-} = {}) => {
+const renderEmailLayout = ({ payload = {}, preheader = '', heading = '', greeting = '', intro = '', body = '', ctaLabel = '', ctaUrl = '', ctaHint = '', secondaryCtaLabel = '', secondaryCtaUrl = '', securityNote = '', footerMessage = '' } = {}) => {
   const brand = resolveBrandConfig(payload);
   const safePreheader = normalizeText(preheader, 160);
   const safeHeading = normalizeText(heading, 120);
@@ -179,19 +166,11 @@ const renderEmailLayout = ({
   const year = __timeNow().getUTCFullYear();
   const generatedAt = __timeNowIso();
 
-  const logoBlock = brand.brandLogoUrl
-    ? `<img src="${escapeHtml(brand.brandLogoUrl)}" alt="${escapeHtml(brand.brandName)}" width="138" style="display:block;border:0;outline:none;text-decoration:none;height:auto;" />`
-    : `<div style="display:inline-block;font-size:24px;font-weight:800;line-height:1.1;color:#ffffff;letter-spacing:0.3px;">${escapeHtml(brand.brandName)}</div>`;
+  const logoBlock = brand.brandLogoUrl ? `<img src="${escapeHtml(brand.brandLogoUrl)}" alt="${escapeHtml(brand.brandName)}" width="138" style="display:block;border:0;outline:none;text-decoration:none;height:auto;" />` : `<div style="display:inline-block;font-size:24px;font-weight:800;line-height:1.1;color:#ffffff;letter-spacing:0.3px;">${escapeHtml(brand.brandName)}</div>`;
 
-  const headingBlock = safeHeading
-    ? `<h1 style="margin:0;color:#0f172a;font-size:27px;line-height:1.2;font-weight:800;letter-spacing:0.1px;">${escapeHtml(safeHeading)}</h1>`
-    : '';
-  const greetingBlock = safeGreeting
-    ? `<p style="margin:0 0 10px;color:#0f172a;font-size:16px;font-weight:700;line-height:1.6;">${escapeHtml(safeGreeting)}</p>`
-    : '';
-  const introBlock = safeIntro
-    ? `<p style="margin:0 0 14px;color:#334155;font-size:15px;line-height:1.7;">${escapeHtml(safeIntro)}</p>`
-    : '';
+  const headingBlock = safeHeading ? `<h1 style="margin:0;color:#0f172a;font-size:27px;line-height:1.2;font-weight:800;letter-spacing:0.1px;">${escapeHtml(safeHeading)}</h1>` : '';
+  const greetingBlock = safeGreeting ? `<p style="margin:0 0 10px;color:#0f172a;font-size:16px;font-weight:700;line-height:1.6;">${escapeHtml(safeGreeting)}</p>` : '';
+  const introBlock = safeIntro ? `<p style="margin:0 0 14px;color:#334155;font-size:15px;line-height:1.7;">${escapeHtml(safeIntro)}</p>` : '';
   const bodyBlock = renderParagraphsHtml(body);
 
   const ctaBlock =
@@ -207,9 +186,7 @@ const renderEmailLayout = ({
     `.trim()
       : '';
 
-  const ctaHintBlock = safeCtaHint
-    ? `<p style="margin:6px 0 0;color:#64748b;font-size:13px;line-height:1.6;">${escapeHtml(safeCtaHint)}</p>`
-    : '';
+  const ctaHintBlock = safeCtaHint ? `<p style="margin:6px 0 0;color:#64748b;font-size:13px;line-height:1.6;">${escapeHtml(safeCtaHint)}</p>` : '';
   const secondaryCtaBlock =
     safeSecondaryCtaLabel && safeSecondaryCtaUrl
       ? `
@@ -219,21 +196,11 @@ const renderEmailLayout = ({
       </p>
     `.trim()
       : '';
-  const fallbackLinkBlock = safeCtaUrl
-    ? `<p style="margin:14px 0 0;color:#64748b;font-size:12px;line-height:1.7;word-break:break-all;">Se o botão não funcionar, copie e cole este link no navegador: ${escapeHtml(safeCtaUrl)}</p>`
-    : '';
-  const securityNoteBlock = safeSecurityNote
-    ? `<p style="margin:16px 0 0;padding:12px 13px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;color:#475569;font-size:12px;line-height:1.65;">${escapeHtml(safeSecurityNote)}</p>`
-    : '';
-  const brandTaglineBlock = brand.brandTagline
-    ? `<p style="margin:8px 0 0;color:#cbd5e1;font-size:13px;line-height:1.6;">${escapeHtml(brand.brandTagline)}</p>`
-    : '';
-  const supportEmailLine = brand.supportEmail
-    ? `<span style="display:block;margin-top:6px;">E-mail: <a href="mailto:${escapeHtml(brand.supportEmail)}" style="color:#2563eb;text-decoration:none;">${escapeHtml(brand.supportEmail)}</a></span>`
-    : '';
-  const footerMessageBlock = safeFooterMessage
-    ? `<span style="display:block;margin-top:7px;color:#64748b;">${escapeHtml(safeFooterMessage)}</span>`
-    : '';
+  const fallbackLinkBlock = safeCtaUrl ? `<p style="margin:14px 0 0;color:#64748b;font-size:12px;line-height:1.7;word-break:break-all;">Se o botão não funcionar, copie e cole este link no navegador: ${escapeHtml(safeCtaUrl)}</p>` : '';
+  const securityNoteBlock = safeSecurityNote ? `<p style="margin:16px 0 0;padding:12px 13px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;color:#475569;font-size:12px;line-height:1.65;">${escapeHtml(safeSecurityNote)}</p>` : '';
+  const brandTaglineBlock = brand.brandTagline ? `<p style="margin:8px 0 0;color:#cbd5e1;font-size:13px;line-height:1.6;">${escapeHtml(brand.brandTagline)}</p>` : '';
+  const supportEmailLine = brand.supportEmail ? `<span style="display:block;margin-top:6px;">E-mail: <a href="mailto:${escapeHtml(brand.supportEmail)}" style="color:#2563eb;text-decoration:none;">${escapeHtml(brand.supportEmail)}</a></span>` : '';
+  const footerMessageBlock = safeFooterMessage ? `<span style="display:block;margin-top:7px;color:#64748b;">${escapeHtml(safeFooterMessage)}</span>` : '';
 
   return `
 <!doctype html>

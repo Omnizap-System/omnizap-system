@@ -11,19 +11,27 @@ const createInMemoryRepository = () => {
   const history = [];
 
   const normalizeGroupJid = (value) => {
-    const normalized = String(value || '').trim().slice(0, 255);
+    const normalized = String(value || '')
+      .trim()
+      .slice(0, 255);
     return normalized || null;
   };
   const normalizeSessionId = (value) => {
-    const normalized = String(value || '').trim().slice(0, 64);
+    const normalized = String(value || '')
+      .trim()
+      .slice(0, 64);
     return normalized || null;
   };
   const normalizeReason = (value) => {
-    const normalized = String(value || '').trim().slice(0, 64);
+    const normalized = String(value || '')
+      .trim()
+      .slice(0, 64);
     return normalized || null;
   };
   const normalizeChangedBy = (value) => {
-    const normalized = String(value || 'system').trim().slice(0, 64);
+    const normalized = String(value || 'system')
+      .trim()
+      .slice(0, 64);
     return normalized || 'system';
   };
 

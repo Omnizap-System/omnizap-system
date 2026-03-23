@@ -34,10 +34,7 @@
         min-height: 100vh;
         font-family: 'Manrope', system-ui, sans-serif;
         color: var(--text-main);
-        background:
-          radial-gradient(52rem 30rem at -4% -8%, rgba(30, 143, 255, 0.18), transparent 62%),
-          radial-gradient(44rem 24rem at 104% 2%, rgba(53, 255, 181, 0.14), transparent 58%),
-          linear-gradient(160deg, var(--bg-start), var(--bg-end));
+        background: radial-gradient(52rem 30rem at -4% -8%, rgba(30, 143, 255, 0.18), transparent 62%), radial-gradient(44rem 24rem at 104% 2%, rgba(53, 255, 181, 0.14), transparent 58%), linear-gradient(160deg, var(--bg-start), var(--bg-end));
       }
 
       body::before {
@@ -45,9 +42,7 @@
         position: fixed;
         inset: 0;
         pointer-events: none;
-        background:
-          linear-gradient(rgba(173, 216, 255, 0.05) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(173, 216, 255, 0.05) 1px, transparent 1px);
+        background: linear-gradient(rgba(173, 216, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(173, 216, 255, 0.05) 1px, transparent 1px);
         background-size: 34px 34px;
         mask-image: radial-gradient(circle at center, black 38%, transparent 100%);
         opacity: 0.25;
@@ -190,7 +185,9 @@
         text-transform: uppercase;
         text-decoration: none;
         cursor: pointer;
-        transition: transform 150ms ease, filter 150ms ease;
+        transition:
+          transform 150ms ease,
+          filter 150ms ease;
       }
 
       .button:disabled {
@@ -399,7 +396,9 @@
               name: String(user?.name || '').trim(),
               picture: String(user?.picture || '').trim(),
             },
-            ownerPhone: String(value?.ownerPhone || '').replace(/\D+/g, '').slice(0, 20),
+            ownerPhone: String(value?.ownerPhone || '')
+              .replace(/\D+/g, '')
+              .slice(0, 20),
             ownerJid: String(value?.ownerJid || '').trim(),
             expiresAt: String(value?.expiresAt || '').trim(),
           };
@@ -458,7 +457,9 @@
         };
 
         const resolveOwnerPhone = ({ ownerPhone = '', ownerJid = '' } = {}) => {
-          const fromPhone = String(ownerPhone || '').replace(/\D+/g, '').slice(0, 20);
+          const fromPhone = String(ownerPhone || '')
+            .replace(/\D+/g, '')
+            .slice(0, 20);
           if (fromPhone.length >= 10) return fromPhone;
           const candidate = String(ownerJid || '')
             .split('@')[0]
@@ -479,7 +480,9 @@
 
         const fillFormWithUserData = ({ name = '', email = '', ownerPhone = '', ownerJid = '' } = {}) => {
           const normalizedName = String(name || '').trim();
-          const normalizedEmail = String(email || '').trim().toLowerCase();
+          const normalizedEmail = String(email || '')
+            .trim()
+            .toLowerCase();
           const normalizedPhone = resolveOwnerPhone({ ownerPhone, ownerJid });
 
           if (normalizedName) nameInputElement.value = normalizedName;

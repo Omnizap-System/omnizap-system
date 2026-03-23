@@ -39,19 +39,21 @@ const createContext = (overrides = {}) => ({
   ...overrides,
 });
 
-const createStopMessagePipeline = () => (ctx, processingResult = '', metadataPatch = null) => {
-  if (processingResult) {
-    ctx.analysisPayload.processingResult = processingResult;
-  }
-  if (metadataPatch) {
-    ctx.analysisPayload.metadata = {
-      ...(ctx.analysisPayload.metadata || {}),
-      ...(metadataPatch || {}),
-    };
-  }
-  ctx.pipelineStopped = true;
-  return { stop: true };
-};
+const createStopMessagePipeline =
+  () =>
+  (ctx, processingResult = '', metadataPatch = null) => {
+    if (processingResult) {
+      ctx.analysisPayload.processingResult = processingResult;
+    }
+    if (metadataPatch) {
+      ctx.analysisPayload.metadata = {
+        ...(ctx.analysisPayload.metadata || {}),
+        ...(metadataPatch || {}),
+      };
+    }
+    ctx.pipelineStopped = true;
+    return { stop: true };
+  };
 
 const mergeAnalysisMetadata = (analysisPayload, patch) => {
   analysisPayload.metadata = {

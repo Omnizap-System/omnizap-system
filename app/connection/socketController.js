@@ -21,11 +21,7 @@ import { extractSenderInfoFromMessage, primeLidCache, resolveUserIdCached, isLid
 import { queueBaileysEventInsert, queueChatUpdate, queueLidUpdate, queueMessageInsert } from '../services/infra/dbWriteQueue.js';
 import { buildGroupMetadataFromGroup, buildGroupMetadataFromUpdate, upsertGroupMetadata, parseParticipantsFromDb } from '../services/group/groupMetadataService.js';
 import { buildMessageData } from '../configParts/messagePersistenceService.js';
-import {
-  getOwner as getGroupOwner,
-  tryAcquire as tryAcquireGroupOwner,
-  heartbeatOwnerSession as heartbeatGroupOwnerSession,
-} from '../services/multiSession/groupOwnershipService.js';
+import { getOwner as getGroupOwner, tryAcquire as tryAcquireGroupOwner, heartbeatOwnerSession as heartbeatGroupOwnerSession } from '../services/multiSession/groupOwnershipService.js';
 import sessionRegistryService from '../services/multiSession/sessionRegistryService.js';
 import { createGroupOwnerWriteStateResolver, normalizeAssignmentVersion } from './groupOwnerWriteStateResolver.js';
 import { useDbAuthState } from './baileysDbAuthState.js';
@@ -194,20 +190,10 @@ const getWriterLockNameBySession = (sessionId) => {
   return `${base}:${safeSessionId}`;
 };
 
-const GROUP_OWNER_WRITE_CACHE_TTL_MS = parseEnvInt(
-  process.env.GROUP_OWNER_WRITE_CACHE_TTL_MS,
-  Math.max(2_000, Math.floor((Number(MULTI_SESSION_RUNTIME_CONFIG?.ownerHeartbeatMs) || 30_000) / 3)),
-  1_000,
-  60_000,
-);
+const GROUP_OWNER_WRITE_CACHE_TTL_MS = parseEnvInt(process.env.GROUP_OWNER_WRITE_CACHE_TTL_MS, Math.max(2_000, Math.floor((Number(MULTI_SESSION_RUNTIME_CONFIG?.ownerHeartbeatMs) || 30_000) / 3)), 1_000, 60_000);
 const GROUP_OWNER_WRITE_CLAIM_ON_MISS = parseEnvBool(process.env.GROUP_OWNER_WRITE_CLAIM_ON_MISS, true);
 const GROUP_OWNER_LEASE_MS = Math.max(5_000, Number(MULTI_SESSION_RUNTIME_CONFIG?.ownerLeaseMs) || 120_000);
-let GROUP_OWNER_HEARTBEAT_MS = parseEnvInt(
-  process.env.GROUP_OWNER_HEARTBEAT_RUNTIME_MS,
-  Math.max(1_000, Math.min(GROUP_OWNER_LEASE_MS - 500, Number(MULTI_SESSION_RUNTIME_CONFIG?.ownerHeartbeatMs) || 30_000)),
-  1_000,
-  5 * 60 * 1000,
-);
+let GROUP_OWNER_HEARTBEAT_MS = parseEnvInt(process.env.GROUP_OWNER_HEARTBEAT_RUNTIME_MS, Math.max(1_000, Math.min(GROUP_OWNER_LEASE_MS - 500, Number(MULTI_SESSION_RUNTIME_CONFIG?.ownerHeartbeatMs) || 30_000)), 1_000, 5 * 60 * 1000);
 if (GROUP_OWNER_HEARTBEAT_MS >= GROUP_OWNER_LEASE_MS) {
   GROUP_OWNER_HEARTBEAT_MS = Math.max(1_000, Math.floor(GROUP_OWNER_LEASE_MS / 2));
 }
@@ -1373,8 +1359,7 @@ const startGroupOwnerHeartbeat = (sessionId, generation) => {
     latestContext.ownerHeartbeatInFlight = true;
     try {
       const socket = latestContext.socket;
-      const botJid =
-        normalizeJid(socket?.user?.id || socket?.authState?.creds?.me?.id || socket?.authState?.creds?.me?.lid) || undefined;
+      const botJid = normalizeJid(socket?.user?.id || socket?.authState?.creds?.me?.id || socket?.authState?.creds?.me?.lid) || undefined;
       const sessionWeight = Math.max(1, Number(MULTI_SESSION_RUNTIME_CONFIG?.sessionWeights?.[safeSessionId] || 1));
       const heartbeatOutcome = await heartbeatGroupOwnerSession({
         sessionId: safeSessionId,
@@ -2103,9 +2088,7 @@ export async function connectToWhatsApp(sessionId = BAILEYS_PRIMARY_SESSION_ID) 
  */
 export async function connectAllWhatsAppSessions() {
   const results = await Promise.allSettled(BAILEYS_SESSION_IDS.map((sessionId) => connectToWhatsApp(sessionId)));
-  const failures = results
-    .map((result, index) => ({ result, sessionId: BAILEYS_SESSION_IDS[index] }))
-    .filter(({ result }) => result.status === 'rejected');
+  const failures = results.map((result, index) => ({ result, sessionId: BAILEYS_SESSION_IDS[index] })).filter(({ result }) => result.status === 'rejected');
 
   if (failures.length > 0) {
     const error = new Error(`Falha ao conectar ${failures.length}/${BAILEYS_SESSION_IDS.length} sessões do WhatsApp.`);

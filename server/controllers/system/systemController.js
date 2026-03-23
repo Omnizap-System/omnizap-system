@@ -190,9 +190,7 @@ export const listSystemAdminSessions = async ({ status = null, limit = 200 } = {
     if (row?.sessionId) knownSessionIds.add(row.sessionId);
   }
 
-  const selectedSessionIds = Array.from(knownSessionIds)
-    .filter(Boolean)
-    .slice(0, safeLimit);
+  const selectedSessionIds = Array.from(knownSessionIds).filter(Boolean).slice(0, safeLimit);
   const registryBySession = new Map((registryRows || []).map((row) => [row.sessionId, row]));
 
   const sessions = selectedSessionIds.map((sessionId) => {
@@ -226,14 +224,7 @@ export const listSystemAdminSessions = async ({ status = null, limit = 200 } = {
   };
 };
 
-export const listSystemAdminAssignments = async (
-  {
-    groupJid = null,
-    ownerSessionId = null,
-    includeExpired = false,
-    limit = 200,
-  } = {},
-) => {
+export const listSystemAdminAssignments = async ({ groupJid = null, ownerSessionId = null, includeExpired = false, limit = 200 } = {}) => {
   const safeGroupJid = normalizeOptional(groupJid, 255);
   const safeOwnerSessionId = normalizeOptional(ownerSessionId, 64);
   const safeIncludeExpired = normalizeBoolean(includeExpired, false);
@@ -269,16 +260,7 @@ export const listSystemAdminAssignments = async (
   };
 };
 
-export const setSystemAdminGroupPin = async (
-  {
-    groupJid,
-    pinned,
-    sessionId = null,
-    reason = null,
-    changedBy = 'admin_api',
-    metadata = null,
-  } = {},
-) => {
+export const setSystemAdminGroupPin = async ({ groupJid, pinned, sessionId = null, reason = null, changedBy = 'admin_api', metadata = null } = {}) => {
   const outcome = await groupOwnershipService.setPinned({
     groupJid,
     pinned,
@@ -307,15 +289,7 @@ export const setSystemAdminGroupPin = async (
   };
 };
 
-export const forceSystemAdminGroupFailover = async (
-  {
-    groupJid,
-    targetSessionId,
-    reason = 'admin_force_failover',
-    changedBy = 'admin_api',
-    metadata = null,
-  } = {},
-) => {
+export const forceSystemAdminGroupFailover = async ({ groupJid, targetSessionId, reason = 'admin_force_failover', changedBy = 'admin_api', metadata = null } = {}) => {
   const outcome = await groupOwnershipService.forceAssign({
     groupJid,
     sessionId: targetSessionId,

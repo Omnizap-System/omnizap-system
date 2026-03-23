@@ -70,16 +70,7 @@ const cloneOutcome = (outcome = null) => {
   };
 };
 
-export const createGroupOwnershipService = ({
-  repository = groupOwnershipRepository,
-  sessionRegistry = sessionRegistryService,
-  withTransactionImpl = withTransaction,
-  nowImpl = () => Date.now(),
-  loggerImpl = logger,
-  defaultLeaseMs = DEFAULT_LEASE_MS,
-  cacheTtlMs = parsePositiveInt(process.env.GROUP_OWNER_CACHE_TTL_MS, DEFAULT_CACHE_TTL_MS, 250, 10_000),
-  cacheMaxEntries = DEFAULT_CACHE_MAX_ENTRIES,
-} = {}) => {
+export const createGroupOwnershipService = ({ repository = groupOwnershipRepository, sessionRegistry = sessionRegistryService, withTransactionImpl = withTransaction, nowImpl = () => Date.now(), loggerImpl = logger, defaultLeaseMs = DEFAULT_LEASE_MS, cacheTtlMs = parsePositiveInt(process.env.GROUP_OWNER_CACHE_TTL_MS, DEFAULT_CACHE_TTL_MS, 250, 10_000), cacheMaxEntries = DEFAULT_CACHE_MAX_ENTRIES } = {}) => {
   const ownerCache = new Map();
   const safeDefaultLeaseMs = parsePositiveInt(defaultLeaseMs, DEFAULT_LEASE_MS, 5_000, 15 * 60 * 1000);
   const safeCacheTtlMs = parsePositiveInt(cacheTtlMs, DEFAULT_CACHE_TTL_MS, 250, 10_000);
@@ -128,18 +119,7 @@ export const createGroupOwnershipService = ({
     return Number(assignment?.assignmentVersion || 1);
   };
 
-  const recordHistory = async (
-    {
-      groupJid,
-      previousSessionId = null,
-      newSessionId = null,
-      reason = null,
-      changedBy = 'system',
-      assignmentVersion = null,
-      metadata = null,
-    } = {},
-    connection = null,
-  ) => {
+  const recordHistory = async ({ groupJid, previousSessionId = null, newSessionId = null, reason = null, changedBy = 'system', assignmentVersion = null, metadata = null } = {}, connection = null) => {
     const safeGroupJid = repository.normalizeGroupJid(groupJid);
     const safePreviousSessionId = repository.normalizeSessionId(previousSessionId);
     const safeNewSessionId = repository.normalizeSessionId(newSessionId) || safePreviousSessionId;
@@ -213,14 +193,7 @@ export const createGroupOwnershipService = ({
     return `${safeGroupJid}:${safeOwnerSessionId}:${safeAssignmentVersion}`;
   };
 
-  const validateFenceToken = async (
-    {
-      groupJid,
-      sessionId,
-      assignmentVersion,
-      bypassCache = true,
-    } = {},
-  ) => {
+  const validateFenceToken = async ({ groupJid, sessionId, assignmentVersion, bypassCache = true } = {}) => {
     const safeGroupJid = repository.normalizeGroupJid(groupJid);
     const safeSessionId = repository.normalizeSessionId(sessionId);
     const safeAssignmentVersion = parseAssignmentVersion(assignmentVersion);
@@ -265,16 +238,7 @@ export const createGroupOwnershipService = ({
     };
   };
 
-  const tryAcquire = async (
-    {
-      groupJid,
-      sessionId,
-      leaseMs = safeDefaultLeaseMs,
-      reason = 'claim',
-      changedBy = null,
-      metadata = null,
-    } = {},
-  ) => {
+  const tryAcquire = async ({ groupJid, sessionId, leaseMs = safeDefaultLeaseMs, reason = 'claim', changedBy = null, metadata = null } = {}) => {
     const safeGroupJid = repository.normalizeGroupJid(groupJid);
     const safeSessionId = repository.normalizeSessionId(sessionId);
     if (!safeGroupJid || !safeSessionId) {
@@ -419,14 +383,7 @@ export const createGroupOwnershipService = ({
     return cloneOutcome(outcome);
   };
 
-  const renewLease = async (
-    {
-      groupJid,
-      sessionId,
-      leaseMs = safeDefaultLeaseMs,
-      reason = 'renew',
-    } = {},
-  ) => {
+  const renewLease = async ({ groupJid, sessionId, leaseMs = safeDefaultLeaseMs, reason = 'renew' } = {}) => {
     const safeGroupJid = repository.normalizeGroupJid(groupJid);
     const safeSessionId = repository.normalizeSessionId(sessionId);
     if (!safeGroupJid || !safeSessionId) {
@@ -480,17 +437,7 @@ export const createGroupOwnershipService = ({
     return cloneOutcome(outcome);
   };
 
-  const heartbeatOwnerSession = async (
-    {
-      sessionId,
-      leaseMs = safeDefaultLeaseMs,
-      reason = 'heartbeat',
-      botJid = undefined,
-      metadata = undefined,
-      currentScore = 0,
-      capacityWeight = 1,
-    } = {},
-  ) => {
+  const heartbeatOwnerSession = async ({ sessionId, leaseMs = safeDefaultLeaseMs, reason = 'heartbeat', botJid = undefined, metadata = undefined, currentScore = 0, capacityWeight = 1 } = {}) => {
     const safeSessionId = repository.normalizeSessionId(sessionId);
     if (!safeSessionId) {
       throw new Error('heartbeatOwnerSession requer sessionId valido.');
@@ -531,15 +478,7 @@ export const createGroupOwnershipService = ({
     };
   };
 
-  const release = async (
-    {
-      groupJid,
-      sessionId = null,
-      reason = 'release',
-      changedBy = null,
-      metadata = null,
-    } = {},
-  ) => {
+  const release = async ({ groupJid, sessionId = null, reason = 'release', changedBy = null, metadata = null } = {}) => {
     const safeGroupJid = repository.normalizeGroupJid(groupJid);
     const safeSessionId = repository.normalizeSessionId(sessionId);
     if (!safeGroupJid) {
@@ -620,17 +559,7 @@ export const createGroupOwnershipService = ({
     return cloneOutcome(outcome);
   };
 
-  const forceAssign = async (
-    {
-      groupJid,
-      sessionId,
-      leaseMs = safeDefaultLeaseMs,
-      reason = 'force_assign',
-      changedBy = null,
-      metadata = null,
-      pinned = undefined,
-    } = {},
-  ) => {
+  const forceAssign = async ({ groupJid, sessionId, leaseMs = safeDefaultLeaseMs, reason = 'force_assign', changedBy = null, metadata = null, pinned = undefined } = {}) => {
     const safeGroupJid = repository.normalizeGroupJid(groupJid);
     const safeSessionId = repository.normalizeSessionId(sessionId);
     if (!safeGroupJid || !safeSessionId) {
@@ -729,17 +658,7 @@ export const createGroupOwnershipService = ({
     return cloneOutcome(outcome);
   };
 
-  const setPinned = async (
-    {
-      groupJid,
-      pinned,
-      sessionId = null,
-      reason = null,
-      changedBy = null,
-      metadata = null,
-      leaseMs = safeDefaultLeaseMs,
-    } = {},
-  ) => {
+  const setPinned = async ({ groupJid, pinned, sessionId = null, reason = null, changedBy = null, metadata = null, leaseMs = safeDefaultLeaseMs } = {}) => {
     const safeGroupJid = repository.normalizeGroupJid(groupJid);
     if (!safeGroupJid) {
       throw new Error('setPinned requer groupJid valido.');
