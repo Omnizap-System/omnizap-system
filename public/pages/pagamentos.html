@@ -156,6 +156,12 @@
         box-shadow: 0 0 0 3px rgba(102, 170, 255, 0.18);
       }
 
+      input[readonly] {
+        opacity: 0.9;
+        background: rgba(14, 28, 54, 0.9);
+        border-color: rgba(110, 146, 212, 0.5);
+      }
+
       .hint {
         margin-top: 6px;
         font-size: 12px;
@@ -461,6 +467,16 @@
           return candidate;
         };
 
+        const lockInputWithSessionValue = (inputElement, shouldLock) => {
+          const locked = Boolean(shouldLock);
+          inputElement.readOnly = locked;
+          if (locked) {
+            inputElement.setAttribute('title', 'Campo preenchido automaticamente pela sua sessao.');
+          } else {
+            inputElement.removeAttribute('title');
+          }
+        };
+
         const fillFormWithUserData = ({ name = '', email = '', ownerPhone = '', ownerJid = '' } = {}) => {
           const normalizedName = String(name || '').trim();
           const normalizedEmail = String(email || '').trim().toLowerCase();
@@ -469,6 +485,10 @@
           if (normalizedName) nameInputElement.value = normalizedName;
           if (normalizedEmail) emailInputElement.value = normalizedEmail;
           if (normalizedPhone) whatsappInputElement.value = normalizedPhone;
+
+          lockInputWithSessionValue(nameInputElement, normalizedName);
+          lockInputWithSessionValue(emailInputElement, normalizedEmail);
+          lockInputWithSessionValue(whatsappInputElement, normalizedPhone);
         };
 
         const buildLoginRedirectUrl = () => {
