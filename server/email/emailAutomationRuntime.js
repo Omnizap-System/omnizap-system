@@ -38,6 +38,19 @@ let inFlight = false;
 let timerHandle = null;
 let nextDelayMs = EMAIL_AUTOMATION_POLL_INTERVAL_MS;
 
+const maskEmailForLogs = (value) => {
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase()
+    .slice(0, 255);
+  const [localPartRaw, domainRaw] = normalized.split('@');
+  const localPart = String(localPartRaw || '').trim();
+  const domain = String(domainRaw || '').trim();
+  if (!localPart || !domain) return 'invalid-email';
+  const localMasked = localPart.length <= 2 ? `${localPart.charAt(0) || '*'}*` : `${localPart.slice(0, 2)}***`;
+  return `${localMasked}@${domain}`;
+};
+
 const applyDelayJitter = (delayMs) => {
   const baseDelay = Math.max(250, Math.floor(Number(delayMs) || 0));
   if (EMAIL_AUTOMATION_IDLE_JITTER_PERCENT <= 0) return baseDelay;
@@ -119,6 +132,16 @@ export const runEmailAutomationTick = async ({ maxPerTick = EMAIL_AUTOMATION_MAX
       });
 
       stats.sent += 1;
+      logger.debug('E-mail da fila entregue com sucesso.', {
+        action: 'email_automation_delivery_succeeded',
+        task_id: task.id,
+        template_key: task.template_key || null,
+        recipient_email_masked: maskEmailForLogs(task.recipient_email),
+        attempts: task.attempts,
+        max_attempts: task.max_attempts,
+        provider_message_id: delivery?.messageId || null,
+        provider_response: delivery?.response || null,
+      });
     } catch (error) {
       stats.failed += 1;
       await failEmailOutboxTask(task.id, {
@@ -129,8 +152,12 @@ export const runEmailAutomationTick = async ({ maxPerTick = EMAIL_AUTOMATION_MAX
       logger.warn('Falha ao entregar e-mail da fila.', {
         action: 'email_automation_delivery_failed',
         task_id: task.id,
-        recipient_email: task.recipient_email,
+        template_key: task.template_key || null,
+        recipient_email_masked: maskEmailForLogs(task.recipient_email),
         attempts: task.attempts,
+        max_attempts: task.max_attempts,
+        retry_delay_seconds: safeRetryDelay,
+        metadata_keys: Object.keys(task?.metadata || {}).slice(0, 20),
         error: error?.message,
       });
     }
@@ -138,6 +165,14 @@ export const runEmailAutomationTick = async ({ maxPerTick = EMAIL_AUTOMATION_MAX
 
   if (stats.claimed > 0) {
     await refreshQueueDepthMetrics().catch(() => null);
+    logger.info('Processamento da fila de e-mail concluído.', {
+      action: 'email_automation_tick_processed',
+      claimed: stats.claimed,
+      sent: stats.sent,
+      failed: stats.failed,
+      max_per_tick: safeMaxPerTick,
+      retry_delay_seconds: safeRetryDelay,
+    });
   }
 
   return stats;

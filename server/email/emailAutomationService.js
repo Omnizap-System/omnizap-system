@@ -1,3 +1,4 @@
+import logger from '#logger';
 import { enqueueEmailOutbox, getEmailOutboxStatusSnapshot } from './emailOutboxRepository.js';
 import { renderEmailTemplate } from './emailTemplateService.js';
 import { getEmailTransportMetadata } from './emailTransportService.js';
@@ -7,6 +8,22 @@ const normalizeEmail = (value) =>
     .trim()
     .toLowerCase()
     .slice(0, 255);
+
+const maskEmailForLogs = (value) => {
+  const normalized = normalizeEmail(value);
+  const [localPartRaw, domainRaw] = normalized.split('@');
+  const localPart = String(localPartRaw || '').trim();
+  const domain = String(domainRaw || '').trim();
+  if (!localPart || !domain) return 'invalid-email';
+  const localMasked = localPart.length <= 2 ? `${localPart.charAt(0) || '*'}*` : `${localPart.slice(0, 2)}***`;
+  return `${localMasked}@${domain}`;
+};
+
+const resolveEmailDomain = (value) => {
+  const normalized = normalizeEmail(value);
+  if (!normalized.includes('@')) return null;
+  return normalized.split('@')[1] || null;
+};
 
 const normalizeOptionalText = (value, maxLength = 500_000) => {
   const normalized =
@@ -30,6 +47,12 @@ const resolveEmailBodyFromPayload = ({ templateKey = '', templateData = {}, subj
   const normalizedTemplateData = normalizePayloadObject(templateData);
 
   const renderedTemplate = normalizedTemplateKey ? renderEmailTemplate(normalizedTemplateKey, normalizedTemplateData) : null;
+
+  if (normalizedTemplateKey && !renderedTemplate && !normalizeOptionalText(subject, 180) && !normalizeOptionalText(text, 120_000) && !normalizeOptionalText(html, 500_000)) {
+    const error = new Error(`Template de e-mail inválido ou indisponível: "${normalizedTemplateKey}".`);
+    error.statusCode = 400;
+    throw error;
+  }
 
   const normalizedSubject = normalizeOptionalText(subject, 180) || renderedTemplate?.subject || '';
   const normalizedText = normalizeOptionalText(text, 120_000) || renderedTemplate?.text || null;
@@ -72,6 +95,8 @@ export const queueAutomatedEmail = async ({ to, name = '', templateKey = '', tem
     html,
   });
 
+  const safeMetadata = normalizePayloadObject(metadata);
+
   const taskId = await enqueueEmailOutbox({
     recipientEmail: normalizedEmail,
     recipientName: normalizeOptionalText(name, 120),
@@ -80,7 +105,7 @@ export const queueAutomatedEmail = async ({ to, name = '', templateKey = '', tem
     htmlBody: body.html_body,
     templateKey: body.template_key,
     templatePayload: body.template_payload,
-    metadata: normalizePayloadObject(metadata),
+    metadata: safeMetadata,
     priority,
     scheduledAt,
     maxAttempts,
@@ -92,6 +117,22 @@ export const queueAutomatedEmail = async ({ to, name = '', templateKey = '', tem
     error.statusCode = 500;
     throw error;
   }
+
+  logger.info('E-mail enfileirado para processamento.', {
+    action: 'email_outbox_enqueued',
+    task_id: taskId,
+    template_key: body.template_key || null,
+    recipient_email_masked: maskEmailForLogs(normalizedEmail),
+    recipient_domain: resolveEmailDomain(normalizedEmail),
+    subject_length: body.subject.length,
+    has_text_body: Boolean(body.text_body),
+    has_html_body: Boolean(body.html_body),
+    metadata_keys: Object.keys(safeMetadata).slice(0, 20),
+    priority: Number.isFinite(Number(priority)) ? Number(priority) : null,
+    scheduled_at: scheduledAt ? String(scheduledAt) : null,
+    max_attempts: Number.isFinite(Number(maxAttempts)) ? Number(maxAttempts) : null,
+    idempotency_key_present: Boolean(String(idempotencyKey || '').trim()),
+  });
 
   return {
     task_id: taskId,

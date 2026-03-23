@@ -1,7 +1,9 @@
 import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
+import logger from '#logger';
 import { resolveAdminPhoneFromEnv, resolveBotPhoneFromEnv, resolveSupportPhoneFromEnv } from '../../utils/whatsapp/contactEnv.js';
 const DEFAULT_SITE_ORIGIN = 'https://omnizap.shop';
 const DEFAULT_BRAND_NAME = 'OmniZap';
+const DEFAULT_BRAND_LOGO_PATH = '/assets/images/brand-logo-128.webp';
 
 const resolveSiteOrigin = () =>
   String(process.env.SITE_ORIGIN || process.env.WHATSAPP_LOGIN_BASE_URL || DEFAULT_SITE_ORIGIN)
@@ -28,6 +30,20 @@ const escapeHtml = (value) =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
+const summarizePayloadKeys = (value, maxItems = 24) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
+  return Object.keys(value)
+    .map((key) => String(key || '').trim().slice(0, 64))
+    .filter(Boolean)
+    .slice(0, maxItems);
+};
+
+const clipTemplatePreview = (value, maxLength = 140) =>
+  String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maxLength);
+
 const normalizeHttpUrl = (value, fallback = '') => {
   const normalized = String(value || '')
     .trim()
@@ -46,6 +62,22 @@ const normalizeEmailAddress = (value) => {
     .replace(/^mailto:/i, '');
   if (!candidate.includes('@')) return '';
   return candidate.slice(0, 255);
+};
+
+const resolveBrandLogoUrl = ({ siteOrigin = '', payloadLogoUrl = '' } = {}) => {
+  const fallbackLogoUrl = normalizeHttpUrl(
+    `${String(siteOrigin || DEFAULT_SITE_ORIGIN).replace(/\/+$/, '')}${DEFAULT_BRAND_LOGO_PATH}`,
+    `${DEFAULT_SITE_ORIGIN}${DEFAULT_BRAND_LOGO_PATH}`,
+  );
+
+  const explicitLogoUrl = normalizeHttpUrl(payloadLogoUrl || process.env.EMAIL_BRAND_LOGO_URL || '', '');
+  if (!explicitLogoUrl) return fallbackLogoUrl;
+
+  const explicitLower = explicitLogoUrl.toLowerCase();
+  const looksLikeFavicon = explicitLower.endsWith('/favicon.ico') || explicitLower.includes('/favicon-');
+  if (looksLikeFavicon) return fallbackLogoUrl;
+
+  return explicitLogoUrl;
 };
 
 const normalizePhoneDigits = (value, maxLength = 20) =>
@@ -89,7 +121,10 @@ const resolveBrandConfig = (payload = {}) => {
     siteOrigin,
     brandName: normalizeText(payload?.brandName || process.env.EMAIL_BRAND_NAME || DEFAULT_BRAND_NAME, 80) || DEFAULT_BRAND_NAME,
     brandTagline: normalizeText(payload?.brandTagline || process.env.EMAIL_BRAND_TAGLINE || 'Automação profissional para WhatsApp.', 120) || null,
-    brandLogoUrl: normalizeHttpUrl(payload?.brandLogoUrl || payload?.logoUrl || process.env.EMAIL_BRAND_LOGO_URL || '', ''),
+    brandLogoUrl: resolveBrandLogoUrl({
+      siteOrigin,
+      payloadLogoUrl: payload?.brandLogoUrl || payload?.logoUrl || '',
+    }),
     supportUrl: resolvedSupportUrl,
     supportLabel: resolvedSupportLabel || 'Central de suporte',
     supportEmail: replyToAddress || fromAddress || '',
@@ -114,7 +149,21 @@ const renderParagraphsHtml = (value, { maxParagraphs = 6, maxLength = 8_000 } = 
   return paragraphs.map((paragraph) => `<p style="margin:0 0 12px;color:#334155;font-size:15px;line-height:1.65;">${escapeHtml(paragraph)}</p>`).join('');
 };
 
-const renderEmailLayout = ({ payload = {}, preheader = '', heading = '', greeting = '', intro = '', body = '', ctaLabel = '', ctaUrl = '', ctaHint = '', secondaryCtaLabel = '', secondaryCtaUrl = '', securityNote = '', footerMessage = '' } = {}) => {
+const renderEmailLayout = ({
+  payload = {},
+  preheader = '',
+  heading = '',
+  greeting = '',
+  intro = '',
+  body = '',
+  ctaLabel = '',
+  ctaUrl = '',
+  ctaHint = '',
+  secondaryCtaLabel = '',
+  secondaryCtaUrl = '',
+  securityNote = '',
+  footerMessage = '',
+} = {}) => {
   const brand = resolveBrandConfig(payload);
   const safePreheader = normalizeText(preheader, 160);
   const safeHeading = normalizeText(heading, 120);
@@ -128,53 +177,95 @@ const renderEmailLayout = ({ payload = {}, preheader = '', heading = '', greetin
   const safeSecurityNote = normalizeText(securityNote, 220);
   const safeFooterMessage = normalizeText(footerMessage, 220);
   const year = __timeNow().getUTCFullYear();
+  const generatedAt = __timeNowIso();
 
-  const logoBlock = brand.brandLogoUrl ? `<img src="${escapeHtml(brand.brandLogoUrl)}" alt="${escapeHtml(brand.brandName)}" width="132" style="display:block;border:0;outline:none;text-decoration:none;height:auto;margin:0 auto;" />` : `<div style="display:inline-block;font-size:26px;font-weight:800;color:#0f172a;letter-spacing:0.2px;">${escapeHtml(brand.brandName)}</div>`;
+  const logoBlock = brand.brandLogoUrl
+    ? `<img src="${escapeHtml(brand.brandLogoUrl)}" alt="${escapeHtml(brand.brandName)}" width="138" style="display:block;border:0;outline:none;text-decoration:none;height:auto;" />`
+    : `<div style="display:inline-block;font-size:24px;font-weight:800;line-height:1.1;color:#ffffff;letter-spacing:0.3px;">${escapeHtml(brand.brandName)}</div>`;
 
-  const greetingBlock = safeGreeting ? `<p style="margin:0 0 10px;color:#0f172a;font-size:16px;font-weight:700;line-height:1.5;">${escapeHtml(safeGreeting)}</p>` : '';
-  const introBlock = safeIntro ? `<p style="margin:0 0 14px;color:#334155;font-size:15px;line-height:1.65;">${escapeHtml(safeIntro)}</p>` : '';
+  const headingBlock = safeHeading
+    ? `<h1 style="margin:0;color:#0f172a;font-size:27px;line-height:1.2;font-weight:800;letter-spacing:0.1px;">${escapeHtml(safeHeading)}</h1>`
+    : '';
+  const greetingBlock = safeGreeting
+    ? `<p style="margin:0 0 10px;color:#0f172a;font-size:16px;font-weight:700;line-height:1.6;">${escapeHtml(safeGreeting)}</p>`
+    : '';
+  const introBlock = safeIntro
+    ? `<p style="margin:0 0 14px;color:#334155;font-size:15px;line-height:1.7;">${escapeHtml(safeIntro)}</p>`
+    : '';
   const bodyBlock = renderParagraphsHtml(body);
 
   const ctaBlock =
     safeCtaUrl && safeCtaLabel
       ? `
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:10px 0 10px;">
-          <tr>
-            <td align="center" bgcolor="#1d4ed8" style="border-radius:10px;">
-              <a href="${escapeHtml(safeCtaUrl)}" style="display:inline-block;padding:12px 20px;font-size:15px;line-height:1.2;font-weight:700;color:#ffffff;text-decoration:none;">${escapeHtml(safeCtaLabel)}</a>
-            </td>
-          </tr>
-        </table>
-      `.trim()
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:14px 0 8px;">
+        <tr>
+          <td align="center" bgcolor="#1d4ed8" style="border-radius:10px;">
+            <a href="${escapeHtml(safeCtaUrl)}" style="display:inline-block;padding:13px 22px;font-size:15px;line-height:1.2;font-weight:700;color:#ffffff;text-decoration:none;letter-spacing:0.2px;">${escapeHtml(safeCtaLabel)}</a>
+          </td>
+        </tr>
+      </table>
+    `.trim()
       : '';
 
-  const ctaHintBlock = safeCtaHint ? `<p style="margin:4px 0 0;color:#64748b;font-size:13px;line-height:1.55;">${escapeHtml(safeCtaHint)}</p>` : '';
-  const secondaryCtaBlock = safeSecondaryCtaLabel && safeSecondaryCtaUrl ? `<p style="margin:10px 0 0;color:#1e293b;font-size:14px;line-height:1.6;">${escapeHtml(safeSecondaryCtaLabel)}: <a href="${escapeHtml(safeSecondaryCtaUrl)}" style="color:#2563eb;text-decoration:none;">${escapeHtml(safeSecondaryCtaUrl)}</a></p>` : '';
-  const fallbackLinkBlock = safeCtaUrl ? `<p style="margin:12px 0 0;color:#64748b;font-size:12px;line-height:1.6;word-break:break-all;">Se o botão não funcionar, copie e cole este link no navegador: ${escapeHtml(safeCtaUrl)}</p>` : '';
-  const securityNoteBlock = safeSecurityNote ? `<p style="margin:16px 0 0;padding:10px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;color:#475569;font-size:12px;line-height:1.6;">${escapeHtml(safeSecurityNote)}</p>` : '';
-
-  const supportEmailLine = brand.supportEmail ? `<span style="display:block;margin-top:6px;">E-mail: <a href="mailto:${escapeHtml(brand.supportEmail)}" style="color:#2563eb;text-decoration:none;">${escapeHtml(brand.supportEmail)}</a></span>` : '';
-  const footerMessageBlock = safeFooterMessage ? `<span style="display:block;margin-top:6px;color:#64748b;">${escapeHtml(safeFooterMessage)}</span>` : '';
-  const taglineBlock = brand.brandTagline ? `<p style="margin:8px 0 0;color:#64748b;font-size:13px;line-height:1.6;">${escapeHtml(brand.brandTagline)}</p>` : '';
+  const ctaHintBlock = safeCtaHint
+    ? `<p style="margin:6px 0 0;color:#64748b;font-size:13px;line-height:1.6;">${escapeHtml(safeCtaHint)}</p>`
+    : '';
+  const secondaryCtaBlock =
+    safeSecondaryCtaLabel && safeSecondaryCtaUrl
+      ? `
+      <p style="margin:12px 0 0;color:#334155;font-size:13px;line-height:1.65;">
+        ${escapeHtml(safeSecondaryCtaLabel)}:
+        <a href="${escapeHtml(safeSecondaryCtaUrl)}" style="color:#1d4ed8;text-decoration:none;font-weight:600;">${escapeHtml(safeSecondaryCtaUrl)}</a>
+      </p>
+    `.trim()
+      : '';
+  const fallbackLinkBlock = safeCtaUrl
+    ? `<p style="margin:14px 0 0;color:#64748b;font-size:12px;line-height:1.7;word-break:break-all;">Se o botão não funcionar, copie e cole este link no navegador: ${escapeHtml(safeCtaUrl)}</p>`
+    : '';
+  const securityNoteBlock = safeSecurityNote
+    ? `<p style="margin:16px 0 0;padding:12px 13px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;color:#475569;font-size:12px;line-height:1.65;">${escapeHtml(safeSecurityNote)}</p>`
+    : '';
+  const brandTaglineBlock = brand.brandTagline
+    ? `<p style="margin:8px 0 0;color:#cbd5e1;font-size:13px;line-height:1.6;">${escapeHtml(brand.brandTagline)}</p>`
+    : '';
+  const supportEmailLine = brand.supportEmail
+    ? `<span style="display:block;margin-top:6px;">E-mail: <a href="mailto:${escapeHtml(brand.supportEmail)}" style="color:#2563eb;text-decoration:none;">${escapeHtml(brand.supportEmail)}</a></span>`
+    : '';
+  const footerMessageBlock = safeFooterMessage
+    ? `<span style="display:block;margin-top:7px;color:#64748b;">${escapeHtml(safeFooterMessage)}</span>`
+    : '';
 
   return `
 <!doctype html>
 <html lang="pt-BR">
-  <body style="margin:0;padding:0;background:#f1f5f9;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <body style="margin:0;padding:0;background:#eef2f8;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
     <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">${escapeHtml(safePreheader)}</div>
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f1f5f9;padding:28px 10px;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#eef2f8;padding:26px 10px;">
       <tr>
         <td align="center">
           <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:640px;">
             <tr>
-              <td align="center" style="padding:0 0 16px;">
-                ${logoBlock}
-                ${taglineBlock}
+              <td style="background:#0f172a;border-radius:16px 16px 0 0;padding:22px 24px 20px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                  <tr>
+                    <td align="left" valign="middle" style="padding-right:12px;">
+                      ${logoBlock}
+                      ${brandTaglineBlock}
+                    </td>
+                    <td align="right" valign="middle" style="white-space:nowrap;">
+                      <span style="display:inline-block;padding:6px 10px;border:1px solid rgba(148,163,184,0.45);border-radius:999px;font-size:11px;font-weight:700;letter-spacing:0.35px;text-transform:uppercase;color:#e2e8f0;">Comunicado oficial</span>
+                    </td>
+                  </tr>
+                </table>
               </td>
             </tr>
             <tr>
-              <td style="background:#ffffff;border:1px solid #dbe3ef;border-radius:14px;padding:26px 24px;box-shadow:0 4px 24px rgba(15,23,42,0.06);">
-                <h1 style="margin:0 0 14px;color:#0f172a;font-size:25px;line-height:1.25;">${escapeHtml(safeHeading)}</h1>
+              <td style="background:#ffffff;border-left:1px solid #d9e2ef;border-right:1px solid #d9e2ef;padding:26px 24px 10px;">
+                ${headingBlock}
+              </td>
+            </tr>
+            <tr>
+              <td style="background:#ffffff;border-left:1px solid #d9e2ef;border-right:1px solid #d9e2ef;padding:0 24px 22px;">
                 ${greetingBlock}
                 ${introBlock}
                 ${bodyBlock}
@@ -186,11 +277,12 @@ const renderEmailLayout = ({ payload = {}, preheader = '', heading = '', greetin
               </td>
             </tr>
             <tr>
-              <td style="padding:14px 2px 0;color:#64748b;font-size:12px;line-height:1.7;text-align:left;">
+              <td style="background:#ffffff;border:1px solid #d9e2ef;border-top:none;border-radius:0 0 16px 16px;padding:14px 24px 18px;color:#64748b;font-size:12px;line-height:1.7;">
                 <span style="display:block;">${escapeHtml(brand.brandName)} © ${year}. Todos os direitos reservados.</span>
                 <span style="display:block;margin-top:6px;">Central de suporte: <a href="${escapeHtml(brand.supportUrl)}" style="color:#2563eb;text-decoration:none;">${escapeHtml(brand.supportLabel)}</a></span>
                 ${supportEmailLine}
                 ${footerMessageBlock}
+                <span style="display:block;margin-top:7px;color:#94a3b8;font-size:11px;">Gerado em ${escapeHtml(generatedAt)} UTC.</span>
               </td>
             </tr>
           </table>
@@ -457,19 +549,66 @@ const TEMPLATE_BUILDERS = {
 };
 
 export const renderEmailTemplate = (templateKey, payload = {}) => {
+  const renderStartedAtMs = __timeNowMs();
   const normalizedTemplateKey = normalizeTemplateKey(templateKey);
-  if (!normalizedTemplateKey) return null;
+  const payloadKeys = summarizePayloadKeys(payload);
+
+  if (!normalizedTemplateKey) {
+    logger.warn('Render de template de e-mail ignorado por chave inválida.', {
+      action: 'email_template_render_invalid_key',
+      template_key_raw: clipTemplatePreview(templateKey, 64),
+      payload_keys: payloadKeys,
+    });
+    return null;
+  }
   const builder = TEMPLATE_BUILDERS[normalizedTemplateKey];
-  if (typeof builder !== 'function') return null;
+  if (typeof builder !== 'function') {
+    logger.warn('Template de e-mail não encontrado.', {
+      action: 'email_template_builder_not_found',
+      template_key: normalizedTemplateKey,
+      payload_keys: payloadKeys,
+    });
+    return null;
+  }
 
   const rendered = builder(payload || {});
-  if (!rendered) return null;
+  if (!rendered) {
+    logger.warn('Template de e-mail retornou conteúdo vazio.', {
+      action: 'email_template_builder_empty',
+      template_key: normalizedTemplateKey,
+      payload_keys: payloadKeys,
+    });
+    return null;
+  }
 
   const subject = normalizeText(rendered.subject, 180);
   const text = normalizeText(rendered.text, 120_000);
   const html = normalizeText(rendered.html, 500_000);
 
-  if (!subject || (!text && !html)) return null;
+  if (!subject || (!text && !html)) {
+    logger.warn('Template de e-mail inválido após normalização.', {
+      action: 'email_template_render_invalid_output',
+      template_key: normalizedTemplateKey,
+      subject_length: subject.length,
+      text_length: text.length,
+      html_length: html.length,
+      payload_keys: payloadKeys,
+    });
+    return null;
+  }
+
+  logger.debug('Template de e-mail renderizado com sucesso.', {
+    action: 'email_template_rendered',
+    template_key: normalizedTemplateKey,
+    subject_preview: clipTemplatePreview(subject),
+    subject_length: subject.length,
+    text_length: text.length,
+    html_length: html.length,
+    has_text: Boolean(text),
+    has_html: Boolean(html),
+    payload_keys: payloadKeys,
+    render_duration_ms: Math.max(0, __timeNowMs() - renderStartedAtMs),
+  });
 
   return {
     subject,
