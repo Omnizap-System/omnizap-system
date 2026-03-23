@@ -2,7 +2,7 @@ import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } fro
 import makeWASocket, { DisconnectReason, Browsers, getAggregateVotesInPollMessage, areJidsSameUser, WAMessageStatus, WAMessageStubType, delayCancellable, getStatusFromReceiptType, promiseTimeout } from '@whiskeysockets/baileys';
 
 import NodeCache from 'node-cache';
-import { parseEnvBool, parseEnvCsv, parseEnvInt, resolveBaileysVersion, resolveAddressingModeFromMessageKey, normalizeAddressingMode, normalizePnToJid, normalizeWAPresence, baileysConnectionLogger as logger, baileysSocketLogger } from '../config/index.js';
+import { parseEnvBool, parseEnvCsv, parseEnvInt, resolveBaileysVersion, resolveAddressingModeFromMessageKey, normalizeAddressingMode, normalizePnToJid, normalizeWAPresence, getMultiSessionRuntimeConfig, baileysConnectionLogger as logger, baileysSocketLogger } from '../config/index.js';
 
 import { Boom } from '@hapi/boom';
 import qrcode from 'qrcode-terminal';
@@ -16,7 +16,7 @@ import { resolveCaptchaByReaction } from '../services/messaging/captchaService.j
 
 import { handleGroupUpdate as handleGroupParticipantsEvent, handleGroupJoinRequest } from '../modules/adminModule/groupEventHandlers.js';
 
-import { dbConfig, executeQuery, findBy, findById, pool, remove } from '../../database/index.js';
+import { dbConfig, executeQuery, findBy, findById, pool, remove, TABLES } from '../../database/index.js';
 import { extractSenderInfoFromMessage, primeLidCache, resolveUserIdCached, isLidUserId, isWhatsAppUserId } from '../config/index.js';
 import { queueBaileysEventInsert, queueChatUpdate, queueLidUpdate, queueMessageInsert } from '../services/infra/dbWriteQueue.js';
 import { buildGroupMetadataFromGroup, buildGroupMetadataFromUpdate, upsertGroupMetadata, parseParticipantsFromDb } from '../services/group/groupMetadataService.js';
@@ -136,10 +136,10 @@ const BAILEYS_GROUP_METADATA_CACHE_CHECKPERIOD_SECONDS = parseEnvInt(process.env
  * Permite isolar múltiplas sessões no mesmo banco.
  * @type {string}
  */
-const BAILEYS_AUTH_SESSION_ID = (() => {
-  const raw = String(process.env.BAILEYS_AUTH_SESSION_ID || '').trim();
-  return raw || 'default';
-})();
+const MULTI_SESSION_RUNTIME_CONFIG = getMultiSessionRuntimeConfig();
+const BAILEYS_SESSION_IDS = Object.freeze(Array.isArray(MULTI_SESSION_RUNTIME_CONFIG?.sessionIds) && MULTI_SESSION_RUNTIME_CONFIG.sessionIds.length > 0 ? [...MULTI_SESSION_RUNTIME_CONFIG.sessionIds] : [String(process.env.BAILEYS_AUTH_SESSION_ID || 'default').trim() || 'default']);
+const BAILEYS_SESSION_ID_SET = new Set(BAILEYS_SESSION_IDS);
+const BAILEYS_PRIMARY_SESSION_ID = String(MULTI_SESSION_RUNTIME_CONFIG?.primarySessionId || BAILEYS_SESSION_IDS[0] || 'default').trim() || 'default';
 /**
  * Habilita bootstrap inicial do auth state no MySQL usando os arquivos locais legados.
  * @type {boolean}
@@ -164,12 +164,28 @@ const BAILEYS_SINGLE_WRITER_LOCK_RETRY_DELAY_MS = parseEnvInt(process.env.BAILEY
  * Nome do lock de escritor único usado no MySQL.
  * @type {string}
  */
-const BAILEYS_SINGLE_WRITER_LOCK_NAME = (() => {
+const BAILEYS_SINGLE_WRITER_LOCK_NAME_BASE = (() => {
   const raw = String(process.env.BAILEYS_SINGLE_WRITER_LOCK_NAME || '').trim();
   if (raw) return raw;
   const dbLabel = String(dbConfig?.database || 'db').replace(/[^a-zA-Z0-9:_-]+/g, '_');
   return `omnizap:baileys:writer:${dbLabel}`;
 })();
+
+const normalizeSessionId = (sessionId) => {
+  const normalized = String(sessionId || '').trim();
+  if (!normalized) return BAILEYS_PRIMARY_SESSION_ID;
+  if (!BAILEYS_SESSION_ID_SET.has(normalized)) return BAILEYS_PRIMARY_SESSION_ID;
+  return normalized;
+};
+
+const getWriterLockNameBySession = (sessionId) => {
+  const safeSessionId = normalizeSessionId(sessionId);
+  const base = BAILEYS_SINGLE_WRITER_LOCK_NAME_BASE;
+  if (base.includes('{sessionId}')) {
+    return base.replace(/\{sessionId\}/g, safeSessionId);
+  }
+  return `${base}:${safeSessionId}`;
+};
 /**
  * Habilita ou desabilita o diário de eventos do Baileys.
  * @type {boolean}
@@ -267,15 +283,59 @@ const normalizeMessageReceiptType = (receiptType) => {
  */
 let activeSocket = null;
 /**
- * Contador de tentativas de conexão.
- * @type {number}
+ * Contexto runtime de cada sessão de WhatsApp.
+ * @typedef {{
+ *   sessionId: string,
+ *   socket: import('@whiskeysockets/baileys').WASocket|null,
+ *   connectPromise: Promise<void>|null,
+ *   reconnectTimeout: ReturnType<typeof delayCancellable>|null,
+ *   reconnectWindowStartedAt: number,
+ *   connectionAttempts: number,
+ *   socketGeneration: number,
+ *   writerLockConnection: import('mysql2/promise').PoolConnection|null
+ * }} SessionContext
  */
-let connectionAttempts = 0;
 /**
- * Timestamp do início da janela de reconexão.
- * @type {number}
+ * Registry em memória de contexto por sessão.
+ * @type {Map<string, SessionContext>}
  */
-let reconnectWindowStartedAt = 0;
+const sessionContexts = new Map();
+
+const createSessionContext = (sessionId) => ({
+  sessionId,
+  socket: null,
+  connectPromise: null,
+  reconnectTimeout: null,
+  reconnectWindowStartedAt: 0,
+  connectionAttempts: 0,
+  socketGeneration: 0,
+  writerLockConnection: null,
+});
+
+const getSessionContext = (sessionId, { createIfMissing = true } = {}) => {
+  const safeSessionId = normalizeSessionId(sessionId);
+  let context = sessionContexts.get(safeSessionId);
+  if (!context && createIfMissing) {
+    context = createSessionContext(safeSessionId);
+    sessionContexts.set(safeSessionId, context);
+  }
+  return context || null;
+};
+
+const resolvePreferredActiveSocket = () => {
+  const primaryContext = getSessionContext(BAILEYS_PRIMARY_SESSION_ID, { createIfMissing: false });
+  if (isSocketOpen(primaryContext?.socket)) return primaryContext.socket;
+
+  for (const context of sessionContexts.values()) {
+    if (isSocketOpen(context?.socket)) return context.socket;
+  }
+
+  return primaryContext?.socket || null;
+};
+
+const syncLegacyActiveSocketReference = () => {
+  activeSocket = resolvePreferredActiveSocket();
+};
 /**
  * Cache para contadores de retentativa de mensagens.
  * @type {NodeCache}
@@ -322,26 +382,6 @@ const MAX_CONNECTION_ATTEMPTS = 5;
  * @type {number}
  */
 const INITIAL_RECONNECT_DELAY = 3000;
-/**
- * Timeout para reconexão.
- * @type {ReturnType<typeof delayCancellable> | null}
- */
-let reconnectTimeout = null;
-/**
- * Promessa de conexão ativa.
- * @type {Promise<void> | null}
- */
-let connectPromise = null;
-/**
- * Geração atual do socket (incrementado a cada nova conexão).
- * @type {number}
- */
-let socketGeneration = 0;
-/**
- * Conexão MySQL dedicada para manter lock de escritor único do Baileys.
- * @type {import('mysql2/promise').PoolConnection | null}
- */
-let baileysWriterLockConnection = null;
 /**
  * Nomes de todos os eventos do Baileys que são monitorados.
  * @type {string[]}
@@ -884,12 +924,15 @@ const queueContactsLidUpdates = (contacts, source) => {
  * Eventos selecionados são enfileirados para persistência.
  * @param {import('@whiskeysockets/baileys').WASocket} sock - A instância do socket do Baileys.
  * @param {number} generation - A geração atual do socket.
+ * @param {string} sessionId - Sessão associada ao socket.
  * @returns {void}
  */
-const registerBaileysEventJournal = (sock, generation) => {
+const registerBaileysEventJournal = (sock, generation, sessionId) => {
+  const safeSessionId = normalizeSessionId(sessionId);
   if (!BAILEYS_EVENT_JOURNAL_ENABLED) {
     logger.debug('Journal de eventos Baileys desativado por configuração.', {
       action: 'baileys_event_journal_disabled',
+      sessionId: safeSessionId,
     });
     return;
   }
@@ -898,6 +941,7 @@ const registerBaileysEventJournal = (sock, generation) => {
   if (unknownEvents.length > 0) {
     logger.warn('Alguns eventos configurados para journal não existem na lista conhecida do Baileys.', {
       action: 'baileys_event_journal_unknown_events',
+      sessionId: safeSessionId,
       unknownEvents,
     });
   }
@@ -906,6 +950,7 @@ const registerBaileysEventJournal = (sock, generation) => {
   if (eventsToPersist.length === 0) {
     logger.warn('Journal de eventos Baileys habilitado sem eventos válidos para persistir.', {
       action: 'baileys_event_journal_empty',
+      sessionId: safeSessionId,
       configuredEvents: BAILEYS_EVENT_JOURNAL_EVENT_LIST,
     });
     return;
@@ -917,6 +962,7 @@ const registerBaileysEventJournal = (sock, generation) => {
         const summary = summarizeBaileysEventPayload(eventName, payload);
         const refs = extractBaileysEventReferences(payload);
         queueBaileysEventInsert({
+          session_id: safeSessionId,
           event_name: eventName,
           socket_generation: generation,
           chat_id: refs.chatId,
@@ -928,6 +974,7 @@ const registerBaileysEventJournal = (sock, generation) => {
       } catch (error) {
         logger.warn('Falha ao enfileirar evento Baileys para journal.', {
           action: 'baileys_event_journal_enqueue_failed',
+          sessionId: safeSessionId,
           eventName,
           error: error?.message,
         });
@@ -937,6 +984,7 @@ const registerBaileysEventJournal = (sock, generation) => {
 
   logger.info('Journal de eventos Baileys habilitado.', {
     action: 'baileys_event_journal_ready',
+    sessionId: safeSessionId,
     generation,
     eventsCount: eventsToPersist.length,
     events: eventsToPersist,
@@ -978,7 +1026,7 @@ const safeJsonParse = (value, fallback) => {
  * @param {'append' | 'notify' | string} type - Tipo do evento de upsert.
  * @returns {Promise<void>} Conclusão da persistência.
  */
-async function persistIncomingMessages(incomingMessages, type) {
+async function persistIncomingMessages(incomingMessages, type, sessionId = BAILEYS_PRIMARY_SESSION_ID) {
   if (type !== 'append' && type !== 'notify') return;
 
   const entries = [];
@@ -1018,7 +1066,10 @@ async function persistIncomingMessages(incomingMessages, type) {
 
     const canonicalSenderId = resolveUserIdCached(senderInfo) || msg.key.participant || msg.key.remoteJid;
 
-    const messageData = buildMessageData(msg, canonicalSenderId);
+    const messageData = {
+      ...buildMessageData(msg, canonicalSenderId),
+      session_id: normalizeSessionId(sessionId),
+    };
     queueMessageInsert(messageData);
   }
 }
@@ -1029,17 +1080,36 @@ async function persistIncomingMessages(incomingMessages, type) {
  * @param {import('@whiskeysockets/baileys').WAMessageKey} key - Chave da mensagem.
  * @returns {Promise<import('@whiskeysockets/baileys').proto.IMessage | undefined>} Conteúdo da mensagem armazenada.
  */
-async function getStoredMessage(key) {
+async function getStoredMessage(key, sessionId = BAILEYS_PRIMARY_SESSION_ID) {
   const messageId = key?.id;
   const remoteJid = key?.remoteJid;
   if (!messageId || !remoteJid) return undefined;
 
   try {
-    const results = await findBy('messages', { message_id: messageId, chat_id: remoteJid }, { limit: 1 });
-    const record = results?.[0];
+    const safeSessionId = normalizeSessionId(sessionId);
+    let record = null;
+
+    try {
+      const rows = await executeQuery(
+        `SELECT raw_message
+           FROM ${TABLES.MESSAGES}
+          WHERE session_id = ? AND message_id = ? AND chat_id = ?
+          LIMIT 1`,
+        [safeSessionId, messageId, remoteJid],
+      );
+      record = rows?.[0] || null;
+    } catch (error) {
+      if (String(error?.code || '') !== 'ER_BAD_FIELD_ERROR') {
+        throw error;
+      }
+      const fallbackRows = await findBy('messages', { message_id: messageId, chat_id: remoteJid }, { limit: 1 });
+      record = fallbackRows?.[0] || null;
+    }
+
     const stored = safeJsonParse(record?.raw_message, null);
     if (record?.raw_message && !stored) {
       logger.error('Falha ao interpretar raw_message armazenado.', {
+        sessionId: safeSessionId,
         messageId,
         remoteJid,
       });
@@ -1047,6 +1117,7 @@ async function getStoredMessage(key) {
     return stored?.message ?? undefined;
   } catch (error) {
     logger.error('Erro ao buscar mensagem armazenada no banco:', {
+      sessionId: normalizeSessionId(sessionId),
       error: error.message,
       messageId,
       remoteJid,
@@ -1057,55 +1128,66 @@ async function getStoredMessage(key) {
 
 /**
  * Limpa o timeout de reconexão agendado, se houver.
+ * @param {string} sessionId
  * @returns {void}
  */
-const clearReconnectTimeout = () => {
-  if (!reconnectTimeout) return;
-  reconnectTimeout.cancel();
-  reconnectTimeout = null;
+const clearReconnectTimeout = (sessionId = BAILEYS_PRIMARY_SESSION_ID) => {
+  const context = getSessionContext(sessionId, { createIfMissing: false });
+  if (!context?.reconnectTimeout) return;
+  context.reconnectTimeout.cancel();
+  context.reconnectTimeout = null;
 };
 
 /**
  * Reseta o estado das tentativas de reconexão.
+ * @param {string} sessionId
  * @returns {void}
  */
-const resetReconnectState = () => {
-  connectionAttempts = 0;
-  reconnectWindowStartedAt = 0;
+const resetReconnectState = (sessionId = BAILEYS_PRIMARY_SESSION_ID) => {
+  const context = getSessionContext(sessionId);
+  context.connectionAttempts = 0;
+  context.reconnectWindowStartedAt = 0;
 };
 
 /**
  * Calcula o número da próxima tentativa de reconexão.
  * Reseta a contagem de tentativas se a janela de reconexão expirou.
+ * @param {string} sessionId
  * @returns {number} O número da próxima tentativa.
  */
-const getNextReconnectAttempt = () => {
+const getNextReconnectAttempt = (sessionId = BAILEYS_PRIMARY_SESSION_ID) => {
+  const context = getSessionContext(sessionId);
   const now = __timeNowMs();
-  if (!reconnectWindowStartedAt || now - reconnectWindowStartedAt >= BAILEYS_RECONNECT_ATTEMPT_RESET_MS) {
-    reconnectWindowStartedAt = now;
-    connectionAttempts = 0;
+  if (!context.reconnectWindowStartedAt || now - context.reconnectWindowStartedAt >= BAILEYS_RECONNECT_ATTEMPT_RESET_MS) {
+    context.reconnectWindowStartedAt = now;
+    context.connectionAttempts = 0;
   }
-  connectionAttempts += 1;
-  return connectionAttempts;
+  context.connectionAttempts += 1;
+  return context.connectionAttempts;
 };
 
 /**
  * Agenda uma reconexão com o WhatsApp após um determinado atraso.
  * Evita agendar múltiplas reconexões.
+ * @param {string} sessionId
  * @param {number} delay - O atraso em milissegundos antes de tentar a reconexão.
  * @returns {void}
  */
-const scheduleReconnect = (delay) => {
-  if (reconnectTimeout) return;
+const scheduleReconnect = (sessionId, delay) => {
+  const safeSessionId = normalizeSessionId(sessionId);
+  const context = getSessionContext(safeSessionId);
+  if (context.reconnectTimeout) return;
+
   const pendingReconnect = delayCancellable(Math.max(0, Number(delay) || 0));
-  reconnectTimeout = pendingReconnect;
+  context.reconnectTimeout = pendingReconnect;
   pendingReconnect.delay
     .then(() => {
-      if (reconnectTimeout !== pendingReconnect) return;
-      reconnectTimeout = null;
-      connectToWhatsApp().catch((error) => {
+      if (context.reconnectTimeout !== pendingReconnect) return;
+      context.reconnectTimeout = null;
+      connectToWhatsApp(safeSessionId).catch((error) => {
         logger.error('Falha ao executar reconexão agendada.', {
           action: 'reconnect_schedule_failure',
+          sessionId: safeSessionId,
           errorMessage: error?.message,
           stack: error?.stack,
           timestamp: __timeNowIso(),
@@ -1113,8 +1195,8 @@ const scheduleReconnect = (delay) => {
       });
     })
     .catch((error) => {
-      if (reconnectTimeout === pendingReconnect) {
-        reconnectTimeout = null;
+      if (context.reconnectTimeout === pendingReconnect) {
+        context.reconnectTimeout = null;
       }
       if (
         String(error?.message || '')
@@ -1125,6 +1207,7 @@ const scheduleReconnect = (delay) => {
       }
       logger.warn('Falha ao aguardar atraso da reconexão agendada.', {
         action: 'reconnect_schedule_delay_error',
+        sessionId: safeSessionId,
         errorMessage: error?.message,
       });
     });
@@ -1132,30 +1215,35 @@ const scheduleReconnect = (delay) => {
 
 /**
  * Libera lock de escritor único do Baileys, se estiver ativo.
+ * @param {string} sessionId
  * @param {string} reason
  * @returns {Promise<void>}
  */
-const releaseBaileysWriterLock = async (reason = 'unknown') => {
-  const connection = baileysWriterLockConnection;
+const releaseBaileysWriterLock = async (sessionId, reason = 'unknown') => {
+  const safeSessionId = normalizeSessionId(sessionId);
+  const context = getSessionContext(safeSessionId, { createIfMissing: false });
+  const connection = context?.writerLockConnection;
   if (!connection) return;
-
-  baileysWriterLockConnection = null;
+  const lockName = getWriterLockNameBySession(safeSessionId);
+  context.writerLockConnection = null;
 
   try {
-    const rows = await executeQuery('SELECT RELEASE_LOCK(?) AS released', [BAILEYS_SINGLE_WRITER_LOCK_NAME], connection);
+    const rows = await executeQuery('SELECT RELEASE_LOCK(?) AS released', [lockName], connection);
     const released = Number(rows?.[0]?.released) === 1;
     logger.info('Lock de escritor do Baileys liberado.', {
       action: 'baileys_writer_lock_released',
+      sessionId: safeSessionId,
       reason,
       released,
-      lockName: BAILEYS_SINGLE_WRITER_LOCK_NAME,
+      lockName,
       timestamp: __timeNowIso(),
     });
   } catch (error) {
     logger.warn('Falha ao liberar lock de escritor do Baileys.', {
       action: 'baileys_writer_lock_release_error',
+      sessionId: safeSessionId,
       reason,
-      lockName: BAILEYS_SINGLE_WRITER_LOCK_NAME,
+      lockName,
       errorMessage: error?.message,
       timestamp: __timeNowIso(),
     });
@@ -1173,27 +1261,33 @@ const releaseBaileysWriterLock = async (reason = 'unknown') => {
 
 /**
  * Garante lock de escritor único para a sessão do Baileys.
+ * @param {string} sessionId
  * @returns {Promise<boolean>}
  */
-const ensureBaileysWriterLock = async () => {
+const ensureBaileysWriterLock = async (sessionId) => {
   if (!BAILEYS_SINGLE_WRITER_LOCK_ENABLED) {
     return true;
   }
 
-  if (baileysWriterLockConnection) {
+  const safeSessionId = normalizeSessionId(sessionId);
+  const context = getSessionContext(safeSessionId);
+  const lockName = getWriterLockNameBySession(safeSessionId);
+
+  if (context.writerLockConnection) {
     return true;
   }
 
   const connection = await pool.getConnection();
 
   try {
-    const rows = await executeQuery('SELECT GET_LOCK(?, ?) AS lock_status', [BAILEYS_SINGLE_WRITER_LOCK_NAME, BAILEYS_SINGLE_WRITER_LOCK_TIMEOUT_SECONDS], connection);
+    const rows = await executeQuery('SELECT GET_LOCK(?, ?) AS lock_status', [lockName, BAILEYS_SINGLE_WRITER_LOCK_TIMEOUT_SECONDS], connection);
     const lockStatus = Number(rows?.[0]?.lock_status);
     if (lockStatus !== 1) {
       connection.release();
       logger.warn('Nao foi possivel adquirir lock de escritor do Baileys nesta tentativa.', {
         action: 'baileys_writer_lock_busy',
-        lockName: BAILEYS_SINGLE_WRITER_LOCK_NAME,
+        sessionId: safeSessionId,
+        lockName,
         timeoutSeconds: BAILEYS_SINGLE_WRITER_LOCK_TIMEOUT_SECONDS,
         status: Number.isFinite(lockStatus) ? lockStatus : null,
         retryAfterMs: BAILEYS_SINGLE_WRITER_LOCK_RETRY_DELAY_MS,
@@ -1202,10 +1296,11 @@ const ensureBaileysWriterLock = async () => {
       return false;
     }
 
-    baileysWriterLockConnection = connection;
+    context.writerLockConnection = connection;
     logger.info('Lock de escritor do Baileys adquirido com sucesso.', {
       action: 'baileys_writer_lock_acquired',
-      lockName: BAILEYS_SINGLE_WRITER_LOCK_NAME,
+      sessionId: safeSessionId,
+      lockName,
       timeoutSeconds: BAILEYS_SINGLE_WRITER_LOCK_TIMEOUT_SECONDS,
       timestamp: __timeNowIso(),
     });
@@ -1220,16 +1315,25 @@ const ensureBaileysWriterLock = async () => {
   }
 };
 
+const releaseAllBaileysWriterLocks = async (reason = 'unknown') => {
+  const targets = Array.from(sessionContexts.keys());
+  if (!targets.length) {
+    await releaseBaileysWriterLock(BAILEYS_PRIMARY_SESSION_ID, reason).catch(() => {});
+    return;
+  }
+  await Promise.allSettled(targets.map((sessionId) => releaseBaileysWriterLock(sessionId, reason)));
+};
+
 process.once('beforeExit', () => {
-  releaseBaileysWriterLock('before_exit').catch(() => {});
+  releaseAllBaileysWriterLocks('before_exit').catch(() => {});
 });
 
 process.once('SIGINT', () => {
-  releaseBaileysWriterLock('sigint').catch(() => {});
+  releaseAllBaileysWriterLocks('sigint').catch(() => {});
 });
 
 process.once('SIGTERM', () => {
-  releaseBaileysWriterLock('sigterm').catch(() => {});
+  releaseAllBaileysWriterLocks('sigterm').catch(() => {});
 });
 
 /**
@@ -1316,31 +1420,36 @@ const syncGroupsOnConnectionOpen = async (sock) => {
  * @returns {Promise<void>} Conclusão da inicialização e do registro de handlers.
  * @throws {Error} Lança erro se a conexão inicial falhar.
  */
-export async function connectToWhatsApp() {
-  if (connectPromise) {
-    return connectPromise;
+export async function connectToWhatsApp(sessionId = BAILEYS_PRIMARY_SESSION_ID) {
+  const safeSessionId = normalizeSessionId(sessionId);
+  const context = getSessionContext(safeSessionId);
+
+  if (context.connectPromise) {
+    return context.connectPromise;
   }
 
-  if (isSocketOpen(activeSocket)) {
+  if (isSocketOpen(context.socket)) {
     return;
   }
 
   logger.info('Iniciando conexão com o WhatsApp...', {
     action: 'connect_init',
+    sessionId: safeSessionId,
     timestamp: __timeNowIso(),
   });
-  connectPromise = (async () => {
-    clearReconnectTimeout();
-    const isWriterReady = await ensureBaileysWriterLock();
+
+  const currentConnectPromise = (async () => {
+    clearReconnectTimeout(safeSessionId);
+    const isWriterReady = await ensureBaileysWriterLock(safeSessionId);
     if (!isWriterReady) {
-      scheduleReconnect(BAILEYS_SINGLE_WRITER_LOCK_RETRY_DELAY_MS);
+      scheduleReconnect(safeSessionId, BAILEYS_SINGLE_WRITER_LOCK_RETRY_DELAY_MS);
       return;
     }
 
-    const generation = ++socketGeneration;
+    const generation = ++context.socketGeneration;
     const legacyAuthPath = path.join(__dirname, 'auth');
     const { state, saveCreds } = await useDbAuthState({
-      sessionId: BAILEYS_AUTH_SESSION_ID,
+      sessionId: safeSessionId,
       bootstrapFromDir: legacyAuthPath,
       bootstrapFromFiles: BAILEYS_AUTH_BOOTSTRAP_FROM_FILES,
     });
@@ -1348,7 +1457,8 @@ export async function connectToWhatsApp() {
     const version = await resolveBaileysVersion();
 
     logger.debug('Dados de autenticação carregados com sucesso.', {
-      authSessionId: BAILEYS_AUTH_SESSION_ID,
+      sessionId: safeSessionId,
+      authSessionId: safeSessionId,
       bootstrappedFromFiles: BAILEYS_AUTH_BOOTSTRAP_FROM_FILES,
       version,
       generation,
@@ -1366,7 +1476,7 @@ export async function connectToWhatsApp() {
       msgRetryCounterCache,
       maxMsgRetryCount: 5,
       retryRequestDelayMs: 250,
-      getMessage: getStoredMessage,
+      getMessage: (key) => getStoredMessage(key, safeSessionId),
       userDevicesCache,
       mediaCache,
       cachedGroupMetadata: resolveCachedGroupMetadata,
@@ -1378,15 +1488,20 @@ export async function connectToWhatsApp() {
 
     const sock = makeWASocket(socketConfig);
 
-    activeSocket = sock;
-    storeActiveSocket(sock);
+    context.socket = sock;
+    storeActiveSocket(sock, safeSessionId);
+    syncLegacyActiveSocketReference();
 
-    const isCurrentSocket = () => activeSocket === sock && generation === socketGeneration;
+    const isCurrentSocket = () => {
+      const latest = getSessionContext(safeSessionId, { createIfMissing: false });
+      return Boolean(latest && latest.socket === sock && latest.socketGeneration === generation);
+    };
 
     sock.ev.on('creds.update', async () => {
       if (!isCurrentSocket()) return;
       logger.debug('Atualizando credenciais de autenticação...', {
         action: 'creds_update',
+        sessionId: safeSessionId,
         timestamp: __timeNowIso(),
       });
       await saveCreds();
@@ -1394,12 +1509,13 @@ export async function connectToWhatsApp() {
 
     sock.ev.on('connection.update', (update) => {
       if (!isCurrentSocket()) return;
-      handleConnectionUpdate(update, sock);
+      handleConnectionUpdate(update, sock, safeSessionId, generation);
       if (update.connection === 'open') {
         syncNewsBroadcastService();
       }
       logger.debug('Estado da conexão atualizado.', {
         action: 'connection_update',
+        sessionId: safeSessionId,
         status: update.connection,
         lastDisconnect: update.lastDisconnect?.error?.message || null,
         isNewLogin: update.isNewLogin || false,
@@ -1415,12 +1531,14 @@ export async function connectToWhatsApp() {
       try {
         logger.debug('Novo(s) evento(s) em messages.upsert', {
           action: 'messages_upsert',
+          sessionId: safeSessionId,
           type: update.type,
           messagesCount: update.messages.length,
           remoteJid: update.messages[0]?.key.remoteJid || null,
         });
-        const persistPromise = persistIncomingMessages(update.messages, update.type).catch((error) => {
+        const persistPromise = persistIncomingMessages(update.messages, update.type, safeSessionId).catch((error) => {
           logger.error('Erro ao persistir mensagens no banco de dados:', {
+            sessionId: safeSessionId,
             error: error.message,
           });
           recordError('messages_upsert');
@@ -1442,6 +1560,7 @@ export async function connectToWhatsApp() {
         });
       } catch (error) {
         logger.error('Erro no evento messages.upsert:', {
+          sessionId: safeSessionId,
           error: error.message,
           stack: error.stack,
           action: 'messages_upsert_error',
@@ -1476,6 +1595,7 @@ export async function connectToWhatsApp() {
       for (const chatId of deletions) {
         remove('chats', chatId).catch((error) => {
           logger.error('Erro ao remover chat do banco:', {
+            sessionId: safeSessionId,
             error: error.message,
             chatId,
           });
@@ -1493,6 +1613,7 @@ export async function connectToWhatsApp() {
           invalidateCachedGroupMetadata(group.id);
         } catch (error) {
           logger.error('Erro no upsert do grupo:', {
+            sessionId: safeSessionId,
             error: error.message,
             groupId: group.id,
           });
@@ -1519,6 +1640,7 @@ export async function connectToWhatsApp() {
         queueLidUpdate(lid, pnJid, 'lid-mapping');
       } catch (error) {
         logger.warn('Falha ao processar lid-mapping.update para lid_map.', {
+          sessionId: safeSessionId,
           error: error.message,
         });
       }
@@ -1529,11 +1651,13 @@ export async function connectToWhatsApp() {
       try {
         logger.debug('Atualização de mensagens recebida.', {
           action: 'messages_update',
+          sessionId: safeSessionId,
           updatesCount: update.length,
         });
         handleMessageUpdate(update, sock);
       } catch (error) {
         logger.error('Erro no evento messages.update:', {
+          sessionId: safeSessionId,
           error: error.message,
           stack: error.stack,
           action: 'messages_update_error',
@@ -1550,6 +1674,7 @@ export async function connectToWhatsApp() {
         const firstError = erroredUpdates[0]?.error;
         logger.warn('Falha reportada em atualização de mídia.', {
           action: 'messages_media_update_error',
+          sessionId: safeSessionId,
           updatesCount: updates.length,
           errorCount: erroredUpdates.length,
           firstMessageId: erroredUpdates[0]?.key?.id || null,
@@ -1561,6 +1686,7 @@ export async function connectToWhatsApp() {
 
       logger.debug('Atualização de mídia de mensagem recebida.', {
         action: 'messages_media_update',
+        sessionId: safeSessionId,
         updatesCount: updates.length,
       });
     });
@@ -1582,6 +1708,7 @@ export async function connectToWhatsApp() {
 
       logger.debug('Atualização de recibos de mensagem recebida.', {
         action: 'message_receipt_update',
+        sessionId: safeSessionId,
         updatesCount: updates.length,
         receiptTypes: Array.from(receiptTypes),
         invalidReceiptTypeCount,
@@ -1621,6 +1748,7 @@ export async function connectToWhatsApp() {
         }
       } catch (error) {
         logger.error('Erro no evento messages.reaction:', {
+          sessionId: safeSessionId,
           error: error.message,
           stack: error.stack,
           action: 'messages_reaction_error',
@@ -1633,12 +1761,14 @@ export async function connectToWhatsApp() {
       try {
         logger.debug('Grupo(s) atualizado(s).', {
           action: 'groups_update',
+          sessionId: safeSessionId,
           groupCount: updates.length,
           groupIds: updates.map((u) => u.id),
         });
         handleGroupUpdate(updates);
       } catch (err) {
         logger.error('Erro no evento groups.update:', {
+          sessionId: safeSessionId,
           error: err.message,
           stack: err.stack,
           action: 'groups_update_error',
@@ -1651,6 +1781,7 @@ export async function connectToWhatsApp() {
       try {
         logger.debug('Participantes do grupo atualizados.', {
           action: 'group_participants_update',
+          sessionId: safeSessionId,
           groupId: update.id,
           actionType: update.action,
           participants: update.participants,
@@ -1659,6 +1790,7 @@ export async function connectToWhatsApp() {
         handleGroupParticipantsEvent(sock, update.id, update.participants, update.action);
       } catch (err) {
         logger.error('Erro no evento group-participants.update:', {
+          sessionId: safeSessionId,
           error: err.message,
           stack: err.stack,
           action: 'group_participants_update_error',
@@ -1671,6 +1803,7 @@ export async function connectToWhatsApp() {
       try {
         logger.debug('Solicitação de entrada no grupo recebida.', {
           action: 'group_join_request',
+          sessionId: safeSessionId,
           groupId: update?.id,
           participant: update?.participant,
           method: update?.method,
@@ -1679,6 +1812,7 @@ export async function connectToWhatsApp() {
         handleGroupJoinRequest(sock, update);
       } catch (err) {
         logger.error('Erro no evento group.join-request:', {
+          sessionId: safeSessionId,
           error: err.message,
           stack: err.stack,
           action: 'group_join_request_error',
@@ -1704,6 +1838,7 @@ export async function connectToWhatsApp() {
           await sock.rejectCall(call.id, call.from);
           logger.info('Chamada recebida rejeitada automaticamente.', {
             action: 'call_auto_reject',
+            sessionId: safeSessionId,
             callId: call.id,
             from: call.from,
             isGroup: call.isGroup || false,
@@ -1713,6 +1848,7 @@ export async function connectToWhatsApp() {
         } catch (error) {
           logger.warn('Falha ao rejeitar chamada automaticamente.', {
             action: 'call_auto_reject_failed',
+            sessionId: safeSessionId,
             callId: call?.id || null,
             from: call?.from || null,
             error: error?.message,
@@ -1722,19 +1858,45 @@ export async function connectToWhatsApp() {
     });
 
     registerBaileysEventLoggers(sock);
-    registerBaileysEventJournal(sock, generation);
+    registerBaileysEventJournal(sock, generation, safeSessionId);
 
     logger.info('Conexão com o WhatsApp estabelecida com sucesso.', {
       action: 'connect_success',
+      sessionId: safeSessionId,
       generation,
       timestamp: __timeNowIso(),
     });
   })();
 
+  context.connectPromise = currentConnectPromise;
+
   try {
-    await connectPromise;
+    await currentConnectPromise;
   } finally {
-    connectPromise = null;
+    if (context.connectPromise === currentConnectPromise) {
+      context.connectPromise = null;
+    }
+  }
+}
+
+/**
+ * Conecta todas as sessões configuradas no runtime.
+ * @returns {Promise<void>}
+ */
+export async function connectAllWhatsAppSessions() {
+  const results = await Promise.allSettled(BAILEYS_SESSION_IDS.map((sessionId) => connectToWhatsApp(sessionId)));
+  const failures = results
+    .map((result, index) => ({ result, sessionId: BAILEYS_SESSION_IDS[index] }))
+    .filter(({ result }) => result.status === 'rejected');
+
+  if (failures.length > 0) {
+    const error = new Error(`Falha ao conectar ${failures.length}/${BAILEYS_SESSION_IDS.length} sessões do WhatsApp.`);
+    // @ts-ignore enrich error object for logs
+    error.failures = failures.map(({ sessionId, result }) => ({
+      sessionId,
+      message: result.reason?.message || String(result.reason || ''),
+    }));
+    throw error;
   }
 }
 
@@ -1744,15 +1906,23 @@ export async function connectToWhatsApp() {
  * @async
  * @param {import('@whiskeysockets/baileys').ConnectionState} update - Objeto contendo o estado atual da conexão.
  * @param {import('@whiskeysockets/baileys').WASocket} sock - Instância do socket do WhatsApp que disparou a atualização.
+ * @param {string} sessionId - Sessão do socket.
+ * @param {number} generation - Geração do socket.
  * @returns {Promise<void>} Uma promessa que resolve quando o processamento do estado da conexão é concluído.
  */
-async function handleConnectionUpdate(update, sock) {
-  if (sock !== activeSocket) return;
+async function handleConnectionUpdate(update, sock, sessionId, generation) {
+  const safeSessionId = normalizeSessionId(sessionId);
+  const context = getSessionContext(safeSessionId, { createIfMissing: false });
+  if (!context) return;
+  if (context.socket !== sock) return;
+  if (context.socketGeneration !== generation) return;
+
   const { connection, lastDisconnect, qr } = update;
 
   if (qr) {
     logger.info('📱 QR Code gerado! Escaneie com seu WhatsApp.', {
       action: 'qr_code_generated',
+      sessionId: safeSessionId,
       timestamp: __timeNowIso(),
     });
     qrcode.generate(qr, { small: true });
@@ -1765,11 +1935,12 @@ async function handleConnectionUpdate(update, sock) {
     const shouldReconnect = lastDisconnect?.error instanceof Boom && disconnectCode !== DisconnectReason.loggedOut;
 
     if (shouldReconnect) {
-      const attempt = getNextReconnectAttempt();
+      const attempt = getNextReconnectAttempt(safeSessionId);
       if (attempt <= MAX_CONNECTION_ATTEMPTS) {
         const reconnectDelay = INITIAL_RECONNECT_DELAY * Math.pow(2, attempt - 1);
         logger.warn(`⚠️ Conexão perdida. Tentando reconectar...`, {
           action: 'reconnect_attempt',
+          sessionId: safeSessionId,
           attempt,
           maxAttempts: MAX_CONNECTION_ATTEMPTS,
           delay: reconnectDelay,
@@ -1777,12 +1948,14 @@ async function handleConnectionUpdate(update, sock) {
           errorMessage,
           timestamp: __timeNowIso(),
         });
-        activeSocket = null;
-        storeActiveSocket(null);
-        scheduleReconnect(reconnectDelay);
+        context.socket = null;
+        storeActiveSocket(null, safeSessionId);
+        syncLegacyActiveSocketReference();
+        scheduleReconnect(safeSessionId, reconnectDelay);
       } else {
         logger.error('❌ Limite de tentativas atingido; aguardando janela para novo retry.', {
           action: 'reconnect_backoff_window',
+          sessionId: safeSessionId,
           totalAttempts: attempt,
           maxAttempts: MAX_CONNECTION_ATTEMPTS,
           retryAfterMs: BAILEYS_RECONNECT_ATTEMPT_RESET_MS,
@@ -1790,38 +1963,43 @@ async function handleConnectionUpdate(update, sock) {
           errorMessage,
           timestamp: __timeNowIso(),
         });
-        activeSocket = null;
-        storeActiveSocket(null);
-        connectionAttempts = 0;
-        reconnectWindowStartedAt = __timeNowMs();
-        scheduleReconnect(BAILEYS_RECONNECT_ATTEMPT_RESET_MS);
+        context.socket = null;
+        storeActiveSocket(null, safeSessionId);
+        syncLegacyActiveSocketReference();
+        context.connectionAttempts = 0;
+        context.reconnectWindowStartedAt = __timeNowMs();
+        scheduleReconnect(safeSessionId, BAILEYS_RECONNECT_ATTEMPT_RESET_MS);
       }
     } else {
       logger.error('❌ Conexão fechada definitivamente.', {
         action: 'connection_closed',
+        sessionId: safeSessionId,
         reasonCode: disconnectCode,
         errorMessage,
         timestamp: __timeNowIso(),
       });
-      activeSocket = null;
-      storeActiveSocket(null);
-      await releaseBaileysWriterLock('connection_closed_no_reconnect');
+      context.socket = null;
+      storeActiveSocket(null, safeSessionId);
+      syncLegacyActiveSocketReference();
+      await releaseBaileysWriterLock(safeSessionId, 'connection_closed_no_reconnect');
     }
   }
 
   if (connection === 'open') {
     logger.info('✅ Conectado com sucesso ao WhatsApp!', {
       action: 'connection_open',
+      sessionId: safeSessionId,
       timestamp: __timeNowIso(),
     });
 
-    resetReconnectState();
-    clearReconnectTimeout();
+    resetReconnectState(safeSessionId);
+    clearReconnectTimeout(safeSessionId);
 
     if (process.send) {
       process.send('ready');
       logger.info('🟢 Sinal de "ready" enviado ao PM2.', {
         action: 'pm2_ready_signal',
+        sessionId: safeSessionId,
         timestamp: __timeNowIso(),
       });
     }
@@ -1831,6 +2009,7 @@ async function handleConnectionUpdate(update, sock) {
     } catch (error) {
       logger.error('❌ Erro ao carregar metadados de grupos na conexão.', {
         action: 'groups_load_error',
+        sessionId: safeSessionId,
         errorMessage: error.message,
         stack: error.stack,
         timeoutMs: GROUP_SYNC_TIMEOUT_MS,
@@ -1953,12 +2132,24 @@ async function handleGroupUpdate(updates) {
  * @returns {import('@whiskeysockets/baileys').WASocket | null} O objeto socket do Baileys ativo ou `null` se não houver conexão ativa.
  */
 export function getActiveSocket() {
+  syncLegacyActiveSocketReference();
   logger.debug('🔍 Recuperando instância do socket ativo.', {
     action: 'get_active_socket',
     socketExists: !!activeSocket,
     timestamp: __timeNowIso(),
   });
   return activeSocket;
+}
+
+/**
+ * Retorna o socket de uma sessão específica.
+ * @param {string} sessionId
+ * @returns {import('@whiskeysockets/baileys').WASocket | null}
+ */
+export function getSocketBySession(sessionId = BAILEYS_PRIMARY_SESSION_ID) {
+  const safeSessionId = normalizeSessionId(sessionId);
+  const context = getSessionContext(safeSessionId, { createIfMissing: false });
+  return context?.socket || null;
 }
 
 /**
@@ -1970,6 +2161,7 @@ export function getActiveSocket() {
  * @throws {Boom} Retorna um erro HTTP 503 se o socket não estiver disponível, ou 501 se o método não existir.
  */
 async function runControllerSocketMethod(methodName, ...args) {
+  const socket = getActiveSocket();
   try {
     return await runActiveSocketMethod(methodName, ...args);
   } catch (error) {
@@ -1977,8 +2169,8 @@ async function runControllerSocketMethod(methodName, ...args) {
     if (message.includes('Socket do WhatsApp indisponível')) {
       logger.warn('Socket ativo indisponível para operação.', {
         action: methodName,
-        socketExists: !!activeSocket,
-        socketOpen: isSocketOpen(activeSocket),
+        socketExists: !!socket,
+        socketOpen: isSocketOpen(socket),
         timestamp: __timeNowIso(),
       });
       throw new Boom('Socket do WhatsApp indisponível no momento.', { statusCode: 503 });
@@ -2207,23 +2399,69 @@ export async function rejectCall(callId, callFrom) {
  * Encerra o socket ativo atual, se existir, para disparar a lógica de reconexão.
  * Se nenhum socket estiver ativo, inicia uma nova conexão.
  * @async
+ * @param {string} [sessionId=BAILEYS_PRIMARY_SESSION_ID]
  * @returns {Promise<void>} Uma promessa que resolve quando o fluxo de reconexão é iniciado ou uma nova conexão é tentada.
  */
-export async function reconnectToWhatsApp() {
-  // eslint-disable-next-line no-undef
-  if (activeSocket && activeSocket.ws?.readyState === WebSocket.OPEN) {
+export async function reconnectToWhatsApp(sessionId = BAILEYS_PRIMARY_SESSION_ID) {
+  const safeSessionId = normalizeSessionId(sessionId);
+  const targetSocket = getSocketBySession(safeSessionId);
+  if (targetSocket && isSocketOpen(targetSocket)) {
     logger.info('♻️ Forçando fechamento do socket para reconectar...', {
       action: 'force_reconnect',
+      sessionId: safeSessionId,
       timestamp: __timeNowIso(),
     });
-    activeSocket.ws.close();
+    targetSocket.ws?.close?.();
   } else {
     logger.warn('⚠️ Nenhum socket ativo detectado. Iniciando nova conexão manualmente.', {
       action: 'reconnect_no_active_socket',
+      sessionId: safeSessionId,
       timestamp: __timeNowIso(),
     });
-    await connectToWhatsApp();
+    await connectToWhatsApp(safeSessionId);
   }
+}
+
+/**
+ * Encerra todas as sessões ativas no processo.
+ * @param {{ releaseLocks?: boolean }} [options]
+ * @returns {Promise<void>}
+ */
+export async function disconnectAllWhatsAppSessions(options = {}) {
+  const { releaseLocks = true } = options;
+  const targetSessionIds = Array.from(new Set([...BAILEYS_SESSION_IDS, ...sessionContexts.keys()]));
+
+  await Promise.allSettled(
+    targetSessionIds.map(async (sessionId) => {
+      const safeSessionId = normalizeSessionId(sessionId);
+      const context = getSessionContext(safeSessionId, { createIfMissing: false });
+      if (!context) return;
+
+      clearReconnectTimeout(safeSessionId);
+
+      const socket = context.socket;
+      context.socket = null;
+      context.connectPromise = null;
+      storeActiveSocket(null, safeSessionId);
+
+      if (socket && typeof socket.end === 'function') {
+        try {
+          await socket.end();
+        } catch (error) {
+          logger.warn('Falha ao encerrar sessão do WhatsApp.', {
+            action: 'disconnect_session_failed',
+            sessionId: safeSessionId,
+            errorMessage: error?.message,
+          });
+        }
+      }
+    }),
+  );
+
+  if (releaseLocks) {
+    await releaseAllBaileysWriterLocks('disconnect_all_sessions');
+  }
+  syncLegacyActiveSocketReference();
 }
 
 if (process.argv[1] === __filename) {

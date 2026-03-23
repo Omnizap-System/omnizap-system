@@ -13,6 +13,7 @@ import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
+import { getMultiSessionRuntimeConfig } from './sessionConfig.js';
 
 /**
  * Utilitários centrais de integração com Baileys.
@@ -78,23 +79,94 @@ import { fileURLToPath } from 'node:url';
  */
 
 const DEFAULT_BAILEYS_VERSION = [7, 0, 0];
+const multiSessionRuntimeConfig = getMultiSessionRuntimeConfig();
+const PRIMARY_BAILEYS_SESSION_ID = String(multiSessionRuntimeConfig?.primarySessionId || process.env.BAILEYS_AUTH_SESSION_ID || 'default').trim() || 'default';
 
+const normalizeSessionId = (sessionId) => {
+  const normalized = String(sessionId || '').trim();
+  return normalized || PRIMARY_BAILEYS_SESSION_ID;
+};
+
+const sessionSocketMap = new Map();
 let activeSocket = null;
 
 /**
- * Atualiza a referência global do socket ativo.
+ * Atualiza a referência global do socket ativo e o registro por sessão.
+ * Mantém compatibilidade com chamadas legadas que não informam `sessionId`.
  * @param {BaileysSocket|null} socket Instância conectada ou `null` para limpar.
+ * @param {string} [sessionId=PRIMARY_BAILEYS_SESSION_ID] Sessão da conexão.
  * @returns {void}
  */
-export const setActiveSocket = (socket) => {
-  activeSocket = socket;
+export const setActiveSocket = (socket, sessionId = PRIMARY_BAILEYS_SESSION_ID) => {
+  const safeSessionId = normalizeSessionId(sessionId);
+  const previousSocket = sessionSocketMap.get(safeSessionId) || null;
+
+  if (socket) {
+    sessionSocketMap.set(safeSessionId, socket);
+  } else {
+    sessionSocketMap.delete(safeSessionId);
+  }
+
+  if (safeSessionId === PRIMARY_BAILEYS_SESSION_ID) {
+    activeSocket = socket || null;
+  } else if (!socket && previousSocket && activeSocket === previousSocket) {
+    activeSocket = null;
+  }
+
+  if (!activeSocket) {
+    activeSocket = sessionSocketMap.get(PRIMARY_BAILEYS_SESSION_ID) || sessionSocketMap.values().next()?.value || null;
+  }
+};
+
+/**
+ * Atualiza o socket ativo de uma sessão específica.
+ * @param {string} sessionId Sessão alvo.
+ * @param {BaileysSocket|null} socket Instância conectada ou `null`.
+ * @returns {void}
+ */
+export const setSocketBySession = (sessionId, socket) => {
+  setActiveSocket(socket, sessionId);
 };
 
 /**
  * Retorna a instância de socket ativa no processo.
  * @returns {BaileysSocket|null}
  */
-export const getActiveSocket = () => activeSocket;
+export const getActiveSocket = () => {
+  if (isSocketOpen(activeSocket)) return activeSocket;
+
+  const primarySocket = sessionSocketMap.get(PRIMARY_BAILEYS_SESSION_ID) || null;
+  if (isSocketOpen(primarySocket)) {
+    activeSocket = primarySocket;
+    return activeSocket;
+  }
+
+  for (const socket of sessionSocketMap.values()) {
+    if (isSocketOpen(socket)) {
+      activeSocket = socket;
+      return activeSocket;
+    }
+  }
+
+  activeSocket = null;
+  return activeSocket;
+};
+
+/**
+ * Retorna o socket ativo associado a uma sessão.
+ * @param {string} [sessionId=PRIMARY_BAILEYS_SESSION_ID]
+ * @returns {BaileysSocket|null}
+ */
+export const getSocketBySession = (sessionId = PRIMARY_BAILEYS_SESSION_ID) => {
+  const safeSessionId = normalizeSessionId(sessionId);
+  return sessionSocketMap.get(safeSessionId) || null;
+};
+
+/**
+ * Snapshot dos sockets ativos por sessão.
+ * @returns {Map<string, BaileysSocket>}
+ */
+export const getActiveSocketsBySession = () => new Map(sessionSocketMap);
 
 /**
  * Indica se uma instância de socket está aberta para operações.
@@ -140,6 +212,15 @@ export const runSocketMethod = async (socket, methodName, ...args) => {
  * @returns {Promise<any>}
  */
 export const runActiveSocketMethod = async (methodName, ...args) => runSocketMethod(activeSocket, methodName, ...args);
+
+/**
+ * Executa um método no socket de uma sessão específica.
+ * @param {string} sessionId Sessão alvo.
+ * @param {string} methodName Nome do método no socket.
+ * @param {...any} args Argumentos do método.
+ * @returns {Promise<any>}
+ */
+export const runSessionSocketMethod = async (sessionId, methodName, ...args) => runSocketMethod(getSocketBySession(sessionId), methodName, ...args);
 
 /**
  * Recupera a blocklist da conta conectada.
@@ -1100,10 +1181,7 @@ const BACKFILL_SOURCE = 'backfill';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const BAILEYS_AUTH_DIR = path.resolve(__dirname, '../connection/auth');
-const BAILEYS_AUTH_SESSION_ID = (() => {
-  const raw = String(process.env.BAILEYS_AUTH_SESSION_ID || '').trim();
-  return raw || 'default';
-})();
+const BAILEYS_AUTH_SESSION_ID = PRIMARY_BAILEYS_SESSION_ID;
 
 const lidCache = new Map();
 const lidWriteBuffer = new Map();

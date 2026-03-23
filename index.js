@@ -18,8 +18,8 @@
 import 'dotenv/config';
 
 import logger from '#logger';
-import { connectToWhatsApp, getActiveSocket } from './app/connection/socketController.js';
-import { backfillLidMapFromMessagesOnce } from './app/config/index.js';
+import { connectAllWhatsAppSessions, disconnectAllWhatsAppSessions } from './app/connection/socketController.js';
+import { backfillLidMapFromMessagesOnce, getMultiSessionRuntimeConfig } from './app/config/index.js';
 import { initializeNewsBroadcastService, stopNewsBroadcastService } from './app/services/messaging/newsBroadcastService.js';
 import initializeDatabase from './database/init.js';
 import { startHttpServer, stopHttpServer } from './server/index.js';
@@ -188,6 +188,21 @@ async function closeDatabasePool() {
 async function startApp() {
   try {
     logger.info('Iniciando Omnizap...');
+    const multiSessionConfig = getMultiSessionRuntimeConfig();
+    logger.info('Configuracao de sessoes WhatsApp carregada.', {
+      sessionIds: multiSessionConfig.sessionIds,
+      primarySessionId: multiSessionConfig.primarySessionId,
+      sessionWeights: multiSessionConfig.sessionWeights,
+      ownerEnforcementMode: multiSessionConfig.ownerEnforcementMode,
+      ownerLeaseMs: multiSessionConfig.ownerLeaseMs,
+      ownerHeartbeatMs: multiSessionConfig.ownerHeartbeatMs,
+      balancerEnabled: multiSessionConfig.balancerEnabled,
+    });
+    if (multiSessionConfig.warnings.length > 0) {
+      logger.warn('Ajustes aplicados na configuracao multi-sessao do WhatsApp.', {
+        warnings: multiSessionConfig.warnings,
+      });
+    }
 
     const shouldValidateCommandConfigs = process.env.COMMAND_CONFIG_VALIDATE_ON_BOOT !== 'false';
     if (shouldValidateCommandConfigs) {
@@ -244,9 +259,10 @@ async function startApp() {
         });
     }
 
-    logger.info('Conectando ao WhatsApp...');
-    await withTimeout(connectToWhatsApp(), WHATSAPP_CONNECT_TIMEOUT_MS, 'Conexao WhatsApp');
-    logger.info('WhatsApp conectado.');
+    logger.info('Conectando sessoes do WhatsApp...');
+    const sessionConnectTimeoutMs = Math.max(WHATSAPP_CONNECT_TIMEOUT_MS, multiSessionConfig.sessionIds.length * WHATSAPP_CONNECT_TIMEOUT_MS);
+    await withTimeout(connectAllWhatsAppSessions(), sessionConnectTimeoutMs, 'Conexao WhatsApp (multi-session)');
+    logger.info('Sessoes do WhatsApp conectadas.');
 
     logger.info('Inicializando servico de noticias...');
     await initializeNewsBroadcastService();
@@ -324,19 +340,16 @@ async function shutdown(signal, error) {
       }
     }
 
-    // 3) Encerrar conexão WhatsApp
-    const sock = getActiveSocket();
-    if (sock) {
-      try {
-        logger.info('Encerrando conexão do WhatsApp...');
-        await withTimeout(sock.end(), 8000, 'Encerramento WhatsApp');
-        logger.info('Conexao do WhatsApp encerrada.');
-      } catch (sockError) {
-        logger.error('Erro ao encerrar a conexão do WhatsApp:', {
-          error: sockError.message,
-          stack: sockError.stack,
-        });
-      }
+    // 3) Encerrar conexões WhatsApp
+    try {
+      logger.info('Encerrando sessoes do WhatsApp...');
+      await withTimeout(disconnectAllWhatsAppSessions(), 12000, 'Encerramento WhatsApp multi-session');
+      logger.info('Sessoes do WhatsApp encerradas.');
+    } catch (sockError) {
+      logger.error('Erro ao encerrar conexões do WhatsApp:', {
+        error: sockError.message,
+        stack: sockError.stack,
+      });
     }
 
     // 4) Encerrar servidor HTTP
