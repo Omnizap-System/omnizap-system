@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-theme="night">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -11,103 +11,15 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Manrope:wght@400;600&display=swap" rel="stylesheet" />
-    <style>
-      :root {
-        --text: #ffe8ee;
-        --muted: #f2b8c8;
-        --danger: #fb7185;
-      }
-
-      body {
-        margin: 0;
-        min-height: 100vh;
-        display: grid;
-        place-items: center;
-        padding: 24px;
-        color: var(--text);
-        font-family: 'Manrope', system-ui, sans-serif;
-        background: radial-gradient(36rem 18rem at 12% -8%, rgba(251, 113, 133, 0.3), transparent 62%), radial-gradient(36rem 18rem at 100% 100%, rgba(239, 68, 68, 0.26), transparent 62%), linear-gradient(160deg, #2b1218, #1e0b10);
-      }
-
-      .card {
-        width: min(620px, 100%);
-        border: 1px solid rgba(253, 166, 180, 0.35);
-        border-radius: 20px;
-        background: rgba(52, 19, 28, 0.82);
-        box-shadow:
-          0 24px 60px rgba(0, 0, 0, 0.44),
-          inset 0 1px 0 rgba(255, 214, 223, 0.1);
-        padding: 28px;
-      }
-
-      h1 {
-        margin: 0;
-        font-family: 'Sora', sans-serif;
-        font-size: clamp(30px, 5vw, 42px);
-        line-height: 1.1;
-      }
-
-      p {
-        margin: 12px 0 0;
-        color: var(--muted);
-        font-size: 16px;
-      }
-
-      .note {
-        margin-top: 16px;
-        border: 1px solid rgba(252, 165, 165, 0.3);
-        border-radius: 12px;
-        background: rgba(74, 22, 33, 0.72);
-        padding: 12px;
-        font-size: 14px;
-        color: #ffd4de;
-      }
-
-      .actions {
-        margin-top: 20px;
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-      }
-
-      .button {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-height: 44px;
-        border-radius: 12px;
-        padding: 0 14px;
-        text-decoration: none;
-        font-family: 'Sora', sans-serif;
-        font-size: 12px;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-      }
-
-      .button.retry {
-        border: 0;
-        color: #28080f;
-        background: linear-gradient(120deg, #fb7185, #f43f5e);
-      }
-
-      .button.home {
-        border: 1px solid rgba(253, 166, 180, 0.4);
-        color: var(--text);
-        background: rgba(78, 27, 39, 0.75);
-      }
-    </style>
+    <link rel="stylesheet" href="/assets/css/payments-react.css" />
   </head>
-  <body>
-    <main class="card">
-      <h1>Pagamento cancelado</h1>
-      <p>Nenhuma cobranca foi finalizada. Se quiser, voce pode tentar novamente agora.</p>
+  <body class="payments-body payments-body-cancel">
+    <div
+      id="payments-cancel-react-root"
+      data-payments-path="/pagamentos/"
+      data-home-path="/"
+    ></div>
 
-      <div class="note">Quando o checkout for concluido, o webhook do Stripe libera seu Premium automaticamente.</div>
-
-      <div class="actions">
-        <a class="button retry" href="/pagamentos/">Tentar novamente</a>
-        <a class="button home" href="/">Voltar para home</a>
-      </div>
-    </main>
+    <script type="module" src="/assets/js/payments-cancel-react.bundle.js"></script>
   </body>
 </html>

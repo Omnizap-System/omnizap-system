@@ -32,6 +32,9 @@ export default defineConfig({
         'stickers-react': path.join(projectRoot, 'public', 'js', 'apps', 'stickersApp.js'),
         'create-pack-react': path.join(projectRoot, 'public', 'js', 'apps', 'createPackApp.js'),
         'stickers-admin': path.join(projectRoot, 'public', 'js', 'apps', 'stickersAdminApp.js'),
+        'payments-react': path.join(projectRoot, 'public', 'js', 'apps', 'paymentsReactApp.js'),
+        'payments-success-react': path.join(projectRoot, 'public', 'js', 'apps', 'paymentsSuccessReactApp.js'),
+        'payments-cancel-react': path.join(projectRoot, 'public', 'js', 'apps', 'paymentsCancelReactApp.js'),
         'user-systemadm': path.join(projectRoot, 'public', 'js', 'apps', 'userSystemAdmReactApp.js'),
       },
       output: {

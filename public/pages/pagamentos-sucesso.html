@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-theme="night">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -11,198 +11,16 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;700;800&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet" />
-    <style>
-      :root {
-        --bg: #051714;
-        --panel: rgba(10, 34, 30, 0.86);
-        --line: rgba(98, 228, 182, 0.24);
-        --text: #eafff6;
-        --muted: #b1ddce;
-        --ok: #4ade80;
-        --warn: #f59e0b;
-        --danger: #fb7185;
-      }
-
-      * {
-        box-sizing: border-box;
-      }
-
-      body {
-        margin: 0;
-        min-height: 100vh;
-        display: grid;
-        place-items: center;
-        font-family: 'Manrope', system-ui, sans-serif;
-        color: var(--text);
-        background: radial-gradient(50rem 22rem at 10% -15%, rgba(74, 222, 128, 0.22), transparent 62%), radial-gradient(42rem 20rem at 100% 110%, rgba(59, 130, 246, 0.2), transparent 62%), linear-gradient(170deg, #051714, #081320);
-        padding: 24px;
-      }
-
-      .card {
-        width: min(680px, 100%);
-        border: 1px solid var(--line);
-        border-radius: 20px;
-        background: var(--panel);
-        box-shadow:
-          0 24px 60px rgba(0, 0, 0, 0.45),
-          inset 0 1px 0 rgba(183, 255, 233, 0.09);
-        padding: 28px;
-      }
-
-      .title {
-        margin: 0;
-        font-family: 'Sora', sans-serif;
-        font-size: clamp(28px, 5vw, 40px);
-        line-height: 1.1;
-      }
-
-      .subtitle {
-        margin: 10px 0 20px;
-        color: var(--muted);
-        font-size: 16px;
-      }
-
-      .status {
-        border: 1px solid rgba(118, 255, 196, 0.24);
-        border-radius: 14px;
-        background: rgba(12, 48, 41, 0.7);
-        padding: 14px;
-        font-size: 15px;
-      }
-
-      .status.pending {
-        border-color: rgba(245, 158, 11, 0.4);
-        background: rgba(59, 39, 7, 0.7);
-        color: #ffe5b0;
-      }
-
-      .status.error {
-        border-color: rgba(251, 113, 133, 0.5);
-        background: rgba(72, 14, 32, 0.72);
-        color: #ffd5df;
-      }
-
-      .meta {
-        margin-top: 16px;
-        font-size: 13px;
-        color: #b6dacd;
-      }
-
-      .actions {
-        margin-top: 20px;
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-      }
-
-      .button {
-        border: 1px solid rgba(148, 255, 216, 0.36);
-        border-radius: 12px;
-        padding: 11px 14px;
-        text-decoration: none;
-        color: var(--text);
-        font-family: 'Sora', sans-serif;
-        font-size: 12px;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        background: rgba(20, 70, 59, 0.8);
-      }
-
-      .button.primary {
-        border-color: transparent;
-        color: #042312;
-        background: linear-gradient(120deg, #4ade80, #22c55e);
-      }
-    </style>
+    <link rel="stylesheet" href="/assets/css/payments-react.css" />
   </head>
-  <body>
-    <main class="card">
-      <h1 class="title">Pagamento recebido</h1>
-      <p class="subtitle">Estamos finalizando a ativacao do seu Premium.</p>
+  <body class="payments-body payments-body-success">
+    <div
+      id="payments-success-react-root"
+      data-payments-api-base-path="/api/payments"
+      data-panel-path="/user/"
+      data-payments-path="/pagamentos/"
+    ></div>
 
-      <p id="payment-status" class="status">Consultando o status no Stripe...</p>
-      <p id="payment-meta" class="meta"></p>
-
-      <div class="actions">
-        <a class="button primary" href="/user/">Ir para painel</a>
-        <a class="button" href="/pagamentos/">Fazer outro pagamento</a>
-      </div>
-    </main>
-
-    <script>
-      (() => {
-        const statusElement = document.getElementById('payment-status');
-        const metaElement = document.getElementById('payment-meta');
-        const params = new URLSearchParams(window.location.search);
-        const sessionId = String(params.get('session_id') || '').trim();
-
-        const setStatus = (text, variant = '') => {
-          statusElement.textContent = text;
-          statusElement.classList.remove('pending', 'error');
-          if (variant) statusElement.classList.add(variant);
-        };
-
-        const setMeta = (text) => {
-          metaElement.textContent = text || '';
-        };
-
-        if (!sessionId) {
-          setStatus('Pagamento concluido. Se o Premium ainda nao apareceu, aguarde alguns segundos e atualize o painel.', 'pending');
-          setMeta('Dica: volte ao painel e confirme se o plano Premium ja foi liberado.');
-          return;
-        }
-
-        const loadStatus = async () => {
-          try {
-            const response = await fetch('/api/payments/finalize-session', {
-              method: 'POST',
-              headers: {
-                Accept: 'application/json',
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                session_id: sessionId,
-              }),
-            });
-            const payload = await response.json().catch(() => ({}));
-
-            if (!response.ok) {
-              throw new Error(payload?.error || 'Nao foi possivel consultar o status da sessao.');
-            }
-
-            const status = String(payload?.session?.status || '').toLowerCase();
-            const paymentStatus = String(payload?.session?.payment_status || '').toLowerCase();
-            const customerEmail = payload?.session?.customer_email || '';
-            const ownerJid = String(payload?.owner_jid || payload?.session?.owner_jid || '').trim();
-            const action = String(payload?.action || '').toLowerCase();
-            const reason = String(payload?.reason || '').toLowerCase();
-
-            if (action === 'premium_activated') {
-              setStatus('Pagamento confirmado e Premium ativado com sucesso.', '');
-            } else if (status === 'complete' && (paymentStatus === 'paid' || paymentStatus === 'no_payment_required') && reason === 'owner_jid_missing') {
-              setStatus('Pagamento confirmado, mas faltou o WhatsApp para liberar Premium. Fale com o suporte.', 'error');
-            } else if (status === 'complete' && (paymentStatus === 'paid' || paymentStatus === 'no_payment_required')) {
-              setStatus('Pagamento confirmado. Estamos finalizando a liberacao do Premium.', 'pending');
-            } else {
-              setStatus('Sessao concluida, aguardando confirmacao final de pagamento no Stripe.', 'pending');
-            }
-
-            const metaParts = [`Sessao: ${sessionId}`];
-            if (customerEmail) metaParts.push(`Cliente: ${customerEmail}`);
-            if (ownerJid) metaParts.push(`WhatsApp: ${ownerJid}`);
-            if (status) metaParts.push(`Status checkout: ${status}`);
-            if (paymentStatus) metaParts.push(`Status pagamento: ${paymentStatus}`);
-            if (action) metaParts.push(`Acao: ${action}`);
-            if (reason && reason !== 'ok') metaParts.push(`Motivo: ${reason}`);
-            setMeta(metaParts.join(' | '));
-          } catch (error) {
-            setStatus(error?.message || 'Falha ao consultar status do pagamento.', 'error');
-            setMeta(`Sessao: ${sessionId}`);
-          }
-        };
-
-        loadStatus();
-      })();
-    </script>
+    <script type="module" src="/assets/js/payments-success-react.bundle.js"></script>
   </body>
 </html>
