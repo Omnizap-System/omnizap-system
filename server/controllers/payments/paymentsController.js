@@ -78,9 +78,6 @@ const STRIPE_CHECKOUT_SUCCESS_URL = toHttpUrl(process.env.STRIPE_CHECKOUT_SUCCES
 const STRIPE_CHECKOUT_CANCEL_URL = toHttpUrl(process.env.STRIPE_CHECKOUT_CANCEL_URL);
 const STRIPE_PLAN_NAME = sanitizePlainString(process.env.STRIPE_PLAN_NAME, 120) || 'Plano Premium';
 const STRIPE_PLAN_PRICE_LABEL = sanitizePlainString(process.env.STRIPE_PLAN_PRICE_LABEL, 120) || 'Assinatura recorrente';
-const STRIPE_PIX_ENABLED = parseEnvBool(process.env.STRIPE_PIX_ENABLED, true);
-const STRIPE_PIX_PRICE_ID = sanitizePlainString(process.env.STRIPE_PIX_PRICE_ID || STRIPE_PRICE_ID, 255);
-const STRIPE_PIX_EXPIRES_AFTER_SECONDS = parseEnvInt(process.env.STRIPE_PIX_EXPIRES_AFTER_SECONDS, 86400, 10, 1209600);
 
 const stripeHttpClient = axios.create({
   baseURL: STRIPE_API_BASE_URL,
@@ -118,19 +115,6 @@ const assertStripeWebhookReady = () => {
   assertPaymentsEnabled();
   if (!STRIPE_WEBHOOK_SECRET) {
     throw createHttpError('STRIPE_WEBHOOK_SECRET nao configurado.', 503, 'stripe_webhook_secret_missing');
-  }
-};
-
-const assertStripePixReady = () => {
-  assertPaymentsEnabled();
-  if (!STRIPE_PIX_ENABLED) {
-    throw createHttpError('PIX esta desativado no servidor.', 503, 'stripe_pix_disabled');
-  }
-  if (!STRIPE_SECRET_KEY) {
-    throw createHttpError('STRIPE_SECRET_KEY nao configurada.', 503, 'stripe_secret_key_missing');
-  }
-  if (!STRIPE_PIX_PRICE_ID) {
-    throw createHttpError('STRIPE_PIX_PRICE_ID nao configurado.', 503, 'stripe_pix_price_id_missing');
   }
 };
 
@@ -307,81 +291,6 @@ const getStripeCheckoutSession = async (sessionId) => {
     method: 'GET',
     path: `/checkout/sessions/${encodeURIComponent(normalizedSessionId)}`,
   });
-};
-
-const getStripePrice = async (priceId) => {
-  const normalizedPriceId = sanitizePlainString(priceId, 255);
-  if (!normalizedPriceId) {
-    throw createHttpError('price_id e obrigatorio.', 400, 'price_id_required');
-  }
-
-  return callStripeApi({
-    method: 'GET',
-    path: `/prices/${encodeURIComponent(normalizedPriceId)}`,
-  });
-};
-
-const resolvePixAmountFromPrice = (priceObject) => {
-  const amount = Number(priceObject?.unit_amount);
-  const currency = sanitizePlainString(priceObject?.currency, 12).toLowerCase();
-
-  if (!Number.isInteger(amount) || amount <= 0) {
-    throw createHttpError('Preco Stripe invalido para PIX (unit_amount).', 400, 'stripe_pix_price_invalid');
-  }
-
-  if (currency !== 'brl') {
-    throw createHttpError('PIX exige preco em BRL.', 400, 'stripe_pix_currency_invalid');
-  }
-
-  return {
-    amount,
-    currency,
-  };
-};
-
-const createStripePixPaymentIntent = async ({ ownerJid, ownerPhone, customerEmail, customerName }) => {
-  const price = await getStripePrice(STRIPE_PIX_PRICE_ID);
-  const { amount, currency } = resolvePixAmountFromPrice(price);
-
-  const formData = new URLSearchParams();
-  formData.set('amount', String(amount));
-  formData.set('currency', currency);
-  formData.set('confirm', 'true');
-  formData.set('payment_method_types[0]', 'pix');
-  formData.set('payment_method_data[type]', 'pix');
-  formData.set('payment_method_options[pix][expires_after_seconds]', String(STRIPE_PIX_EXPIRES_AFTER_SECONDS));
-  formData.set('description', STRIPE_PLAN_NAME);
-  formData.set('metadata[owner_jid]', ownerJid);
-  if (ownerPhone) formData.set('metadata[owner_phone]', ownerPhone);
-  if (customerName) formData.set('metadata[customer_name]', customerName);
-  if (customerEmail) {
-    formData.set('metadata[customer_email]', customerEmail);
-    formData.set('receipt_email', customerEmail);
-    formData.set('payment_method_data[billing_details][email]', customerEmail);
-  }
-
-  return callStripeApi({
-    method: 'POST',
-    path: '/payment_intents',
-    formData,
-  });
-};
-
-const extractPixQrPayload = (paymentIntent = {}) => {
-  const pixQr = paymentIntent?.next_action?.pix_display_qr_code || {};
-  const qrPayload = {
-    data: String(pixQr?.data || '').trim(),
-    image_url_png: toHttpUrl(pixQr?.image_url_png),
-    image_url_svg: toHttpUrl(pixQr?.image_url_svg),
-    hosted_instructions_url: toHttpUrl(pixQr?.hosted_instructions_url),
-    expires_at: Number.isFinite(Number(pixQr?.expires_at)) ? Number(pixQr.expires_at) : null,
-  };
-
-  if (!qrPayload.data && !qrPayload.image_url_png && !qrPayload.hosted_instructions_url) {
-    throw createHttpError('Stripe nao retornou QR Code PIX para este pagamento.', 502, 'stripe_pix_qr_missing');
-  }
-
-  return qrPayload;
 };
 
 const normalizeFromMetadata = (metadata = {}, key) => sanitizePlainString(metadata?.[key], 255);
@@ -572,11 +481,6 @@ const processStripeWebhookEvent = async (event) => {
     return activatePremiumOwner({ ownerJid, eventType, eventId });
   }
 
-  if (eventType === 'payment_intent.succeeded') {
-    const ownerJid = extractOwnerJidFromStripeObject(object);
-    return activatePremiumOwner({ ownerJid, eventType, eventId });
-  }
-
   if (eventType === 'invoice.paid' || eventType === 'invoice.payment_succeeded') {
     const ownerJid = extractOwnerJidFromStripeObject(object);
     return activatePremiumOwner({ ownerJid, eventType, eventId });
@@ -630,9 +534,6 @@ const buildPublicConfigPayload = () => ({
   plan_name: STRIPE_PLAN_NAME,
   plan_price_label: STRIPE_PLAN_PRICE_LABEL,
   stripe_ready: Boolean(STRIPE_SECRET_KEY && STRIPE_PRICE_ID && STRIPE_WEBHOOK_SECRET),
-  pix_enabled: STRIPE_PIX_ENABLED,
-  pix_ready: Boolean(STRIPE_SECRET_KEY && STRIPE_PIX_PRICE_ID),
-  pix_expires_after_seconds: STRIPE_PIX_EXPIRES_AFTER_SECONDS,
   auto_revoke_on_cancellation: STRIPE_AUTO_REVOKE_ON_CANCELLATION,
 });
 
@@ -668,7 +569,6 @@ export const maybeHandlePaymentsRequest = async (req, res, { pathname, url }) =>
   const healthPath = `${PAYMENTS_API_BASE_PATH}/health`;
   const configPath = `${PAYMENTS_API_BASE_PATH}/config`;
   const checkoutPath = `${PAYMENTS_API_BASE_PATH}/checkout-session`;
-  const pixQrPath = `${PAYMENTS_API_BASE_PATH}/pix-qr`;
   const webhookPath = `${PAYMENTS_API_BASE_PATH}/webhook`;
   const sessionStatusPath = `${PAYMENTS_API_BASE_PATH}/session-status`;
 
@@ -683,7 +583,6 @@ export const maybeHandlePaymentsRequest = async (req, res, { pathname, url }) =>
         payments_enabled: STRIPE_PAYMENTS_ENABLED,
         stripe_checkout_ready: Boolean(STRIPE_SECRET_KEY && STRIPE_PRICE_ID),
         stripe_webhook_ready: Boolean(STRIPE_WEBHOOK_SECRET),
-        stripe_pix_ready: Boolean(STRIPE_SECRET_KEY && STRIPE_PIX_PRICE_ID),
         api_base_path: PAYMENTS_API_BASE_PATH,
       });
     }
@@ -724,39 +623,6 @@ export const maybeHandlePaymentsRequest = async (req, res, { pathname, url }) =>
         checkout_url: checkoutSession.url,
         session_id: checkoutSession.id || null,
         owner_jid: identity.ownerJid,
-      });
-    }
-
-    if (pathname === pixQrPath) {
-      if (req.method !== 'POST') {
-        return sendJson(req, res, 405, { error: 'Method Not Allowed' });
-      }
-
-      assertStripePixReady();
-      const body = await readJsonBody(req, { maxBytes: 32 * 1024 });
-      const identity = normalizeWhatsappIdentity(body?.whatsapp || body?.owner_jid || body?.ownerPhone || body?.phone);
-      const customerEmail = normalizeCheckoutEmail(body?.email);
-      if (!customerEmail) {
-        throw createHttpError('E-mail obrigatorio para gerar o PIX.', 400, 'stripe_pix_email_required');
-      }
-      const customerName = normalizeCustomerName(body?.name);
-
-      const paymentIntent = await createStripePixPaymentIntent({
-        ownerJid: identity.ownerJid,
-        ownerPhone: identity.ownerPhone,
-        customerEmail,
-        customerName,
-      });
-
-      const pixQr = extractPixQrPayload(paymentIntent);
-
-      return sendJson(req, res, 201, {
-        ok: true,
-        mode: 'pix',
-        payment_intent_id: paymentIntent?.id || null,
-        payment_status: paymentIntent?.status || null,
-        owner_jid: identity.ownerJid,
-        pix_qr: pixQr,
       });
     }
 

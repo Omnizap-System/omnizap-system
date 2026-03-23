@@ -223,45 +223,6 @@
         color: var(--primary);
       }
 
-      .pix-result {
-        margin-top: 18px;
-        border: 1px solid rgba(124, 180, 255, 0.32);
-        border-radius: 14px;
-        background: rgba(9, 22, 44, 0.72);
-        padding: 14px;
-      }
-
-      .pix-title {
-        margin: 0 0 10px;
-        font-family: 'Sora', sans-serif;
-        font-size: 14px;
-        letter-spacing: 0.02em;
-      }
-
-      .pix-qr-image {
-        display: block;
-        width: min(280px, 100%);
-        aspect-ratio: 1 / 1;
-        border: 1px solid rgba(117, 162, 235, 0.3);
-        border-radius: 10px;
-        background: #ffffff;
-        object-fit: contain;
-        padding: 8px;
-      }
-
-      .pix-code {
-        width: 100%;
-        margin-top: 10px;
-        border: 1px solid rgba(120, 160, 231, 0.34);
-        border-radius: 10px;
-        background: rgba(9, 18, 38, 0.84);
-        color: var(--text-main);
-        min-height: 92px;
-        padding: 10px 12px;
-        resize: vertical;
-        font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-      }
-
       .plan-badge {
         display: inline-flex;
         align-items: center;
@@ -335,7 +296,7 @@
       <section class="hero">
         <span class="eyebrow">Pagamento Automatico Stripe</span>
         <h1>Ative o Premium em minutos</h1>
-        <p>Preencha seu WhatsApp e escolha entre checkout normal ou PIX com QR Code. Assim que o pagamento confirmar no webhook, seu acesso Premium e liberado automaticamente.</p>
+        <p>Preencha seu WhatsApp e siga para o checkout seguro. Assim que o pagamento confirmar no webhook, seu acesso Premium e liberado automaticamente.</p>
       </section>
 
       <section class="layout">
@@ -359,22 +320,10 @@
 
             <div class="actions">
               <button id="checkout-submit" class="button button-primary" type="submit">Ir para checkout</button>
-              <button id="pix-generate" class="button button-secondary" type="button">Gerar QR PIX</button>
               <a class="button button-secondary" href="/" role="button">Voltar para home</a>
             </div>
 
             <p id="checkout-status" class="status" aria-live="polite"></p>
-
-            <section id="pix-result" class="pix-result" hidden>
-              <h3 class="pix-title">QR Code PIX</h3>
-              <img id="pix-qr-image" class="pix-qr-image" alt="QR Code PIX" hidden />
-              <textarea id="pix-code" class="pix-code" readonly placeholder="Codigo PIX copia e cola"></textarea>
-              <div class="actions">
-                <button id="pix-copy" class="button button-secondary" type="button">Copiar codigo PIX</button>
-                <a id="pix-open-link" class="button button-secondary" href="#" target="_blank" rel="noopener noreferrer" hidden>Abrir instrucoes Stripe</a>
-              </div>
-              <p id="pix-meta" class="hint"></p>
-            </section>
           </form>
         </article>
 
@@ -387,7 +336,6 @@
             <li>Ativacao automatica apos pagamento confirmado no Stripe.</li>
             <li>Fluxo seguro com assinatura de webhook validada no backend.</li>
             <li>Checkout hospedado no Stripe para reduzir risco e fraude.</li>
-            <li>Geracao de QR Code PIX com codigo copia e cola.</li>
           </ul>
 
           <p class="small">
@@ -404,16 +352,9 @@
       (() => {
         const form = document.getElementById('checkout-form');
         const submitButton = document.getElementById('checkout-submit');
-        const pixButton = document.getElementById('pix-generate');
         const statusElement = document.getElementById('checkout-status');
         const planNameElement = document.getElementById('plan-name');
         const planPriceElement = document.getElementById('plan-price');
-        const pixResultElement = document.getElementById('pix-result');
-        const pixQrImageElement = document.getElementById('pix-qr-image');
-        const pixCodeElement = document.getElementById('pix-code');
-        const pixCopyButton = document.getElementById('pix-copy');
-        const pixOpenLinkElement = document.getElementById('pix-open-link');
-        const pixMetaElement = document.getElementById('pix-meta');
 
         const setStatus = (message, type = '') => {
           statusElement.textContent = message || '';
@@ -421,72 +362,9 @@
           if (type) statusElement.classList.add(type);
         };
 
-        const setLoading = (loading, mode = 'checkout') => {
+        const setLoading = (loading) => {
           submitButton.disabled = loading;
-          pixButton.disabled = loading;
-          submitButton.textContent = loading && mode === 'checkout' ? 'Criando checkout...' : 'Ir para checkout';
-          pixButton.textContent = loading && mode === 'pix' ? 'Gerando QR PIX...' : 'Gerar QR PIX';
-        };
-
-        const setPixVisible = (visible) => {
-          pixResultElement.hidden = !visible;
-        };
-
-        const resetPixResult = () => {
-          setPixVisible(false);
-          pixQrImageElement.src = '';
-          pixQrImageElement.hidden = true;
-          pixCodeElement.value = '';
-          pixCopyButton.disabled = true;
-          pixOpenLinkElement.href = '#';
-          pixOpenLinkElement.hidden = true;
-          pixMetaElement.textContent = '';
-        };
-
-        const formatTimestamp = (unixSeconds) => {
-          const parsed = Number(unixSeconds);
-          if (!Number.isFinite(parsed) || parsed <= 0) return '';
-          try {
-            return new Date(parsed * 1000).toLocaleString('pt-BR', {
-              dateStyle: 'short',
-              timeStyle: 'short',
-            });
-          } catch {
-            return '';
-          }
-        };
-
-        const renderPixResult = (payload) => {
-          const qrPayload = payload?.pix_qr || {};
-          const qrData = String(qrPayload?.data || '').trim();
-          const qrImage = String(qrPayload?.image_url_png || '').trim();
-          const hostedInstructionsUrl = String(qrPayload?.hosted_instructions_url || '').trim();
-          const expiresAt = formatTimestamp(qrPayload?.expires_at);
-          const paymentIntentId = String(payload?.payment_intent_id || '').trim();
-
-          if (!qrData && !qrImage && !hostedInstructionsUrl) {
-            throw new Error('PIX criado sem dados de QR Code.');
-          }
-
-          if (qrImage) {
-            pixQrImageElement.src = qrImage;
-            pixQrImageElement.hidden = false;
-          }
-
-          pixCodeElement.value = qrData;
-          pixCopyButton.disabled = !qrData;
-
-          if (hostedInstructionsUrl) {
-            pixOpenLinkElement.href = hostedInstructionsUrl;
-            pixOpenLinkElement.hidden = false;
-          }
-
-          const details = [];
-          if (paymentIntentId) details.push(`Pagamento: ${paymentIntentId}`);
-          if (expiresAt) details.push(`Expira em: ${expiresAt}`);
-          pixMetaElement.textContent = details.join(' | ');
-
-          setPixVisible(true);
+          submitButton.textContent = loading ? 'Criando checkout...' : 'Ir para checkout';
         };
 
         const loadPublicConfig = async () => {
@@ -504,11 +382,6 @@
             if (payload.enabled === false) {
               setStatus('Pagamentos estao temporariamente indisponiveis.', 'error');
               submitButton.disabled = true;
-              pixButton.disabled = true;
-            }
-
-            if (payload.pix_enabled === false) {
-              pixButton.disabled = true;
             }
           } catch {
             // Se config falhar, mantemos fallback visual e formulario funcionando.
@@ -529,8 +402,7 @@
             return;
           }
 
-          resetPixResult();
-          setLoading(true, 'checkout');
+          setLoading(true);
           setStatus('Preparando checkout seguro...', 'success');
 
           try {
@@ -556,65 +428,7 @@
             window.location.href = payload.checkout_url;
           } catch (error) {
             setStatus(error?.message || 'Falha ao iniciar checkout.', 'error');
-            setLoading(false, 'checkout');
-          }
-        });
-
-        pixButton.addEventListener('click', async () => {
-          setStatus('');
-
-          const formData = new FormData(form);
-          const whatsapp = String(formData.get('whatsapp') || '').trim();
-          const email = String(formData.get('email') || '').trim();
-          const name = String(formData.get('name') || '').trim();
-
-          if (!whatsapp) {
-            setStatus('Informe seu WhatsApp para continuar.', 'error');
-            return;
-          }
-
-          if (!email) {
-            setStatus('Para PIX, informe um e-mail valido.', 'error');
-            return;
-          }
-
-          setLoading(true, 'pix');
-          setStatus('Gerando QR Code PIX...', 'success');
-          resetPixResult();
-
-          try {
-            const response = await fetch('/api/payments/pix-qr', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Accept: 'application/json',
-              },
-              body: JSON.stringify({ whatsapp, email, name }),
-            });
-
-            const payload = await response.json().catch(() => ({}));
-            if (!response.ok) {
-              throw new Error(payload?.error || 'Nao foi possivel gerar o QR Code PIX.');
-            }
-
-            renderPixResult(payload);
-            setStatus('QR Code PIX gerado. Realize o pagamento no app do seu banco.', 'success');
-          } catch (error) {
-            setStatus(error?.message || 'Falha ao gerar o QR Code PIX.', 'error');
-          } finally {
-            setLoading(false, 'pix');
-          }
-        });
-
-        pixCopyButton.addEventListener('click', async () => {
-          const pixCode = String(pixCodeElement.value || '').trim();
-          if (!pixCode) return;
-
-          try {
-            await navigator.clipboard.writeText(pixCode);
-            setStatus('Codigo PIX copiado para a area de transferencia.', 'success');
-          } catch {
-            setStatus('Nao foi possivel copiar automaticamente. Selecione e copie manualmente.', 'error');
+            setLoading(false);
           }
         });
 
