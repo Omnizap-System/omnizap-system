@@ -36,3 +36,4 @@ backups/
 .tmp_tools/
 app/modules/playModule/local/bin/
 app/modules/playModule/local/downloads/
+.vscode/
