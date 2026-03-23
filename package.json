@@ -1,6 +1,6 @@
 {
   "name": "@omnizap-system/omnizap",
-  "version": "2.6.1",
+  "version": "2.6.2",
   "description": "Sistema profissional de automação WhatsApp com tecnologia Baileys",
   "main": "index.js",
   "publishConfig": {
