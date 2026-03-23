@@ -40,6 +40,7 @@ let messageAnalysisSessionColumnSupported = true;
 
 export async function createMessageAnalysisEvent(payload = {}, connection = null) {
   const sessionId = sanitizeText(payload.sessionId || payload.session_id, 64) || 'default';
+  const ownerSessionId = sanitizeText(payload.ownerSessionId || payload.owner_session_id || payload?.metadata?.owner_session_id, 64);
   const messageId = sanitizeText(payload.messageId, 255);
   const chatId = sanitizeText(payload.chatId, 255);
   const senderId = sanitizeText(payload.senderId, 255);
@@ -52,8 +53,13 @@ export async function createMessageAnalysisEvent(payload = {}, connection = null
   const processingResult = sanitizeText(payload.processingResult, 64) || 'processed';
   const errorCode = sanitizeText(payload.errorCode, 96);
   const metadata = sanitizeMetadata(payload.metadata);
+  const isGroup = sanitizeBool(payload.isGroup);
 
-  const valuesWithSession = [sessionId, messageId, chatId, senderId, senderName, upsertType, source, sanitizeBool(payload.isGroup), sanitizeBool(payload.isFromBot), sanitizeBool(payload.isCommand), commandName, clampInt(payload.commandArgsCount, 0, 0, 64), payload.commandKnown === null || payload.commandKnown === undefined ? null : sanitizeBool(payload.commandKnown), commandPrefix, messageKind, sanitizeBool(payload.hasMedia), clampInt(payload.mediaCount, 0, 0, 25), clampInt(payload.textLength, 0, 0, 16_000), processingResult, errorCode, metadata];
+  if (isGroup && ownerSessionId && ownerSessionId !== sessionId) {
+    return false;
+  }
+
+  const valuesWithSession = [sessionId, messageId, chatId, senderId, senderName, upsertType, source, isGroup, sanitizeBool(payload.isFromBot), sanitizeBool(payload.isCommand), commandName, clampInt(payload.commandArgsCount, 0, 0, 64), payload.commandKnown === null || payload.commandKnown === undefined ? null : sanitizeBool(payload.commandKnown), commandPrefix, messageKind, sanitizeBool(payload.hasMedia), clampInt(payload.mediaCount, 0, 0, 25), clampInt(payload.textLength, 0, 0, 16_000), processingResult, errorCode, metadata];
   const valuesWithoutSession = valuesWithSession.slice(1);
 
   const sqlWithSession = `INSERT INTO ${TABLES.MESSAGE_ANALYSIS_EVENT}

@@ -1,8 +1,17 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { timingSafeEqual } from 'node:crypto';
 import { URL } from 'node:url';
 
 import logger from '#logger';
+import {
+  forceSystemAdminGroupFailover,
+  listSystemAdminAssignmentHistory,
+  listSystemAdminAssignments,
+  listSystemAdminSessions,
+  setSystemAdminGroupPin,
+  triggerSystemAdminManualRebalance,
+} from '../system/systemController.js';
 
 const parseEnvBool = (value, fallback) => {
   if (value === undefined || value === null || value === '') return fallback;
@@ -25,6 +34,8 @@ const SYSTEM_ADMIN_API_BASE_PATH = normalizeBasePath(process.env.SYSTEM_ADMIN_AP
 const SYSTEM_ADMIN_API_SESSION_PATH = `${SYSTEM_ADMIN_API_BASE_PATH}/session`;
 const LEGACY_SYSTEM_ADMIN_API_BASE_PATH = `${LEGACY_STICKER_API_BASE_PATH}/admin`;
 const LEGACY_SYSTEM_ADMIN_API_SESSION_PATH = `${LEGACY_SYSTEM_ADMIN_API_BASE_PATH}/session`;
+const SYSTEM_ADMIN_MULTI_SESSION_API_PATH = `${SYSTEM_ADMIN_API_BASE_PATH}/multi-session`;
+const LEGACY_SYSTEM_ADMIN_MULTI_SESSION_API_PATH = `${LEGACY_SYSTEM_ADMIN_API_BASE_PATH}/multi-session`;
 const STICKER_LOGIN_WEB_PATH = normalizeBasePath(process.env.STICKER_LOGIN_WEB_PATH, '/login');
 const STICKER_WEB_PATH = normalizeBasePath(process.env.STICKER_WEB_PATH, '/stickers');
 const STICKER_ADMIN_WEB_PATH = `${STICKER_WEB_PATH}/admin`;
@@ -37,6 +48,9 @@ const SITE_ORIGIN = String(process.env.SITE_ORIGIN || 'https://omnizap.shop')
 
 const USER_SYSTEMADM_TEMPLATE_PATH = path.join(process.cwd(), 'public', 'pages', 'user-systemadm.html');
 const LEGACY_STICKER_ADMIN_TEMPLATE_PATH = path.join(process.cwd(), 'public', 'pages', 'stickers-admin.html');
+const SYSTEM_ADMIN_OPS_TOKEN = String(
+  process.env.SYSTEM_ADMIN_OPS_TOKEN || process.env.USER_INTERNAL_API_TOKEN || process.env.ADMIN_TOKEN || process.env.ADMIN_API_TOKEN || '',
+).trim();
 
 let stickerCatalogControllerPromise = null;
 const loadStickerCatalogController = async () => {
@@ -108,6 +122,106 @@ const mapAdminApiPathToLegacy = (pathname) => {
   return null;
 };
 
+const mapMultiSessionApiPath = (pathname) => {
+  if (hasPathPrefix(pathname, SYSTEM_ADMIN_MULTI_SESSION_API_PATH)) {
+    const suffix = pathname.slice(SYSTEM_ADMIN_MULTI_SESSION_API_PATH.length);
+    return suffix || '/';
+  }
+  if (hasPathPrefix(pathname, LEGACY_SYSTEM_ADMIN_MULTI_SESSION_API_PATH)) {
+    const suffix = pathname.slice(LEGACY_SYSTEM_ADMIN_MULTI_SESSION_API_PATH.length);
+    return suffix || '/';
+  }
+  return null;
+};
+
+const constantTimeStringEqual = (left, right) => {
+  const leftBuffer = Buffer.from(String(left || ''), 'utf8');
+  const rightBuffer = Buffer.from(String(right || ''), 'utf8');
+  if (!leftBuffer.length || leftBuffer.length !== rightBuffer.length) return false;
+  try {
+    return timingSafeEqual(leftBuffer, rightBuffer);
+  } catch {
+    return false;
+  }
+};
+
+const extractBearerToken = (req) => {
+  const authHeader = String(req?.headers?.authorization || '').trim();
+  if (!authHeader.toLowerCase().startsWith('bearer ')) return '';
+  return authHeader.slice(7).trim();
+};
+
+const resolveOpsTokenFromRequest = (req) =>
+  String(req?.headers?.['x-system-admin-token'] || req?.headers?.['x-internal-api-token'] || req?.headers?.['x-admin-token'] || '').trim() ||
+  extractBearerToken(req);
+
+const hasValidOpsToken = (req) => {
+  if (!SYSTEM_ADMIN_OPS_TOKEN) return true;
+  const requestToken = resolveOpsTokenFromRequest(req);
+  if (!requestToken) return false;
+  return constantTimeStringEqual(requestToken, SYSTEM_ADMIN_OPS_TOKEN);
+};
+
+const readJsonBody = async (req, { maxBytes = 64 * 1024 } = {}) =>
+  new Promise((resolve, reject) => {
+    const chunks = [];
+    let total = 0;
+
+    req.on('data', (chunk) => {
+      total += chunk.length;
+      if (total > maxBytes) {
+        const error = new Error('Payload excedeu limite permitido.');
+        error.statusCode = 413;
+        reject(error);
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+
+    req.on('end', () => {
+      const raw = Buffer.concat(chunks).toString('utf8').trim();
+      if (!raw) {
+        resolve({});
+        return;
+      }
+
+      try {
+        resolve(JSON.parse(raw));
+      } catch {
+        const error = new Error('JSON invalido.');
+        error.statusCode = 400;
+        reject(error);
+      }
+    });
+
+    req.on('error', (error) => reject(error));
+  });
+
+const parseBool = (value, fallback = false) => {
+  if (value === undefined || value === null || value === '') return fallback;
+  const normalized = String(value).trim().toLowerCase();
+  if (['1', 'true', 'yes', 'y', 'on'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'n', 'off'].includes(normalized)) return false;
+  return fallback;
+};
+
+const parsePositiveInt = (value, fallback = 200, min = 1, max = 5000) => {
+  const parsed = Number.parseInt(String(value ?? ''), 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, parsed));
+};
+
+const decodePathSegment = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+};
+
 const renderUserSystemAdminHtml = async () => {
   const template = await fs.readFile(USER_SYSTEMADM_TEMPLATE_PATH, 'utf8');
   const dataAttributes = {
@@ -124,13 +238,147 @@ const renderUserSystemAdminHtml = async () => {
   return html;
 };
 
+const requireSystemAdminOpsAccess = (req, res) => {
+  if (hasValidOpsToken(req)) return true;
+  sendJson(req, res, 401, { error: 'Nao autorizado para operacoes de system admin.' });
+  return false;
+};
+
+const normalizeMultiSessionSubPath = (value) => {
+  const raw = String(value || '/').trim();
+  if (!raw || raw === '/') return '/';
+  return `/${raw
+    .replace(/^\/+/g, '')
+    .replace(/\/+$/g, '')}`;
+};
+
+const handleMultiSessionOpsRequest = async (req, res, { pathname, url }) => {
+  if (!requireSystemAdminOpsAccess(req, res)) return true;
+
+  const subPath = normalizeMultiSessionSubPath(pathname);
+  const requestUrl = (() => {
+    try {
+      return new URL(String(url?.href || req.url || '/'), SITE_ORIGIN);
+    } catch {
+      return new URL(SITE_ORIGIN);
+    }
+  })();
+
+  if (subPath === '/sessions') {
+    if (!['GET', 'HEAD'].includes(req.method || '')) {
+      sendJson(req, res, 405, { error: 'Metodo nao permitido.' });
+      return true;
+    }
+    const payload = await listSystemAdminSessions({
+      status: requestUrl.searchParams.get('status'),
+      limit: parsePositiveInt(requestUrl.searchParams.get('limit'), 200, 1, 5000),
+    });
+    sendJson(req, res, 200, payload);
+    return true;
+  }
+
+  if (subPath === '/assignments') {
+    if (!['GET', 'HEAD'].includes(req.method || '')) {
+      sendJson(req, res, 405, { error: 'Metodo nao permitido.' });
+      return true;
+    }
+    const payload = await listSystemAdminAssignments({
+      groupJid: requestUrl.searchParams.get('group_jid'),
+      ownerSessionId: requestUrl.searchParams.get('owner_session_id'),
+      includeExpired: parseBool(requestUrl.searchParams.get('include_expired'), false),
+      limit: parsePositiveInt(requestUrl.searchParams.get('limit'), 200, 1, 5000),
+    });
+    sendJson(req, res, 200, payload);
+    return true;
+  }
+
+  if (subPath === '/history') {
+    if (!['GET', 'HEAD'].includes(req.method || '')) {
+      sendJson(req, res, 405, { error: 'Metodo nao permitido.' });
+      return true;
+    }
+    const payload = await listSystemAdminAssignmentHistory({
+      groupJid: requestUrl.searchParams.get('group_jid'),
+      limit: parsePositiveInt(requestUrl.searchParams.get('limit'), 100, 1, 5000),
+    });
+    sendJson(req, res, 200, payload);
+    return true;
+  }
+
+  if (subPath === '/rebalance') {
+    if (!['POST'].includes(req.method || '')) {
+      sendJson(req, res, 405, { error: 'Metodo nao permitido.' });
+      return true;
+    }
+    const payload = await triggerSystemAdminManualRebalance();
+    sendJson(req, res, 200, payload);
+    return true;
+  }
+
+  const groupActionMatch = subPath.match(/^\/groups\/([^/]+)\/(pin|unpin|failover)$/i);
+  if (groupActionMatch) {
+    if (!['POST'].includes(req.method || '')) {
+      sendJson(req, res, 405, { error: 'Metodo nao permitido.' });
+      return true;
+    }
+
+    const groupJid = decodePathSegment(groupActionMatch[1]);
+    const action = String(groupActionMatch[2] || '').toLowerCase();
+    const body = await readJsonBody(req).catch((error) => {
+      const statusCode = Number(error?.statusCode || 400);
+      sendJson(req, res, statusCode, { error: error?.message || 'Falha ao interpretar payload JSON.' });
+      return null;
+    });
+    if (body === null) return true;
+
+    if (action === 'pin' || action === 'unpin') {
+      const pinned = action === 'pin';
+      const payload = await setSystemAdminGroupPin({
+        groupJid,
+        pinned,
+        sessionId: body?.session_id || body?.sessionId || null,
+        reason: body?.reason || null,
+        changedBy: 'system_admin_api',
+        metadata: body?.metadata || null,
+      });
+      sendJson(req, res, 200, payload);
+      return true;
+    }
+
+    if (action === 'failover') {
+      const targetSessionId = String(body?.target_session_id || body?.targetSessionId || requestUrl.searchParams.get('target_session_id') || '')
+        .trim()
+        .slice(0, 64);
+      if (!targetSessionId) {
+        sendJson(req, res, 400, { error: 'target_session_id e obrigatorio.' });
+        return true;
+      }
+
+      const payload = await forceSystemAdminGroupFailover({
+        groupJid,
+        targetSessionId,
+        reason: body?.reason || 'admin_force_failover',
+        changedBy: 'system_admin_api',
+        metadata: body?.metadata || null,
+      });
+      sendJson(req, res, 200, payload);
+      return true;
+    }
+  }
+
+  sendJson(req, res, 404, { error: 'Endpoint de operacao multi-session nao encontrado.' });
+  return true;
+};
+
 export const getSystemAdminRouteConfig = () => ({
   webPath: USER_SYSTEMADM_WEB_PATH,
   legacyWebPath: STICKER_ADMIN_WEB_PATH,
   apiAdminBasePath: SYSTEM_ADMIN_API_BASE_PATH,
   apiAdminSessionPath: SYSTEM_ADMIN_API_SESSION_PATH,
+  apiAdminMultiSessionPath: SYSTEM_ADMIN_MULTI_SESSION_API_PATH,
   legacyApiAdminBasePath: LEGACY_SYSTEM_ADMIN_API_BASE_PATH,
   legacyApiAdminSessionPath: LEGACY_SYSTEM_ADMIN_API_SESSION_PATH,
+  legacyApiAdminMultiSessionPath: LEGACY_SYSTEM_ADMIN_MULTI_SESSION_API_PATH,
 });
 
 export const maybeHandleSystemAdminRequest = async (req, res, { pathname, url }) => {
@@ -186,6 +434,25 @@ export const maybeHandleSystemAdminRequest = async (req, res, { pathname, url })
   }
 
   if (hasPathPrefix(pathname, SYSTEM_ADMIN_API_BASE_PATH) || hasPathPrefix(pathname, LEGACY_SYSTEM_ADMIN_API_BASE_PATH)) {
+    const multiSessionPath = mapMultiSessionApiPath(pathname);
+    if (multiSessionPath !== null) {
+      try {
+        return await handleMultiSessionOpsRequest(req, res, {
+          pathname: multiSessionPath,
+          url,
+        });
+      } catch (error) {
+        logger.error('Falha ao processar endpoint operacional multi-sessao.', {
+          action: 'system_admin_multi_session_endpoint_failed',
+          method: req.method,
+          path: pathname,
+          error: error?.message,
+        });
+        sendJson(req, res, 500, { error: 'Falha interna ao processar operacao multi-sessao.' });
+        return true;
+      }
+    }
+
     const legacyPathname = mapAdminApiPathToLegacy(pathname);
     if (!legacyPathname) return false;
 

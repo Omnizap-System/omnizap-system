@@ -2,6 +2,7 @@ import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } fro
 import { baileysConnectionLogger as logger } from './loggerConfig.js';
 import { queueMessageInsert } from '../services/infra/dbWriteQueue.js';
 import { parseEnvBool, parseEnvInt, normalizeJid, isGroupJid, isStatusJid, isBroadcastJid, isNewsletterJid, normalizeWAPresence } from './baileysConfig.js';
+import { getOwner as getGroupOwner, tryAcquire as tryAcquireGroupOwner } from '../services/multiSession/groupOwnershipService.js';
 
 const BAILEYS_SEND_RETRY_ATTEMPTS = parseEnvInt(process.env.BAILEYS_SEND_RETRY_ATTEMPTS, 2, 1, 5);
 const BAILEYS_SEND_RETRY_BASE_DELAY_MS = parseEnvInt(process.env.BAILEYS_SEND_RETRY_BASE_DELAY_MS, 600, 100, 10_000);
@@ -11,11 +12,102 @@ const BAILEYS_REPLY_PRESENCE_SUBSCRIBE = parseEnvBool(process.env.BAILEYS_REPLY_
 const BAILEYS_REPLY_PRESENCE_DELAY_MS = parseEnvInt(process.env.BAILEYS_REPLY_PRESENCE_DELAY_MS, 280, 0, 3_000);
 const BAILEYS_REPLY_PRESENCE_BEFORE = normalizeWAPresence(process.env.BAILEYS_REPLY_PRESENCE_BEFORE, 'composing');
 const BAILEYS_REPLY_PRESENCE_AFTER = normalizeWAPresence(process.env.BAILEYS_REPLY_PRESENCE_AFTER, 'paused');
+const GROUP_WRITE_PERMISSION_CACHE_TTL_MS = parseEnvInt(process.env.GROUP_OWNER_WRITE_CACHE_TTL_MS, 8_000, 1_000, 60_000);
 
 const isPlainObject = (value) => Object.prototype.toString.call(value) === '[object Object]';
 
 const ANY_MESSAGE_CONTENT_PRIMARY_KEYS = new Set(['text', 'image', 'video', 'audio', 'sticker', 'stickerPack', 'stickerPackMessage', 'document', 'event', 'poll', 'contacts', 'location', 'react', 'buttonReply', 'groupInvite', 'listReply', 'pin', 'product', 'sharePhoneNumber', 'requestPhoneNumber', 'forward', 'delete', 'disappearingMessagesInChat', 'limitSharing']);
 const PRESENCE_NON_REPLY_CONTENT_KEYS = new Set(['react', 'delete', 'pin', 'disappearingMessagesInChat']);
+const groupWritePermissionCache = new Map();
+
+const normalizeSessionId = (value) => {
+  const normalized = String(value || '').trim();
+  return normalized || null;
+};
+
+const getCachedGroupWritePermission = (groupJid, sessionId) => {
+  const key = `${sessionId}:${groupJid}`;
+  const cached = groupWritePermissionCache.get(key);
+  if (!cached) return null;
+  if (cached.expiresAtMs <= __timeNowMs()) {
+    groupWritePermissionCache.delete(key);
+    return null;
+  }
+  return cached;
+};
+
+const setCachedGroupWritePermission = (groupJid, sessionId, allowed, ownerSessionId = null) => {
+  const key = `${sessionId}:${groupJid}`;
+  groupWritePermissionCache.set(key, {
+    allowed: Boolean(allowed),
+    ownerSessionId: normalizeSessionId(ownerSessionId),
+    expiresAtMs: __timeNowMs() + GROUP_WRITE_PERMISSION_CACHE_TTL_MS,
+  });
+};
+
+const resolveGroupWritePermission = async (groupJid, sessionId) => {
+  if (!isGroupJid(groupJid) || !sessionId) {
+    return {
+      allowed: true,
+      ownerSessionId: null,
+      reason: 'not_group_or_missing_session',
+    };
+  }
+
+  const cached = getCachedGroupWritePermission(groupJid, sessionId);
+  if (cached) {
+    return {
+      allowed: cached.allowed,
+      ownerSessionId: cached.ownerSessionId,
+      reason: 'cache_hit',
+    };
+  }
+
+  try {
+    const ownerState = await getGroupOwner(groupJid);
+    let ownerSessionId = normalizeSessionId(ownerState?.ownerSessionId);
+    let allowed = false;
+    let reason = 'owned_by_other';
+
+    if (!ownerSessionId) {
+      const claimOutcome = await tryAcquireGroupOwner({
+        groupJid,
+        sessionId,
+        reason: 'send_store_claim',
+        changedBy: sessionId,
+        metadata: {
+          source: 'message_persistence_service',
+          gate: 'group_write',
+        },
+      });
+      ownerSessionId = normalizeSessionId(claimOutcome?.owner?.ownerSessionId);
+      allowed = Boolean(claimOutcome?.acquired && ownerSessionId === sessionId);
+      reason = claimOutcome?.reason || 'claim_attempt';
+    } else {
+      allowed = ownerSessionId === sessionId;
+      reason = allowed ? 'owner_match' : 'owned_by_other';
+    }
+
+    setCachedGroupWritePermission(groupJid, sessionId, allowed, ownerSessionId);
+    return {
+      allowed,
+      ownerSessionId,
+      reason,
+    };
+  } catch (error) {
+    logger.warn('Falha ao validar ownership para persistência de saída em grupo.', {
+      action: 'group_write_permission_resolution_failed',
+      groupJid,
+      sessionId,
+      error: error?.message,
+    });
+    return {
+      allowed: false,
+      ownerSessionId: null,
+      reason: 'resolution_failed',
+    };
+  }
+};
 
 /**
  * Verifica se o payload se parece com AnyMessageContent do Baileys.
@@ -62,6 +154,8 @@ const normalizeSendOptions = (options) => {
  * @param {unknown} options
  * @returns {{
  *   sendOptions: import('@whiskeysockets/baileys').MiscMessageGenerationOptions|undefined,
+ *   sessionId: string | null,
+ *   allowGroupWrite: boolean | undefined,
  *   skipPresenceUpdate: boolean,
  *   presenceBefore: import('@whiskeysockets/baileys').WAPresence,
  *   presenceAfter: import('@whiskeysockets/baileys').WAPresence,
@@ -73,6 +167,8 @@ const resolveRuntimeSendOptions = (options) => {
   if (!isPlainObject(options)) {
     return {
       sendOptions: undefined,
+      sessionId: null,
+      allowGroupWrite: undefined,
       skipPresenceUpdate: false,
       presenceBefore: BAILEYS_REPLY_PRESENCE_BEFORE,
       presenceAfter: BAILEYS_REPLY_PRESENCE_AFTER,
@@ -81,10 +177,12 @@ const resolveRuntimeSendOptions = (options) => {
     };
   }
 
-  const { skipPresenceUpdate, presenceBefore, presenceAfter, presenceDelayMs, presenceSubscribe, ...sendOptions } = options;
+  const { skipPresenceUpdate, presenceBefore, presenceAfter, presenceDelayMs, presenceSubscribe, sessionId, allowGroupWrite, ...sendOptions } = options;
   const normalizedDelay = parseEnvInt(presenceDelayMs, BAILEYS_REPLY_PRESENCE_DELAY_MS, 0, 3_000);
   return {
     sendOptions: Object.keys(sendOptions).length > 0 ? sendOptions : undefined,
+    sessionId: normalizeSessionId(sessionId),
+    allowGroupWrite: typeof allowGroupWrite === 'boolean' ? allowGroupWrite : undefined,
     skipPresenceUpdate: Boolean(skipPresenceUpdate),
     presenceBefore: normalizeWAPresence(presenceBefore, BAILEYS_REPLY_PRESENCE_BEFORE),
     presenceAfter: normalizeWAPresence(presenceAfter, BAILEYS_REPLY_PRESENCE_AFTER),
@@ -163,9 +261,11 @@ const resolveMessageTimestampMs = (msg) => {
  * Normaliza uma mensagem do Baileys para o formato persistido no banco.
  * @param {import('@whiskeysockets/baileys').WAMessage} msg - Mensagem recebida/enviada.
  * @param {string} [senderId] - ID do remetente (opcional).
+ * @param {string|null} [sessionId] - Sessão lógica para persistência.
  * @returns {Object} Objeto com dados prontos para persistencia.
  */
-export const buildMessageData = (msg, senderId) => ({
+export const buildMessageData = (msg, senderId, sessionId = null) => ({
+  session_id: normalizeSessionId(sessionId),
   message_id: msg?.key?.id,
   chat_id: msg?.key?.remoteJid,
   sender_id: senderId || msg?.key?.participant || msg?.key?.remoteJid,
@@ -227,6 +327,40 @@ export async function sendAndStore(sock, jid, content, options) {
 
   const normalizedJid = normalizeJid(jid) || String(jid).trim();
   const runtimeOptions = resolveRuntimeSendOptions(options);
+  const runtimeSessionId = runtimeOptions.sessionId || normalizeSessionId(sock?.__omnizapSessionId);
+  let resolvedGroupWritePermission = null;
+
+  if (isGroupJid(normalizedJid)) {
+    if (runtimeOptions.allowGroupWrite === false) {
+      logger.debug('Envio para grupo ignorado por bloqueio explícito de escrita.', {
+        action: 'send_group_blocked_explicit',
+        groupJid: normalizedJid,
+        sessionId: runtimeSessionId,
+      });
+      return undefined;
+    }
+
+    if (runtimeOptions.allowGroupWrite === true) {
+      resolvedGroupWritePermission = {
+        allowed: true,
+        ownerSessionId: runtimeSessionId,
+        reason: 'explicit_allow',
+      };
+    } else {
+      resolvedGroupWritePermission = await resolveGroupWritePermission(normalizedJid, runtimeSessionId);
+      if (!resolvedGroupWritePermission.allowed) {
+        logger.info('Envio para grupo bloqueado por sessão não-owner.', {
+          action: 'send_group_blocked_non_owner',
+          groupJid: normalizedJid,
+          sessionId: runtimeSessionId,
+          ownerSessionId: resolvedGroupWritePermission.ownerSessionId,
+          reason: resolvedGroupWritePermission.reason,
+        });
+        return undefined;
+      }
+    }
+  }
+
   const normalizedOptions = normalizeSendOptions(runtimeOptions.sendOptions);
   const shouldSendPresence = shouldSendReplyPresence(normalizedJid, content, runtimeOptions);
 
@@ -292,7 +426,13 @@ export async function sendAndStore(sock, jid, content, options) {
   const senderId = sock?.user?.id || sent?.key?.participant;
   if (sent?.key?.id) {
     try {
-      queueMessageInsert(buildMessageData(sent, senderId));
+      const messageData = buildMessageData(sent, senderId, runtimeSessionId);
+      const targetGroupJid = normalizeJid(messageData.chat_id || normalizedJid);
+      if (isGroupJid(targetGroupJid)) {
+        const allowGroupWrite = runtimeOptions.allowGroupWrite === true || resolvedGroupWritePermission?.allowed === true;
+        messageData.allow_group_write = allowGroupWrite;
+      }
+      queueMessageInsert(messageData);
     } catch (error) {
       logger.warn('Falha ao enfileirar mensagem enviada para persistencia.', {
         error: error.message,

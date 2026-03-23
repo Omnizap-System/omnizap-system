@@ -105,7 +105,7 @@ const INVALID_SURROGATE_REGEX = /surrogate pair/i;
 const messageQueue = [];
 
 /**
- * Conjunto de IDs de mensagens que já estão enfileiradas, para evitar duplicação.
+ * Conjunto de IDs de mensagens já enfileiradas no formato `${session_id}:${message_id}`.
  * @type {Set<string>}
  */
 const messagePendingIds = new Set();
@@ -132,7 +132,7 @@ const chatCache = new Map();
 
 /**
  * Fila em memória com eventos do Baileys pendentes de persistência.
- * @type {Array<{event_name:string, socket_generation:(number|null), chat_id:(string|null), message_id:(string|null), participant_id:(string|null), payload_summary:(string|null), event_timestamp:Date}>}
+ * @type {Array<{session_id:string, event_name:string, socket_generation:(number|null), chat_id:(string|null), message_id:(string|null), participant_id:(string|null), payload_summary:(string|null), event_timestamp:Date}>}
  */
 const baileysEventQueue = [];
 
@@ -251,8 +251,8 @@ const isInvalidJsonPayloadError = (error) => {
  * - content: remove surrogate inválido
  * - raw_message: serializa JSON seguro para coluna JSON
  *
- * @param {{message_id:string, chat_id:string, sender_id:string, canonical_sender_id?:(string|null), content:(string|null), raw_message:(Object|string|null), timestamp:(number|string|Date)}} messageData
- * @returns {{message_id:string, chat_id:string, sender_id:(string|null), canonical_sender_id:(string|null), content:(string|null), raw_message:(string|null), timestamp:(number|string|Date)}}
+ * @param {{session_id?:(string|null), message_id:string, chat_id:string, sender_id:string, canonical_sender_id?:(string|null), content:(string|null), raw_message:(Object|string|null), timestamp:(number|string|Date), allow_group_write?:(boolean)}} messageData
+ * @returns {{session_id:string, message_id:string, chat_id:(string|null), sender_id:(string|null), canonical_sender_id:(string|null), content:(string|null), raw_message:(string|null), timestamp:(number|string|Date)}}
  */
 const normalizeUserIdForColumn = (value, maxLength = 255) => {
   if (value === null || value === undefined) return null;
@@ -277,8 +277,13 @@ const resolveCanonicalSenderIdForMessage = (messageData) => {
 
 const normalizeMessageForQueue = (messageData) => {
   const senderId = normalizeUserIdForColumn(messageData?.sender_id, 255);
+  const messageId = normalizeTextForColumn(messageData?.message_id, 255);
+  const chatId = normalizeTextForColumn(messageData?.chat_id, 255);
   return {
     ...messageData,
+    session_id: normalizeSessionIdForColumn(messageData?.session_id || messageData?.sessionId),
+    message_id: messageId,
+    chat_id: chatId,
     sender_id: senderId,
     canonical_sender_id: resolveCanonicalSenderIdForMessage({
       ...messageData,
@@ -302,7 +307,25 @@ const normalizeTimestampForColumn = (value) => {
   return __timeNow();
 };
 
+const normalizeSessionIdForColumn = (value) => {
+  const normalized = normalizeTextForColumn(value, 64);
+  return normalized || 'default';
+};
+
+const isGroupChatId = (chatId) => {
+  const normalized = String(chatId || '').trim();
+  return normalized.endsWith('@g.us');
+};
+
+const buildMessagePendingKey = (sessionId, messageId) => {
+  const safeSessionId = normalizeSessionIdForColumn(sessionId);
+  const safeMessageId = normalizeTextForColumn(messageId, 255);
+  if (!safeMessageId) return null;
+  return `${safeSessionId}:${safeMessageId}`;
+};
+
 const normalizeBaileysEventForQueue = (eventData) => ({
+  session_id: normalizeSessionIdForColumn(eventData?.session_id || eventData?.sessionId),
   event_name: normalizeTextForColumn(eventData?.event_name, 64),
   socket_generation: Number.isFinite(Number(eventData?.socket_generation)) ? Math.max(0, Math.floor(Number(eventData.socket_generation))) : null,
   chat_id: normalizeTextForColumn(eventData?.chat_id, 255),
@@ -313,14 +336,14 @@ const normalizeBaileysEventForQueue = (eventData) => ({
 });
 
 const insertBaileysEventBatch = async (batch) => {
-  const placeholders = buildPlaceholders(batch.length, 7);
+  const placeholders = buildPlaceholders(batch.length, 8);
   const params = [];
   for (const entry of batch) {
-    params.push(entry.event_name, entry.socket_generation, entry.chat_id, entry.message_id, entry.participant_id, entry.payload_summary, entry.event_timestamp);
+    params.push(entry.session_id, entry.event_name, entry.socket_generation, entry.chat_id, entry.message_id, entry.participant_id, entry.payload_summary, entry.event_timestamp);
   }
 
   const sql = `INSERT INTO ${TABLES.BAILEYS_EVENT_JOURNAL}
-      (event_name, socket_generation, chat_id, message_id, participant_id, payload_summary, event_timestamp)
+      (session_id, event_name, socket_generation, chat_id, message_id, participant_id, payload_summary, event_timestamp)
       VALUES ${placeholders}`;
 
   await executeQuery(sql, params);
@@ -329,18 +352,18 @@ const insertBaileysEventBatch = async (batch) => {
 /**
  * Executa INSERT IGNORE de um batch de mensagens.
  *
- * @param {Array<{message_id:string, chat_id:string, sender_id:(string|null), canonical_sender_id:(string|null), content:(string|null), raw_message:(string|null), timestamp:(number|string|Date)}>} batch
+ * @param {Array<{session_id:string, message_id:string, chat_id:string, sender_id:(string|null), canonical_sender_id:(string|null), content:(string|null), raw_message:(string|null), timestamp:(number|string|Date)}>} batch
  * @returns {Promise<void>}
  */
 const insertMessageBatch = async (batch) => {
-  const placeholders = buildPlaceholders(batch.length, 7);
+  const placeholders = buildPlaceholders(batch.length, 8);
   const params = [];
   for (const message of batch) {
-    params.push(message.message_id, message.chat_id, message.sender_id, message.canonical_sender_id, message.content, message.raw_message, message.timestamp);
+    params.push(message.session_id, message.message_id, message.chat_id, message.sender_id, message.canonical_sender_id, message.content, message.raw_message, message.timestamp);
   }
 
   const sql = `INSERT IGNORE INTO ${TABLES.MESSAGES}
-      (message_id, chat_id, sender_id, canonical_sender_id, content, raw_message, timestamp)
+      (session_id, message_id, chat_id, sender_id, canonical_sender_id, content, raw_message, timestamp)
       VALUES ${placeholders}`;
 
   await executeQuery(sql, params);
@@ -424,12 +447,13 @@ const refreshMessageActivityDailyForBatch = async (batch) => {
 /**
  * Remove IDs de mensagens do set de pendentes.
  *
- * @param {Array<{message_id:string}>} batch
+ * @param {Array<{session_id:string, message_id:string}>} batch
  * @returns {void}
  */
 const clearPendingMessageIds = (batch) => {
   for (const message of batch) {
-    messagePendingIds.delete(message.message_id);
+    const key = buildMessagePendingKey(message?.session_id, message?.message_id);
+    if (key) messagePendingIds.delete(key);
   }
 };
 
@@ -438,7 +462,7 @@ const clearPendingMessageIds = (batch) => {
  * - Mensagem inválida é descartada para não travar a fila inteira.
  * - Em erro transitório, re-enfileira o restante e interrompe.
  *
- * @param {Array<{message_id:string, chat_id:string, sender_id:(string|null), canonical_sender_id:(string|null), content:(string|null), raw_message:(string|null), timestamp:(number|string|Date)}>} batch
+ * @param {Array<{session_id:string, message_id:string, chat_id:string, sender_id:(string|null), canonical_sender_id:(string|null), content:(string|null), raw_message:(string|null), timestamp:(number|string|Date)}>} batch
  * @returns {Promise<void>}
  */
 const salvageJsonErrorBatch = async (batch) => {
@@ -679,26 +703,32 @@ const baileysEventFlushRunner = createFlushRunner({
 
 /**
  * Enfileira uma mensagem para INSERT no banco (INSERT IGNORE).
- * - Evita duplicar message_id usando um Set.
+ * - Evita duplicar por `${session_id}:${message_id}` usando um Set.
  * - Força flush se a fila estiver muito grande.
  * - Agenda flush quando atinge o tamanho de batch.
  *
- * @param {{message_id:string, chat_id:string, sender_id:string, canonical_sender_id?:(string|null), content:(string|null), raw_message:(Object|string|null), timestamp:(number|string)}} messageData
+ * @param {{session_id?:(string|null), message_id:string, chat_id:string, sender_id:string, canonical_sender_id?:(string|null), content:(string|null), raw_message:(Object|string|null), timestamp:(number|string), allow_group_write?:(boolean)}} messageData
  *   Objeto com os campos necessários para persistência.
  * @returns {boolean} true se foi enfileirada; false se inválida/duplicada.
  */
 export function queueMessageInsert(messageData) {
-  if (!messageData?.message_id) return false;
-  if (messagePendingIds.has(messageData.message_id)) return false;
-
   const normalizedMessage = normalizeMessageForQueue(messageData);
+  if (!normalizedMessage?.message_id) return false;
+
+  if (isGroupChatId(normalizedMessage.chat_id) && normalizedMessage.allow_group_write === false) {
+    return false;
+  }
+
+  const pendingKey = buildMessagePendingKey(normalizedMessage.session_id, normalizedMessage.message_id);
+  if (!pendingKey) return false;
+  if (messagePendingIds.has(pendingKey)) return false;
 
   if (messageQueue.length >= MESSAGE_QUEUE_MAX) {
     logger.warn('Fila de mensagens cheia, forçando flush.', { size: messageQueue.length });
     scheduleFlush();
   }
 
-  messagePendingIds.add(normalizedMessage.message_id);
+  messagePendingIds.add(pendingKey);
   messageQueue.push(normalizedMessage);
   updateQueueMetrics();
 
@@ -782,7 +812,7 @@ export function queueChatUpdate(chat, options = {}) {
 /**
  * Enfileira um evento resumido do Baileys para o journal de auditoria.
  *
- * @param {{event_name:string, socket_generation?:(number|null), chat_id?:(string|null), message_id?:(string|null), participant_id?:(string|null), payload_summary?:any, event_timestamp?:(string|number|Date)}} eventData
+ * @param {{session_id?:(string|null), event_name:string, socket_generation?:(number|null), chat_id?:(string|null), message_id?:(string|null), participant_id?:(string|null), payload_summary?:any, event_timestamp?:(string|number|Date)}} eventData
  * @returns {boolean}
  */
 export function queueBaileysEventInsert(eventData) {

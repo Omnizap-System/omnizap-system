@@ -101,6 +101,12 @@ const ASSIGNMENT_SELECT_COLUMNS = `group_jid,
   created_at,
   updated_at`;
 
+const clampLimit = (value, fallback = 200, min = 1, max = 5_000) => {
+  const parsed = Number.parseInt(String(value ?? ''), 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, parsed));
+};
+
 export const getAssignment = async (groupJid, connection = null) => {
   const safeGroupJid = normalizeGroupJid(groupJid);
   if (!safeGroupJid) return null;
@@ -135,6 +141,52 @@ export const getAssignmentForUpdate = async (groupJid, connection) => {
   );
 
   return normalizeAssignmentRow(rows?.[0] || null);
+};
+
+export const listAssignments = async (
+  {
+    groupJid = null,
+    ownerSessionId = null,
+    includeExpired = true,
+    limit = 200,
+  } = {},
+  connection = null,
+) => {
+  const safeGroupJid = normalizeGroupJid(groupJid);
+  const safeOwnerSessionId = normalizeSessionId(ownerSessionId);
+  const safeLimit = clampLimit(limit, 200, 1, 5_000);
+
+  const where = [];
+  const params = [];
+
+  if (safeGroupJid) {
+    where.push('group_jid = ?');
+    params.push(safeGroupJid);
+  }
+
+  if (safeOwnerSessionId) {
+    where.push('owner_session_id = ?');
+    params.push(safeOwnerSessionId);
+  }
+
+  if (!includeExpired) {
+    where.push('lease_expires_at > UTC_TIMESTAMP()');
+  }
+
+  const whereSql = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
+  const rows = await executeQuery(
+    `SELECT ${ASSIGNMENT_SELECT_COLUMNS}
+       FROM ${GROUP_ASSIGNMENT_TABLE}
+      ${whereSql}
+      ORDER BY updated_at DESC
+      LIMIT ${safeLimit}`,
+    params,
+    connection,
+  );
+
+  return (Array.isArray(rows) ? rows : [])
+    .map((row) => normalizeAssignmentRow(row))
+    .filter(Boolean);
 };
 
 export const createAssignment = async (
@@ -263,6 +315,35 @@ export const expireAssignment = async (
   );
 
   return getAssignment(safeGroupJid, connection);
+};
+
+export const renewLeasesByOwner = async (
+  {
+    ownerSessionId,
+    leaseExpiresAt,
+    reason = null,
+    now = undefined,
+  } = {},
+  connection = null,
+) => {
+  const safeOwnerSessionId = normalizeSessionId(ownerSessionId);
+  const safeLeaseExpiresAt = toDateOrNull(leaseExpiresAt);
+  const safeNow = now === undefined ? new Date() : toDateOrNull(now) || new Date();
+  if (!safeOwnerSessionId || !safeLeaseExpiresAt) {
+    throw new Error('renewLeasesByOwner requer ownerSessionId e leaseExpiresAt validos.');
+  }
+
+  const result = await executeQuery(
+    `UPDATE ${GROUP_ASSIGNMENT_TABLE}
+        SET lease_expires_at = ?,
+            last_reason = ?
+      WHERE owner_session_id = ?
+        AND lease_expires_at > ?`,
+    [safeLeaseExpiresAt, normalizeReason(reason), safeOwnerSessionId, safeNow],
+    connection,
+  );
+
+  return Number(result?.affectedRows || 0);
 };
 
 export const insertAssignmentHistory = async (

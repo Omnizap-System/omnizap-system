@@ -16,6 +16,12 @@ const parsePositiveInt = (value, fallback, min = 1, max = Number.MAX_SAFE_INTEGE
   return Math.max(min, Math.min(max, parsed));
 };
 
+const parseAssignmentVersion = (value) => {
+  const parsed = Number.parseInt(String(value ?? ''), 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return parsed;
+};
+
 const isDuplicateError = (error) => {
   const code = String(error?.code || error?.originalError?.code || '');
   return DUPLICATE_KEY_ERRORS.has(code);
@@ -170,6 +176,93 @@ export const createGroupOwnershipService = ({
     const ownerState = toOwnerState(assignment, nowMs);
     setCacheEntry(safeGroupJid, ownerState, nowMs);
     return cloneOwnerState(ownerState);
+  };
+
+  const listAssignments = async ({ groupJid = null, ownerSessionId = null, includeExpired = false, limit = 200 } = {}) => {
+    const assignments = await repository.listAssignments({
+      groupJid,
+      ownerSessionId,
+      includeExpired,
+      limit,
+    });
+
+    const nowMs = nowImpl();
+    return (Array.isArray(assignments) ? assignments : []).map((assignment) => {
+      const owner = toOwnerState(assignment, nowMs);
+      if (owner) return owner;
+      return {
+        groupJid: assignment?.groupJid || null,
+        ownerSessionId: assignment?.ownerSessionId || null,
+        leaseExpiresAt: cloneDate(assignment?.leaseExpiresAt),
+        cooldownUntil: cloneDate(assignment?.cooldownUntil),
+        assignmentVersion: Number(assignment?.assignmentVersion || 1),
+        pinned: assignment?.pinned === true,
+        lastReason: assignment?.lastReason || null,
+        createdAt: cloneDate(assignment?.createdAt),
+        updatedAt: cloneDate(assignment?.updatedAt),
+        active: false,
+      };
+    });
+  };
+
+  const buildFencingToken = ({ groupJid, ownerSessionId, assignmentVersion } = {}) => {
+    const safeGroupJid = repository.normalizeGroupJid(groupJid);
+    const safeOwnerSessionId = repository.normalizeSessionId(ownerSessionId);
+    const safeAssignmentVersion = parseAssignmentVersion(assignmentVersion);
+    if (!safeGroupJid || !safeOwnerSessionId || !safeAssignmentVersion) return null;
+    return `${safeGroupJid}:${safeOwnerSessionId}:${safeAssignmentVersion}`;
+  };
+
+  const validateFenceToken = async (
+    {
+      groupJid,
+      sessionId,
+      assignmentVersion,
+      bypassCache = true,
+    } = {},
+  ) => {
+    const safeGroupJid = repository.normalizeGroupJid(groupJid);
+    const safeSessionId = repository.normalizeSessionId(sessionId);
+    const safeAssignmentVersion = parseAssignmentVersion(assignmentVersion);
+    if (!safeGroupJid || !safeSessionId || !safeAssignmentVersion) {
+      return {
+        valid: false,
+        reason: 'invalid_token',
+        owner: null,
+      };
+    }
+
+    const owner = await getOwner(safeGroupJid, { bypassCache });
+    if (!owner?.ownerSessionId) {
+      return {
+        valid: false,
+        reason: 'owner_missing',
+        owner: null,
+      };
+    }
+
+    if (owner.ownerSessionId !== safeSessionId) {
+      return {
+        valid: false,
+        reason: 'owner_mismatch',
+        owner: cloneOwnerState(owner),
+      };
+    }
+
+    const currentVersion = parseAssignmentVersion(owner.assignmentVersion);
+    if (currentVersion !== safeAssignmentVersion) {
+      return {
+        valid: false,
+        reason: 'assignment_version_mismatch',
+        owner: cloneOwnerState(owner),
+      };
+    }
+
+    return {
+      valid: true,
+      reason: 'ok',
+      owner: cloneOwnerState(owner),
+    };
   };
 
   const tryAcquire = async (
@@ -387,6 +480,57 @@ export const createGroupOwnershipService = ({
     return cloneOutcome(outcome);
   };
 
+  const heartbeatOwnerSession = async (
+    {
+      sessionId,
+      leaseMs = safeDefaultLeaseMs,
+      reason = 'heartbeat',
+      botJid = undefined,
+      metadata = undefined,
+      currentScore = 0,
+      capacityWeight = 1,
+    } = {},
+  ) => {
+    const safeSessionId = repository.normalizeSessionId(sessionId);
+    if (!safeSessionId) {
+      throw new Error('heartbeatOwnerSession requer sessionId valido.');
+    }
+
+    const safeLeaseMs = resolveLeaseMs(leaseMs);
+    const safeReason = repository.normalizeReason(reason) || 'heartbeat';
+    const heartbeatAt = new Date(nowImpl());
+    const leaseExpiresAt = new Date(heartbeatAt.getTime() + safeLeaseMs);
+
+    const renewedAssignments = await withTransactionImpl(async (connection) => {
+      await sessionRegistry.heartbeatSession(safeSessionId, {
+        status: 'online',
+        currentScore,
+        metadata,
+        botJid,
+        capacityWeight,
+        connection,
+      });
+
+      return repository.renewLeasesByOwner(
+        {
+          ownerSessionId: safeSessionId,
+          leaseExpiresAt,
+          reason: safeReason,
+          now: heartbeatAt,
+        },
+        connection,
+      );
+    });
+
+    return {
+      renewedAssignments: Number(renewedAssignments || 0),
+      heartbeatAt: new Date(heartbeatAt.getTime()),
+      leaseExpiresAt: new Date(leaseExpiresAt.getTime()),
+      sessionId: safeSessionId,
+      reason: safeReason,
+    };
+  };
+
   const release = async (
     {
       groupJid,
@@ -476,6 +620,236 @@ export const createGroupOwnershipService = ({
     return cloneOutcome(outcome);
   };
 
+  const forceAssign = async (
+    {
+      groupJid,
+      sessionId,
+      leaseMs = safeDefaultLeaseMs,
+      reason = 'force_assign',
+      changedBy = null,
+      metadata = null,
+      pinned = undefined,
+    } = {},
+  ) => {
+    const safeGroupJid = repository.normalizeGroupJid(groupJid);
+    const safeSessionId = repository.normalizeSessionId(sessionId);
+    if (!safeGroupJid || !safeSessionId) {
+      throw new Error('forceAssign requer groupJid e sessionId validos.');
+    }
+
+    const safeLeaseMs = resolveLeaseMs(leaseMs);
+    const safeReason = repository.normalizeReason(reason) || 'force_assign';
+    const safeChangedBy = repository.normalizeChangedBy(changedBy || safeSessionId || 'system');
+
+    const outcome = await withTransactionImpl(async (connection) => {
+      await sessionRegistry.ensureSession(safeSessionId, { status: 'online', connection });
+
+      const nowMs = nowImpl();
+      const leaseExpiresAt = new Date(nowMs + safeLeaseMs);
+      const current = await repository.getAssignmentForUpdate(safeGroupJid, connection);
+
+      if (!current) {
+        const created = await repository.createAssignment(
+          {
+            groupJid: safeGroupJid,
+            ownerSessionId: safeSessionId,
+            leaseExpiresAt,
+            reason: safeReason,
+            pinned: pinned === undefined ? false : pinned === true,
+            assignmentVersion: 1,
+          },
+          connection,
+        );
+
+        const assignmentVersion = Number(created?.assignmentVersion || 1);
+        await recordHistory(
+          {
+            groupJid: safeGroupJid,
+            previousSessionId: null,
+            newSessionId: safeSessionId,
+            reason: safeReason,
+            changedBy: safeChangedBy,
+            assignmentVersion,
+            metadata,
+          },
+          connection,
+        );
+
+        return {
+          reassigned: true,
+          owner: toOwnerState(created, nowMs),
+          reason: 'created',
+          assignmentVersion,
+          previousOwnerSessionId: null,
+        };
+      }
+
+      const isOwnerChanged = current.ownerSessionId !== safeSessionId;
+      const hasLeaseActive = hasActiveLease(current, nowMs);
+      const nextLeaseExpiresAt = hasLeaseActive ? leaseExpiresAt : new Date(nowMs + safeLeaseMs);
+      const updated = await repository.updateAssignmentOwner(
+        {
+          groupJid: safeGroupJid,
+          ownerSessionId: safeSessionId,
+          leaseExpiresAt: nextLeaseExpiresAt,
+          reason: safeReason,
+          bumpVersion: isOwnerChanged,
+          pinned,
+        },
+        connection,
+      );
+
+      const assignmentVersion = Number(updated?.assignmentVersion || (isOwnerChanged ? Number(current.assignmentVersion || 1) + 1 : Number(current.assignmentVersion || 1)));
+
+      if (isOwnerChanged) {
+        await recordHistory(
+          {
+            groupJid: safeGroupJid,
+            previousSessionId: current.ownerSessionId,
+            newSessionId: safeSessionId,
+            reason: safeReason,
+            changedBy: safeChangedBy,
+            assignmentVersion,
+            metadata,
+          },
+          connection,
+        );
+      }
+
+      return {
+        reassigned: isOwnerChanged,
+        owner: toOwnerState(updated, nowMs),
+        reason: isOwnerChanged ? 'reassigned' : 'already_owner',
+        assignmentVersion,
+        previousOwnerSessionId: current.ownerSessionId,
+      };
+    });
+
+    setCacheEntry(safeGroupJid, outcome.owner ?? null);
+    return cloneOutcome(outcome);
+  };
+
+  const setPinned = async (
+    {
+      groupJid,
+      pinned,
+      sessionId = null,
+      reason = null,
+      changedBy = null,
+      metadata = null,
+      leaseMs = safeDefaultLeaseMs,
+    } = {},
+  ) => {
+    const safeGroupJid = repository.normalizeGroupJid(groupJid);
+    if (!safeGroupJid) {
+      throw new Error('setPinned requer groupJid valido.');
+    }
+
+    const desiredPinned = pinned === true;
+    const safeSessionId = repository.normalizeSessionId(sessionId);
+    const safeReason = repository.normalizeReason(reason) || (desiredPinned ? 'pin_assignment' : 'unpin_assignment');
+    const safeChangedBy = repository.normalizeChangedBy(changedBy || safeSessionId || 'system');
+    const safeLeaseMs = resolveLeaseMs(leaseMs);
+
+    const outcome = await withTransactionImpl(async (connection) => {
+      const nowMs = nowImpl();
+      const current = await repository.getAssignmentForUpdate(safeGroupJid, connection);
+      if (!current) {
+        if (!desiredPinned) {
+          return {
+            updated: false,
+            owner: null,
+            reason: 'not_found',
+            assignmentVersion: null,
+            previousOwnerSessionId: null,
+          };
+        }
+
+        if (!safeSessionId) {
+          throw new Error('Nao e possivel pinar grupo sem assignment existente sem informar sessionId.');
+        }
+
+        await sessionRegistry.ensureSession(safeSessionId, { status: 'online', connection });
+        const created = await repository.createAssignment(
+          {
+            groupJid: safeGroupJid,
+            ownerSessionId: safeSessionId,
+            leaseExpiresAt: new Date(nowMs + safeLeaseMs),
+            reason: safeReason,
+            pinned: true,
+            assignmentVersion: 1,
+          },
+          connection,
+        );
+        const assignmentVersion = Number(created?.assignmentVersion || 1);
+        await recordHistory(
+          {
+            groupJid: safeGroupJid,
+            previousSessionId: null,
+            newSessionId: safeSessionId,
+            reason: safeReason,
+            changedBy: safeChangedBy,
+            assignmentVersion,
+            metadata,
+          },
+          connection,
+        );
+
+        return {
+          updated: true,
+          owner: toOwnerState(created, nowMs),
+          reason: 'created_and_pinned',
+          assignmentVersion,
+          previousOwnerSessionId: null,
+        };
+      }
+
+      const targetSessionId = safeSessionId || current.ownerSessionId;
+      const hasLease = hasActiveLease(current, nowMs);
+      const leaseExpiresAt = hasLease ? current.leaseExpiresAt : new Date(nowMs + safeLeaseMs);
+
+      const updated = await repository.updateAssignmentOwner(
+        {
+          groupJid: safeGroupJid,
+          ownerSessionId: targetSessionId,
+          leaseExpiresAt,
+          reason: safeReason,
+          bumpVersion: targetSessionId !== current.ownerSessionId,
+          pinned: desiredPinned,
+        },
+        connection,
+      );
+
+      const assignmentVersion = Number(updated?.assignmentVersion || current.assignmentVersion || 1);
+      const ownerChanged = targetSessionId !== current.ownerSessionId;
+      if (ownerChanged) {
+        await recordHistory(
+          {
+            groupJid: safeGroupJid,
+            previousSessionId: current.ownerSessionId,
+            newSessionId: targetSessionId,
+            reason: safeReason,
+            changedBy: safeChangedBy,
+            assignmentVersion,
+            metadata,
+          },
+          connection,
+        );
+      }
+
+      return {
+        updated: true,
+        owner: toOwnerState(updated, nowMs),
+        reason: ownerChanged ? 'owner_changed_and_pin_updated' : 'pin_updated',
+        assignmentVersion,
+        previousOwnerSessionId: current.ownerSessionId,
+      };
+    });
+
+    setCacheEntry(safeGroupJid, outcome.owner ?? null);
+    return cloneOutcome(outcome);
+  };
+
   const getCacheStats = () => ({
     size: ownerCache.size,
     ttlMs: safeCacheTtlMs,
@@ -483,10 +857,16 @@ export const createGroupOwnershipService = ({
 
   return {
     getOwner,
+    listAssignments,
     tryAcquire,
     renewLease,
+    heartbeatOwnerSession,
     release,
+    forceAssign,
+    setPinned,
     recordHistory,
+    validateFenceToken,
+    buildFencingToken,
     invalidateCache,
     clearCache,
     getCacheStats,
@@ -496,9 +876,15 @@ export const createGroupOwnershipService = ({
 const groupOwnershipService = createGroupOwnershipService();
 
 export const getOwner = (...args) => groupOwnershipService.getOwner(...args);
+export const listAssignments = (...args) => groupOwnershipService.listAssignments(...args);
 export const tryAcquire = (...args) => groupOwnershipService.tryAcquire(...args);
 export const renewLease = (...args) => groupOwnershipService.renewLease(...args);
+export const heartbeatOwnerSession = (...args) => groupOwnershipService.heartbeatOwnerSession(...args);
 export const release = (...args) => groupOwnershipService.release(...args);
+export const forceAssign = (...args) => groupOwnershipService.forceAssign(...args);
+export const setPinned = (...args) => groupOwnershipService.setPinned(...args);
 export const recordHistory = (...args) => groupOwnershipService.recordHistory(...args);
+export const validateFenceToken = (...args) => groupOwnershipService.validateFenceToken(...args);
+export const buildFencingToken = (...args) => groupOwnershipService.buildFencingToken(...args);
 
 export default groupOwnershipService;

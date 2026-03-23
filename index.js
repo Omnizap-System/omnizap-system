@@ -33,6 +33,7 @@ import { startAiLearningWorker, stopAiLearningWorker } from './app/workers/aiLea
 import { startCommandConfigEnrichmentWorker, stopCommandConfigEnrichmentWorker } from './app/workers/commandConfigEnrichmentWorker.js';
 import { startAiHelperContinuousLearningWorker, stopAiHelperContinuousLearningWorker } from './app/workers/aiHelperContinuousLearningWorker.js';
 import { formatCommandConfigValidationReport, validateAllCommandConfigs } from './app/services/ai/commandConfigValidationService.js';
+import { startGroupAssignmentBalancer, stopGroupAssignmentBalancer } from './app/services/multiSession/assignmentBalancerService.js';
 
 /**
  * Timeout máximo para inicialização do banco (criar/verificar DB + tabelas).
@@ -264,6 +265,8 @@ async function startApp() {
     await withTimeout(connectAllWhatsAppSessions(), sessionConnectTimeoutMs, 'Conexao WhatsApp (multi-session)');
     logger.info('Sessoes do WhatsApp conectadas.');
 
+    startGroupAssignmentBalancer();
+
     logger.info('Inicializando servico de noticias...');
     await initializeNewsBroadcastService();
     logger.info('Servico de noticias pronto.');
@@ -325,6 +328,14 @@ async function shutdown(signal, error) {
       }
     } catch (stopError) {
       logger.warn('Falha ao encerrar servico de noticias.', { error: stopError.message });
+    }
+
+    try {
+      stopGroupAssignmentBalancer();
+    } catch (balancerStopError) {
+      logger.warn('Falha ao encerrar balanceador de grupos.', {
+        error: balancerStopError?.message,
+      });
     }
 
     // 2) Esperar backfill (best-effort) com timeout

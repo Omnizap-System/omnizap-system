@@ -2,7 +2,7 @@ import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } fro
 import makeWASocket, { DisconnectReason, Browsers, getAggregateVotesInPollMessage, areJidsSameUser, WAMessageStatus, WAMessageStubType, delayCancellable, getStatusFromReceiptType, promiseTimeout } from '@whiskeysockets/baileys';
 
 import NodeCache from 'node-cache';
-import { parseEnvBool, parseEnvCsv, parseEnvInt, resolveBaileysVersion, resolveAddressingModeFromMessageKey, normalizeAddressingMode, normalizePnToJid, normalizeWAPresence, getMultiSessionRuntimeConfig, baileysConnectionLogger as logger, baileysSocketLogger } from '../config/index.js';
+import { parseEnvBool, parseEnvCsv, parseEnvInt, resolveBaileysVersion, resolveAddressingModeFromMessageKey, normalizeAddressingMode, normalizeJid, normalizePnToJid, normalizeWAPresence, isGroupJid, getMultiSessionRuntimeConfig, baileysConnectionLogger as logger, baileysSocketLogger } from '../config/index.js';
 
 import { Boom } from '@hapi/boom';
 import qrcode from 'qrcode-terminal';
@@ -21,6 +21,13 @@ import { extractSenderInfoFromMessage, primeLidCache, resolveUserIdCached, isLid
 import { queueBaileysEventInsert, queueChatUpdate, queueLidUpdate, queueMessageInsert } from '../services/infra/dbWriteQueue.js';
 import { buildGroupMetadataFromGroup, buildGroupMetadataFromUpdate, upsertGroupMetadata, parseParticipantsFromDb } from '../services/group/groupMetadataService.js';
 import { buildMessageData } from '../configParts/messagePersistenceService.js';
+import {
+  getOwner as getGroupOwner,
+  tryAcquire as tryAcquireGroupOwner,
+  heartbeatOwnerSession as heartbeatGroupOwnerSession,
+} from '../services/multiSession/groupOwnershipService.js';
+import sessionRegistryService from '../services/multiSession/sessionRegistryService.js';
+import { createGroupOwnerWriteStateResolver, normalizeAssignmentVersion } from './groupOwnerWriteStateResolver.js';
 import { useDbAuthState } from './baileysDbAuthState.js';
 
 import { fileURLToPath } from 'node:url';
@@ -186,6 +193,58 @@ const getWriterLockNameBySession = (sessionId) => {
   }
   return `${base}:${safeSessionId}`;
 };
+
+const GROUP_OWNER_WRITE_CACHE_TTL_MS = parseEnvInt(
+  process.env.GROUP_OWNER_WRITE_CACHE_TTL_MS,
+  Math.max(2_000, Math.floor((Number(MULTI_SESSION_RUNTIME_CONFIG?.ownerHeartbeatMs) || 30_000) / 3)),
+  1_000,
+  60_000,
+);
+const GROUP_OWNER_WRITE_CLAIM_ON_MISS = parseEnvBool(process.env.GROUP_OWNER_WRITE_CLAIM_ON_MISS, true);
+const GROUP_OWNER_LEASE_MS = Math.max(5_000, Number(MULTI_SESSION_RUNTIME_CONFIG?.ownerLeaseMs) || 120_000);
+let GROUP_OWNER_HEARTBEAT_MS = parseEnvInt(
+  process.env.GROUP_OWNER_HEARTBEAT_RUNTIME_MS,
+  Math.max(1_000, Math.min(GROUP_OWNER_LEASE_MS - 500, Number(MULTI_SESSION_RUNTIME_CONFIG?.ownerHeartbeatMs) || 30_000)),
+  1_000,
+  5 * 60 * 1000,
+);
+if (GROUP_OWNER_HEARTBEAT_MS >= GROUP_OWNER_LEASE_MS) {
+  GROUP_OWNER_HEARTBEAT_MS = Math.max(1_000, Math.floor(GROUP_OWNER_LEASE_MS / 2));
+}
+const groupOwnerWriteStateCache = new NodeCache({
+  stdTTL: Math.max(1, Math.ceil(GROUP_OWNER_WRITE_CACHE_TTL_MS / 1000)),
+  checkperiod: Math.max(1, Math.ceil(GROUP_OWNER_WRITE_CACHE_TTL_MS / 1000)),
+  useClones: false,
+});
+
+const buildGroupOwnerWriteCacheKey = (groupJid, sessionId) => {
+  const safeGroupJid = String(groupJid || '').trim();
+  const safeSessionId = normalizeSessionId(sessionId);
+  if (!safeGroupJid || !safeSessionId) return '';
+  return `${safeSessionId}:${safeGroupJid}`;
+};
+
+const clearGroupOwnerWriteCacheForSession = (sessionId) => {
+  const safeSessionId = normalizeSessionId(sessionId);
+  const prefix = `${safeSessionId}:`;
+  const keys = groupOwnerWriteStateCache.keys();
+  for (const key of keys) {
+    if (String(key || '').startsWith(prefix)) {
+      groupOwnerWriteStateCache.del(key);
+    }
+  }
+};
+
+const resolveGroupOwnerWriteState = createGroupOwnerWriteStateResolver({
+  getOwnerImpl: getGroupOwner,
+  tryAcquireImpl: tryAcquireGroupOwner,
+  cacheImpl: groupOwnerWriteStateCache,
+  isGroupJidImpl: isGroupJid,
+  normalizeSessionIdImpl: normalizeSessionId,
+  buildCacheKeyImpl: buildGroupOwnerWriteCacheKey,
+  loggerImpl: logger,
+  defaultAllowClaim: GROUP_OWNER_WRITE_CLAIM_ON_MISS,
+});
 /**
  * Habilita ou desabilita o diário de eventos do Baileys.
  * @type {boolean}
@@ -292,7 +351,9 @@ let activeSocket = null;
  *   reconnectWindowStartedAt: number,
  *   connectionAttempts: number,
  *   socketGeneration: number,
- *   writerLockConnection: import('mysql2/promise').PoolConnection|null
+ *   writerLockConnection: import('mysql2/promise').PoolConnection|null,
+ *   ownerHeartbeatInterval: ReturnType<typeof setInterval>|null,
+ *   ownerHeartbeatInFlight: boolean
  * }} SessionContext
  */
 /**
@@ -310,6 +371,8 @@ const createSessionContext = (sessionId) => ({
   connectionAttempts: 0,
   socketGeneration: 0,
   writerLockConnection: null,
+  ownerHeartbeatInterval: null,
+  ownerHeartbeatInFlight: false,
 });
 
 const getSessionContext = (sessionId, { createIfMissing = true } = {}) => {
@@ -957,10 +1020,32 @@ const registerBaileysEventJournal = (sock, generation, sessionId) => {
   }
 
   for (const eventName of eventsToPersist) {
-    sock.ev.on(eventName, (payload) => {
+    sock.ev.on(eventName, async (payload) => {
       try {
         const summary = summarizeBaileysEventPayload(eventName, payload);
         const refs = extractBaileysEventReferences(payload);
+        if (isGroupJid(refs.chatId || '')) {
+          const ownerWriteCacheKey = buildGroupOwnerWriteCacheKey(refs.chatId, safeSessionId);
+          const expectedAssignmentVersion = normalizeAssignmentVersion(groupOwnerWriteStateCache.get(ownerWriteCacheKey)?.assignmentVersion);
+          const ownerState = await resolveGroupOwnerWriteState(refs.chatId, safeSessionId, {
+            source: `baileys_journal:${eventName}`,
+            expectedAssignmentVersion,
+            enforceFence: true,
+          });
+          if (!ownerState.allowed) {
+            logger.debug('Evento Baileys de grupo ignorado para escrita por não-owner.', {
+              action: 'baileys_event_group_write_skipped_non_owner',
+              sessionId: safeSessionId,
+              groupId: refs.chatId,
+              ownerSessionId: ownerState.ownerSessionId,
+              ownerAssignmentVersion: ownerState.assignmentVersion || null,
+              expectedAssignmentVersion,
+              reason: ownerState.reason,
+              eventName,
+            });
+            return;
+          }
+        }
         queueBaileysEventInsert({
           session_id: safeSessionId,
           event_name: eventName,
@@ -1031,6 +1116,8 @@ async function persistIncomingMessages(incomingMessages, type, sessionId = BAILE
 
   const entries = [];
   const lidsToPrime = new Set();
+  const groupWriteStateByJid = new Map();
+  const safeSessionId = normalizeSessionId(sessionId);
 
   for (const msg of incomingMessages) {
     if (!msg.message || msg.key.remoteJid === 'status@broadcast') continue;
@@ -1067,9 +1154,35 @@ async function persistIncomingMessages(incomingMessages, type, sessionId = BAILE
     const canonicalSenderId = resolveUserIdCached(senderInfo) || msg.key.participant || msg.key.remoteJid;
 
     const messageData = {
-      ...buildMessageData(msg, canonicalSenderId),
-      session_id: normalizeSessionId(sessionId),
+      ...buildMessageData(msg, canonicalSenderId, safeSessionId),
     };
+    if (isGroupJid(messageData.chat_id || '')) {
+      let ownerState = groupWriteStateByJid.get(messageData.chat_id);
+      if (!ownerState) {
+        const ownerWriteCacheKey = buildGroupOwnerWriteCacheKey(messageData.chat_id, safeSessionId);
+        const expectedAssignmentVersion = normalizeAssignmentVersion(groupOwnerWriteStateCache.get(ownerWriteCacheKey)?.assignmentVersion);
+        ownerState = await resolveGroupOwnerWriteState(messageData.chat_id, safeSessionId, {
+          source: 'persist_incoming_messages',
+          expectedAssignmentVersion,
+          enforceFence: true,
+        });
+        groupWriteStateByJid.set(messageData.chat_id, ownerState);
+      }
+      if (!ownerState.allowed) {
+        logger.debug('Persistência de mensagem de grupo ignorada para sessão não-owner.', {
+          action: 'incoming_group_message_persistence_skipped_non_owner',
+          sessionId: safeSessionId,
+          groupId: messageData.chat_id,
+          ownerSessionId: ownerState.ownerSessionId,
+          ownerAssignmentVersion: ownerState.assignmentVersion || null,
+          messageId: messageData.message_id,
+          reason: ownerState.reason,
+        });
+        continue;
+      }
+      messageData.allow_group_write = true;
+    }
+
     queueMessageInsert(messageData);
   }
 }
@@ -1211,6 +1324,110 @@ const scheduleReconnect = (sessionId, delay) => {
         errorMessage: error?.message,
       });
     });
+};
+
+/**
+ * Interrompe o heartbeat de ownership por sessão.
+ * @param {string} sessionId
+ * @param {string} reason
+ * @returns {void}
+ */
+const stopGroupOwnerHeartbeat = (sessionId, reason = 'unknown') => {
+  const safeSessionId = normalizeSessionId(sessionId);
+  const context = getSessionContext(safeSessionId, { createIfMissing: false });
+  if (!context) return;
+
+  if (context.ownerHeartbeatInterval) {
+    clearInterval(context.ownerHeartbeatInterval);
+    context.ownerHeartbeatInterval = null;
+  }
+  context.ownerHeartbeatInFlight = false;
+  clearGroupOwnerWriteCacheForSession(safeSessionId);
+
+  logger.debug('Heartbeat de ownership por grupo interrompido.', {
+    action: 'group_owner_heartbeat_stopped',
+    sessionId: safeSessionId,
+    reason,
+  });
+};
+
+/**
+ * Inicia heartbeat de ownership por sessão para renovar lease dos grupos de que a sessão é owner.
+ * @param {string} sessionId
+ * @param {number} generation
+ * @returns {void}
+ */
+const startGroupOwnerHeartbeat = (sessionId, generation) => {
+  const safeSessionId = normalizeSessionId(sessionId);
+  const context = getSessionContext(safeSessionId);
+
+  stopGroupOwnerHeartbeat(safeSessionId, 'restart');
+
+  const runTick = async () => {
+    const latestContext = getSessionContext(safeSessionId, { createIfMissing: false });
+    if (!latestContext) return;
+    if (latestContext.ownerHeartbeatInFlight) return;
+    if (latestContext.socketGeneration !== generation) return;
+    if (!isSocketOpen(latestContext.socket)) return;
+
+    latestContext.ownerHeartbeatInFlight = true;
+    try {
+      const socket = latestContext.socket;
+      const botJid =
+        normalizeJid(socket?.user?.id || socket?.authState?.creds?.me?.id || socket?.authState?.creds?.me?.lid) || undefined;
+      const sessionWeight = Math.max(1, Number(MULTI_SESSION_RUNTIME_CONFIG?.sessionWeights?.[safeSessionId] || 1));
+      const heartbeatOutcome = await heartbeatGroupOwnerSession({
+        sessionId: safeSessionId,
+        leaseMs: GROUP_OWNER_LEASE_MS,
+        reason: 'owner_lease_heartbeat',
+        botJid,
+        metadata: {
+          source: 'socket_controller',
+          socketGeneration: generation,
+        },
+        capacityWeight: sessionWeight,
+        currentScore: 0,
+      });
+
+      logger.debug('Heartbeat de ownership executado.', {
+        action: 'group_owner_heartbeat_tick',
+        sessionId: safeSessionId,
+        generation,
+        renewedAssignments: heartbeatOutcome?.renewedAssignments || 0,
+        heartbeatMs: GROUP_OWNER_HEARTBEAT_MS,
+        leaseMs: GROUP_OWNER_LEASE_MS,
+      });
+    } catch (error) {
+      logger.warn('Falha no heartbeat de ownership da sessão.', {
+        action: 'group_owner_heartbeat_failed',
+        sessionId: safeSessionId,
+        generation,
+        error: error?.message,
+      });
+    } finally {
+      const current = getSessionContext(safeSessionId, { createIfMissing: false });
+      if (current) {
+        current.ownerHeartbeatInFlight = false;
+      }
+    }
+  };
+
+  context.ownerHeartbeatInterval = setInterval(() => {
+    void runTick();
+  }, GROUP_OWNER_HEARTBEAT_MS);
+  if (typeof context.ownerHeartbeatInterval.unref === 'function') {
+    context.ownerHeartbeatInterval.unref();
+  }
+
+  logger.info('Heartbeat de ownership por grupo iniciado.', {
+    action: 'group_owner_heartbeat_started',
+    sessionId: safeSessionId,
+    generation,
+    heartbeatMs: GROUP_OWNER_HEARTBEAT_MS,
+    leaseMs: GROUP_OWNER_LEASE_MS,
+  });
+
+  void runTick();
 };
 
 /**
@@ -1487,6 +1704,7 @@ export async function connectToWhatsApp(sessionId = BAILEYS_PRIMARY_SESSION_ID) 
     };
 
     const sock = makeWASocket(socketConfig);
+    sock.__omnizapSessionId = safeSessionId;
 
     context.socket = sock;
     storeActiveSocket(sock, safeSessionId);
@@ -1933,6 +2151,24 @@ async function handleConnectionUpdate(update, sock, sessionId, generation) {
     const errorMessage = lastDisconnect?.error?.message || 'Sem mensagem de erro';
 
     const shouldReconnect = lastDisconnect?.error instanceof Boom && disconnectCode !== DisconnectReason.loggedOut;
+    stopGroupOwnerHeartbeat(safeSessionId, shouldReconnect ? 'connection_close_reconnect' : 'connection_close_final');
+    void sessionRegistryService
+      .markSessionDisconnected(safeSessionId, {
+        status: shouldReconnect ? 'reconnecting' : 'offline',
+        metadata: {
+          reasonCode: disconnectCode,
+          errorMessage,
+          shouldReconnect,
+        },
+      })
+      .catch((error) => {
+        logger.warn('Falha ao registrar sessao offline no registry.', {
+          action: 'session_registry_mark_disconnected_failed',
+          sessionId: safeSessionId,
+          reasonCode: disconnectCode,
+          error: error?.message,
+        });
+      });
 
     if (shouldReconnect) {
       const attempt = getNextReconnectAttempt(safeSessionId);
@@ -1994,6 +2230,23 @@ async function handleConnectionUpdate(update, sock, sessionId, generation) {
 
     resetReconnectState(safeSessionId);
     clearReconnectTimeout(safeSessionId);
+    startGroupOwnerHeartbeat(safeSessionId, generation);
+    void sessionRegistryService
+      .markSessionConnected(safeSessionId, {
+        botJid: normalizeJid(sock?.user?.id || sock?.authState?.creds?.me?.id || sock?.authState?.creds?.me?.lid) || undefined,
+        metadata: {
+          source: 'connection_open',
+          socketGeneration: generation,
+        },
+        capacityWeight: Math.max(1, Number(MULTI_SESSION_RUNTIME_CONFIG?.sessionWeights?.[safeSessionId] || 1)),
+      })
+      .catch((error) => {
+        logger.warn('Falha ao registrar sessao online no registry.', {
+          action: 'session_registry_mark_connected_failed',
+          sessionId: safeSessionId,
+          error: error?.message,
+        });
+      });
 
     if (process.send) {
       process.send('ready');
@@ -2438,6 +2691,7 @@ export async function disconnectAllWhatsAppSessions(options = {}) {
       if (!context) return;
 
       clearReconnectTimeout(safeSessionId);
+      stopGroupOwnerHeartbeat(safeSessionId, 'disconnect_all_sessions');
 
       const socket = context.socket;
       context.socket = null;
@@ -2455,6 +2709,15 @@ export async function disconnectAllWhatsAppSessions(options = {}) {
           });
         }
       }
+
+      void sessionRegistryService
+        .markSessionDisconnected(safeSessionId, {
+          status: 'offline',
+          metadata: {
+            reason: 'disconnect_all_sessions',
+          },
+        })
+        .catch(() => {});
     }),
   );
 
