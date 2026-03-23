@@ -452,6 +452,32 @@ const shouldActivateCheckoutEvent = (sessionObject) => {
   return paymentStatus === 'paid' || paymentStatus === 'no_payment_required';
 };
 
+const isCheckoutSessionComplete = (sessionObject) => sanitizePlainString(sessionObject?.status, 32).toLowerCase() === 'complete';
+
+const buildCheckoutSessionPayload = (session = {}) => ({
+  id: session?.id || null,
+  status: session?.status || null,
+  payment_status: session?.payment_status || null,
+  customer_email: session?.customer_details?.email || session?.customer_email || null,
+  mode: session?.mode || null,
+  owner_jid: extractOwnerJidFromStripeObject(session) || null,
+});
+
+const finalizePremiumFromCheckoutSession = async (sessionObject = {}, source = 'finalize_api') => {
+  if (!isCheckoutSessionComplete(sessionObject) || !shouldActivateCheckoutEvent(sessionObject)) {
+    return {
+      action: 'ignored',
+      reason: 'checkout_not_paid',
+      ownerJid: '',
+    };
+  }
+
+  const ownerJid = extractOwnerJidFromStripeObject(sessionObject);
+  const eventId = sanitizePlainString(sessionObject?.id, 120);
+  const eventType = `checkout.session.${source}`;
+  return activatePremiumOwner({ ownerJid, eventType, eventId });
+};
+
 const shouldActivateSubscriptionStatus = (status) => ['active', 'trialing', 'past_due'].includes(status);
 const shouldDeactivateSubscriptionStatus = (status) => ['canceled', 'incomplete_expired', 'unpaid'].includes(status);
 
@@ -571,6 +597,7 @@ export const maybeHandlePaymentsRequest = async (req, res, { pathname, url }) =>
   const checkoutPath = `${PAYMENTS_API_BASE_PATH}/checkout-session`;
   const webhookPath = `${PAYMENTS_API_BASE_PATH}/webhook`;
   const sessionStatusPath = `${PAYMENTS_API_BASE_PATH}/session-status`;
+  const finalizeSessionPath = `${PAYMENTS_API_BASE_PATH}/finalize-session`;
 
   try {
     if (pathname === healthPath) {
@@ -641,13 +668,32 @@ export const maybeHandlePaymentsRequest = async (req, res, { pathname, url }) =>
 
       return sendJson(req, res, 200, {
         ok: true,
-        session: {
-          id: session?.id || null,
-          status: session?.status || null,
-          payment_status: session?.payment_status || null,
-          customer_email: session?.customer_details?.email || session?.customer_email || null,
-          mode: session?.mode || null,
-        },
+        session: buildCheckoutSessionPayload(session),
+      });
+    }
+
+    if (pathname === finalizeSessionPath) {
+      if (req.method !== 'POST') {
+        return sendJson(req, res, 405, { error: 'Method Not Allowed' });
+      }
+
+      assertStripeCheckoutReady();
+      const body = await readJsonBody(req, { maxBytes: 32 * 1024 });
+      const sessionId = sanitizePlainString(body?.session_id || '', 255);
+      if (!sessionId) {
+        throw createHttpError('session_id e obrigatorio.', 400, 'session_id_required');
+      }
+
+      const session = await getStripeCheckoutSession(sessionId);
+      const processing = await finalizePremiumFromCheckoutSession(session, 'finalize_api');
+
+      return sendJson(req, res, 200, {
+        ok: true,
+        finalized: processing?.action === 'premium_activated',
+        action: processing?.action || 'ignored',
+        reason: processing?.reason || null,
+        owner_jid: processing?.ownerJid || null,
+        session: buildCheckoutSessionPayload(session),
       });
     }
 
