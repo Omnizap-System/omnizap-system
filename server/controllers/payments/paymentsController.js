@@ -360,11 +360,19 @@ const createStripePixPaymentIntent = async ({ ownerJid, ownerPhone, customerEmai
     formData.set('payment_method_data[billing_details][email]', customerEmail);
   }
 
-  return callStripeApi({
-    method: 'POST',
-    path: '/payment_intents',
-    formData,
-  });
+  try {
+    return await callStripeApi({
+      method: 'POST',
+      path: '/payment_intents',
+      formData,
+    });
+  } catch (error) {
+    const normalizedErrorMessage = sanitizePlainString(error?.message, 255).toLowerCase();
+    if (normalizedErrorMessage.includes('payment method type "pix" is invalid')) {
+      throw createHttpError('PIX nao esta ativado na sua conta Stripe. Ative o metodo em Configuracoes > Payment methods.', 400, 'stripe_pix_not_activated');
+    }
+    throw error;
+  }
 };
 
 const extractPixQrPayload = (paymentIntent = {}) => {
