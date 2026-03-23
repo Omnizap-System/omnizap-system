@@ -303,12 +303,12 @@
         <article class="card checkout">
           <form id="checkout-form" novalidate>
             <div class="row">
-              <label for="checkout-name">Nome (opcional)</label>
+              <label for="checkout-name">Nome</label>
               <input id="checkout-name" name="name" type="text" maxlength="120" autocomplete="name" placeholder="Seu nome" />
             </div>
 
             <div class="row">
-              <label for="checkout-email">E-mail (opcional)</label>
+              <label for="checkout-email">E-mail</label>
               <input id="checkout-email" name="email" type="email" maxlength="255" autocomplete="email" placeholder="voce@empresa.com" />
             </div>
 
@@ -355,6 +355,16 @@
         const statusElement = document.getElementById('checkout-status');
         const planNameElement = document.getElementById('plan-name');
         const planPriceElement = document.getElementById('plan-price');
+        const nameInputElement = document.getElementById('checkout-name');
+        const emailInputElement = document.getElementById('checkout-email');
+        const whatsappInputElement = document.getElementById('checkout-whatsapp');
+        const GOOGLE_AUTH_CACHE_KEY = 'omnizap_google_web_auth_cache_v1';
+        const GOOGLE_AUTH_CACHE_MAX_STALE_MS = 8 * 24 * 60 * 60 * 1000;
+        const HOME_BOOTSTRAP_ENDPOINT = '/api/home-bootstrap';
+        const LOGIN_PATH = '/login/';
+        let paymentsEnabled = true;
+        let authenticated = false;
+        let loadingCheckout = false;
 
         const setStatus = (message, type = '') => {
           statusElement.textContent = message || '';
@@ -362,9 +372,169 @@
           if (type) statusElement.classList.add(type);
         };
 
+        const syncSubmitState = () => {
+          submitButton.disabled = loadingCheckout || !authenticated || !paymentsEnabled;
+        };
+
         const setLoading = (loading) => {
-          submitButton.disabled = loading;
+          loadingCheckout = Boolean(loading);
+          syncSubmitState();
           submitButton.textContent = loading ? 'Criando checkout...' : 'Ir para checkout';
+        };
+
+        const normalizeGoogleAuthState = (value) => {
+          const user = value?.user && typeof value.user === 'object' ? value.user : null;
+          const sub = String(user?.sub || '').trim();
+          if (!sub) return null;
+          return {
+            user: {
+              sub,
+              email: String(user?.email || '').trim(),
+              name: String(user?.name || '').trim(),
+              picture: String(user?.picture || '').trim(),
+            },
+            ownerPhone: String(value?.ownerPhone || '').replace(/\D+/g, '').slice(0, 20),
+            ownerJid: String(value?.ownerJid || '').trim(),
+            expiresAt: String(value?.expiresAt || '').trim(),
+          };
+        };
+
+        const readGoogleAuthCache = () => {
+          try {
+            const raw = localStorage.getItem(GOOGLE_AUTH_CACHE_KEY);
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            const savedAt = Number(parsed?.savedAt || 0);
+            if (savedAt && Date.now() - savedAt > GOOGLE_AUTH_CACHE_MAX_STALE_MS) {
+              localStorage.removeItem(GOOGLE_AUTH_CACHE_KEY);
+              return null;
+            }
+            const normalized = normalizeGoogleAuthState(parsed?.auth || null);
+            if (!normalized?.user?.sub) {
+              localStorage.removeItem(GOOGLE_AUTH_CACHE_KEY);
+              return null;
+            }
+            if (normalized.expiresAt) {
+              const expiresAt = Number(new Date(normalized.expiresAt));
+              if (Number.isFinite(expiresAt) && expiresAt <= Date.now()) {
+                localStorage.removeItem(GOOGLE_AUTH_CACHE_KEY);
+                return null;
+              }
+            }
+            return normalized;
+          } catch {
+            return null;
+          }
+        };
+
+        const writeGoogleAuthCache = (authState) => {
+          try {
+            const normalized = normalizeGoogleAuthState(authState);
+            if (!normalized?.user?.sub) return;
+            localStorage.setItem(
+              GOOGLE_AUTH_CACHE_KEY,
+              JSON.stringify({
+                auth: normalized,
+                savedAt: Date.now(),
+              }),
+            );
+          } catch {
+            // ignore storage errors
+          }
+        };
+
+        const clearGoogleAuthCache = () => {
+          try {
+            localStorage.removeItem(GOOGLE_AUTH_CACHE_KEY);
+          } catch {
+            // ignore storage errors
+          }
+        };
+
+        const resolveOwnerPhone = ({ ownerPhone = '', ownerJid = '' } = {}) => {
+          const fromPhone = String(ownerPhone || '').replace(/\D+/g, '').slice(0, 20);
+          if (fromPhone.length >= 10) return fromPhone;
+          const candidate = String(ownerJid || '')
+            .split('@')[0]
+            .replace(/\D+/g, '')
+            .slice(0, 20);
+          return candidate;
+        };
+
+        const fillFormWithUserData = ({ name = '', email = '', ownerPhone = '', ownerJid = '' } = {}) => {
+          const normalizedName = String(name || '').trim();
+          const normalizedEmail = String(email || '').trim().toLowerCase();
+          const normalizedPhone = resolveOwnerPhone({ ownerPhone, ownerJid });
+
+          if (normalizedName) nameInputElement.value = normalizedName;
+          if (normalizedEmail) emailInputElement.value = normalizedEmail;
+          if (normalizedPhone) whatsappInputElement.value = normalizedPhone;
+        };
+
+        const buildLoginRedirectUrl = () => {
+          const nextPath = `${window.location.pathname || '/pagamentos/'}${window.location.search || ''}`;
+          const loginUrl = new URL(LOGIN_PATH, window.location.origin);
+          loginUrl.searchParams.set('next', nextPath);
+          return `${loginUrl.pathname}${loginUrl.search}`;
+        };
+
+        const redirectToLogin = () => {
+          window.location.replace(buildLoginRedirectUrl());
+        };
+
+        const loadAuthenticatedUser = async () => {
+          const cachedAuth = readGoogleAuthCache();
+          if (cachedAuth?.user?.sub) {
+            fillFormWithUserData({
+              name: cachedAuth.user?.name,
+              email: cachedAuth.user?.email,
+              ownerPhone: cachedAuth.ownerPhone,
+              ownerJid: cachedAuth.ownerJid,
+            });
+          }
+
+          let response;
+          try {
+            response = await fetch(HOME_BOOTSTRAP_ENDPOINT, {
+              method: 'GET',
+              headers: { Accept: 'application/json' },
+              credentials: 'include',
+            });
+          } catch {
+            if (cachedAuth?.user?.sub) {
+              authenticated = true;
+              syncSubmitState();
+              return;
+            }
+            redirectToLogin();
+            return;
+          }
+
+          const payload = await response.json().catch(() => ({}));
+          const session = payload?.data?.session || null;
+          const isAuthenticated = Boolean(response.ok && session?.authenticated && session?.user?.sub);
+          if (!isAuthenticated) {
+            clearGoogleAuthCache();
+            redirectToLogin();
+            return;
+          }
+
+          const authState = {
+            user: {
+              sub: String(session?.user?.sub || ''),
+              email: String(session?.user?.email || ''),
+              name: String(session?.user?.name || ''),
+              picture: String(session?.user?.picture || ''),
+            },
+            ownerPhone: String(session?.owner_phone || ''),
+            ownerJid: String(session?.owner_jid || ''),
+            expiresAt: String(session?.expires_at || ''),
+          };
+
+          writeGoogleAuthCache(authState);
+          fillFormWithUserData(authState);
+          authenticated = true;
+          syncSubmitState();
         };
 
         const loadPublicConfig = async () => {
@@ -380,8 +550,9 @@
             if (payload.plan_price_label) planPriceElement.textContent = payload.plan_price_label;
 
             if (payload.enabled === false) {
+              paymentsEnabled = false;
+              syncSubmitState();
               setStatus('Pagamentos estao temporariamente indisponiveis.', 'error');
-              submitButton.disabled = true;
             }
           } catch {
             // Se config falhar, mantemos fallback visual e formulario funcionando.
@@ -412,6 +583,7 @@
                 'Content-Type': 'application/json',
                 Accept: 'application/json',
               },
+              credentials: 'include',
               body: JSON.stringify({ whatsapp, email, name }),
             });
 
@@ -432,7 +604,13 @@
           }
         });
 
-        loadPublicConfig();
+        setStatus('Validando sua sessao...', 'success');
+        syncSubmitState();
+        void Promise.all([loadPublicConfig(), loadAuthenticatedUser()]).then(() => {
+          if (paymentsEnabled) {
+            setStatus('');
+          }
+        });
       })();
     </script>
   </body>
