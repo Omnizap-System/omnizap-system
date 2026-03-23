@@ -78,6 +78,7 @@
     "core:ai:on": "node ./scripts/core-ai-mode.mjs on",
     "core:ai:off": "node ./scripts/core-ai-mode.mjs off",
     "core:ai:status": "node ./scripts/core-ai-mode.mjs status",
+    "new:work": "bash ./scripts/new-whatsapp-session.sh",
     "command-config:schema:generate": "node ./scripts/generate-command-config-schema.mjs",
     "command-config:schema:validate": "node ./scripts/validate-command-config-schema.mjs",
     "format": "node ./scripts/run-prettier-all.mjs --write",
