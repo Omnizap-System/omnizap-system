@@ -225,7 +225,7 @@ export const buildCookieString = (name, value, req, options = {}) => {
   return parts.join('; ');
 };
 
-export const readJsonBody = async (req, { maxBytes = 64 * 1024 } = {}) =>
+export const readRawBody = async (req, { maxBytes = 64 * 1024 } = {}) =>
   new Promise((resolve, reject) => {
     const chunks = [];
     let total = 0;
@@ -243,20 +243,24 @@ export const readJsonBody = async (req, { maxBytes = 64 * 1024 } = {}) =>
     });
 
     req.on('end', () => {
-      const raw = Buffer.concat(chunks).toString('utf8').trim();
-      if (!raw) {
-        resolve({});
-        return;
-      }
-
-      try {
-        resolve(JSON.parse(raw));
-      } catch {
-        const error = new Error('JSON invalido.');
-        error.statusCode = 400;
-        reject(error);
-      }
+      resolve(Buffer.concat(chunks));
     });
 
     req.on('error', (error) => reject(error));
   });
+
+export const readJsonBody = async (req, { maxBytes = 64 * 1024 } = {}) => {
+  const rawBuffer = await readRawBody(req, { maxBytes });
+  const raw = rawBuffer.toString('utf8').trim();
+  if (!raw) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    const error = new Error('JSON invalido.');
+    error.statusCode = 400;
+    throw error;
+  }
+};

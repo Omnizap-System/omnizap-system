@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pagamentos | OmniZap Premium</title>
+    <meta name="description" content="Ative seu plano Premium do OmniZap com pagamento automatico via Stripe Checkout." />
+    <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#0f172a" />
+    <link rel="canonical" href="https://omnizap.shop/pagamentos/" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Manrope:wght@400;600;700&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --bg-start: #071024;
+        --bg-end: #11172f;
+        --panel: rgba(13, 26, 52, 0.84);
+        --panel-line: rgba(148, 187, 255, 0.2);
+        --text-main: #e7f0ff;
+        --text-muted: #9eb6da;
+        --primary: #4ade80;
+        --primary-strong: #22c55e;
+        --danger: #fb7185;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: 'Manrope', system-ui, sans-serif;
+        color: var(--text-main);
+        background:
+          radial-gradient(52rem 30rem at -4% -8%, rgba(30, 143, 255, 0.18), transparent 62%),
+          radial-gradient(44rem 24rem at 104% 2%, rgba(53, 255, 181, 0.14), transparent 58%),
+          linear-gradient(160deg, var(--bg-start), var(--bg-end));
+      }
+
+      body::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background:
+          linear-gradient(rgba(173, 216, 255, 0.05) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(173, 216, 255, 0.05) 1px, transparent 1px);
+        background-size: 34px 34px;
+        mask-image: radial-gradient(circle at center, black 38%, transparent 100%);
+        opacity: 0.25;
+      }
+
+      .page {
+        position: relative;
+        z-index: 1;
+        width: min(980px, 92vw);
+        margin: 40px auto;
+      }
+
+      .hero {
+        margin-bottom: 22px;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid rgba(93, 138, 219, 0.36);
+        border-radius: 999px;
+        padding: 8px 14px;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #bcdaff;
+        background: rgba(20, 38, 74, 0.56);
+      }
+
+      .eyebrow::before {
+        content: '';
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--primary);
+        box-shadow: 0 0 0 6px rgba(74, 222, 128, 0.2);
+      }
+
+      h1 {
+        margin: 14px 0 10px;
+        font-family: 'Sora', sans-serif;
+        font-size: clamp(30px, 5vw, 48px);
+        line-height: 1.04;
+      }
+
+      .hero p {
+        margin: 0;
+        max-width: 780px;
+        color: var(--text-muted);
+        font-size: clamp(15px, 2vw, 18px);
+      }
+
+      .layout {
+        display: grid;
+        gap: 18px;
+        grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.9fr);
+      }
+
+      .card {
+        border: 1px solid var(--panel-line);
+        border-radius: 20px;
+        background: var(--panel);
+        box-shadow:
+          0 24px 60px rgba(5, 10, 22, 0.5),
+          inset 0 1px 0 rgba(192, 217, 255, 0.08);
+      }
+
+      .checkout {
+        padding: 24px;
+      }
+
+      .aside {
+        padding: 24px;
+      }
+
+      .row {
+        margin-bottom: 14px;
+      }
+
+      .row:last-of-type {
+        margin-bottom: 0;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 13px;
+        color: #d1e2ff;
+      }
+
+      input {
+        width: 100%;
+        border: 1px solid rgba(120, 160, 231, 0.34);
+        border-radius: 12px;
+        background: rgba(9, 18, 38, 0.8);
+        color: var(--text-main);
+        min-height: 48px;
+        padding: 0 14px;
+        font: inherit;
+      }
+
+      input:focus {
+        outline: none;
+        border-color: rgba(132, 185, 255, 0.9);
+        box-shadow: 0 0 0 3px rgba(102, 170, 255, 0.18);
+      }
+
+      .hint {
+        margin-top: 6px;
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+
+      .actions {
+        margin-top: 20px;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        appearance: none;
+        border: 0;
+        border-radius: 12px;
+        min-height: 48px;
+        padding: 0 18px;
+        font-family: 'Sora', sans-serif;
+        font-size: 13px;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        text-decoration: none;
+        cursor: pointer;
+        transition: transform 150ms ease, filter 150ms ease;
+      }
+
+      .button:disabled {
+        opacity: 0.65;
+        cursor: not-allowed;
+      }
+
+      .button-primary {
+        color: #052312;
+        background: linear-gradient(120deg, var(--primary), var(--primary-strong));
+        box-shadow: 0 10px 26px rgba(34, 197, 94, 0.3);
+      }
+
+      .button-secondary {
+        color: #d5e8ff;
+        background: rgba(26, 50, 91, 0.9);
+        border: 1px solid rgba(129, 175, 255, 0.4);
+      }
+
+      .button:hover:not(:disabled) {
+        transform: translateY(-1px);
+        filter: brightness(1.03);
+      }
+
+      .status {
+        margin-top: 14px;
+        min-height: 22px;
+        font-size: 14px;
+      }
+
+      .status.error {
+        color: var(--danger);
+      }
+
+      .status.success {
+        color: var(--primary);
+      }
+
+      .plan-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 14px;
+        border: 1px solid rgba(141, 176, 246, 0.28);
+        border-radius: 999px;
+        padding: 7px 12px;
+        background: rgba(17, 33, 66, 0.7);
+        font-size: 12px;
+      }
+
+      .plan-title {
+        margin: 0;
+        font-family: 'Sora', sans-serif;
+        font-size: 24px;
+        line-height: 1.2;
+      }
+
+      .plan-price {
+        margin: 8px 0 16px;
+        color: #9fd5ff;
+        font-size: 15px;
+      }
+
+      .feature-list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .feature-list li {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        margin-bottom: 12px;
+        color: #d0e3ff;
+        font-size: 14px;
+      }
+
+      .feature-list li::before {
+        content: '✓';
+        flex: 0 0 auto;
+        color: var(--primary);
+        font-weight: 700;
+      }
+
+      .small {
+        margin-top: 16px;
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+
+      .small a {
+        color: #a6d1ff;
+      }
+
+      @media (max-width: 860px) {
+        .page {
+          margin-block: 24px;
+        }
+
+        .layout {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <span class="eyebrow">Pagamento Automatico Stripe</span>
+        <h1>Ative o Premium em minutos</h1>
+        <p>Preencha seu WhatsApp e siga para o checkout seguro. Assim que o pagamento confirmar no webhook, seu acesso Premium e liberado automaticamente.</p>
+      </section>
+
+      <section class="layout">
+        <article class="card checkout">
+          <form id="checkout-form" novalidate>
+            <div class="row">
+              <label for="checkout-name">Nome (opcional)</label>
+              <input id="checkout-name" name="name" type="text" maxlength="120" autocomplete="name" placeholder="Seu nome" />
+            </div>
+
+            <div class="row">
+              <label for="checkout-email">E-mail (opcional)</label>
+              <input id="checkout-email" name="email" type="email" maxlength="255" autocomplete="email" placeholder="voce@empresa.com" />
+            </div>
+
+            <div class="row">
+              <label for="checkout-whatsapp">WhatsApp para liberar Premium</label>
+              <input id="checkout-whatsapp" name="whatsapp" type="text" required autocomplete="tel" placeholder="5511999999999" />
+              <p class="hint">Use com DDI e DDD. Exemplo: <code>5511999999999</code> ou <code>5511999999999@s.whatsapp.net</code></p>
+            </div>
+
+            <div class="actions">
+              <button id="checkout-submit" class="button button-primary" type="submit">Ir para checkout</button>
+              <a class="button button-secondary" href="/" role="button">Voltar para home</a>
+            </div>
+
+            <p id="checkout-status" class="status" aria-live="polite"></p>
+          </form>
+        </article>
+
+        <aside class="card aside">
+          <p class="plan-badge">Plano ativo no checkout</p>
+          <h2 id="plan-name" class="plan-title">Plano Premium</h2>
+          <p id="plan-price" class="plan-price">Assinatura recorrente</p>
+
+          <ul class="feature-list">
+            <li>Ativacao automatica apos pagamento confirmado no Stripe.</li>
+            <li>Fluxo seguro com assinatura de webhook validada no backend.</li>
+            <li>Checkout hospedado no Stripe para reduzir risco e fraude.</li>
+          </ul>
+
+          <p class="small">
+            Ao continuar, voce concorda com os
+            <a href="/termos-de-uso/">Termos de Uso</a>
+            e
+            <a href="/politica-de-privacidade/">Politica de Privacidade</a>.
+          </p>
+        </aside>
+      </section>
+    </main>
+
+    <script>
+      (() => {
+        const form = document.getElementById('checkout-form');
+        const submitButton = document.getElementById('checkout-submit');
+        const statusElement = document.getElementById('checkout-status');
+        const planNameElement = document.getElementById('plan-name');
+        const planPriceElement = document.getElementById('plan-price');
+
+        const setStatus = (message, type = '') => {
+          statusElement.textContent = message || '';
+          statusElement.classList.remove('error', 'success');
+          if (type) statusElement.classList.add(type);
+        };
+
+        const setLoading = (loading) => {
+          submitButton.disabled = loading;
+          submitButton.textContent = loading ? 'Criando checkout...' : 'Ir para checkout';
+        };
+
+        const loadPublicConfig = async () => {
+          try {
+            const response = await fetch('/api/payments/config', {
+              method: 'GET',
+              headers: { Accept: 'application/json' },
+            });
+            const payload = await response.json();
+            if (!response.ok || !payload || payload.ok !== true) return;
+
+            if (payload.plan_name) planNameElement.textContent = payload.plan_name;
+            if (payload.plan_price_label) planPriceElement.textContent = payload.plan_price_label;
+
+            if (payload.enabled === false) {
+              setStatus('Pagamentos estao temporariamente indisponiveis.', 'error');
+              submitButton.disabled = true;
+            }
+          } catch {
+            // Se config falhar, mantemos fallback visual e formulario funcionando.
+          }
+        };
+
+        form.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          setStatus('');
+
+          const formData = new FormData(form);
+          const whatsapp = String(formData.get('whatsapp') || '').trim();
+          const email = String(formData.get('email') || '').trim();
+          const name = String(formData.get('name') || '').trim();
+
+          if (!whatsapp) {
+            setStatus('Informe seu WhatsApp para continuar.', 'error');
+            return;
+          }
+
+          setLoading(true);
+          setStatus('Preparando checkout seguro...', 'success');
+
+          try {
+            const response = await fetch('/api/payments/checkout-session', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+              },
+              body: JSON.stringify({ whatsapp, email, name }),
+            });
+
+            const payload = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+              throw new Error(payload?.error || 'Nao foi possivel iniciar o checkout.');
+            }
+
+            if (!payload?.checkout_url) {
+              throw new Error('Checkout criado sem URL de redirecionamento.');
+            }
+
+            window.location.href = payload.checkout_url;
+          } catch (error) {
+            setStatus(error?.message || 'Falha ao iniciar checkout.', 'error');
+            setLoading(false);
+          }
+        });
+
+        loadPublicConfig();
+      })();
+    </script>
+  </body>
+</html>

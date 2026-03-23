@@ -3,6 +3,7 @@ import path from 'node:path';
 import { maybeHandleMetricsRequest } from './metrics/metricsRouter.js';
 import { maybeHandleHealthRequest, shouldHandleHealthPath } from './health/healthRouter.js';
 import { getEmailAutomationRouterConfig, maybeHandleEmailAutomationRequest, shouldHandleEmailAutomationPath } from './email/emailAutomationRouter.js';
+import { getPaymentsRouterConfig, maybeHandlePaymentsRequest, shouldHandlePaymentsPath } from './payments/paymentsRouter.js';
 import { buildUserApiPaths, getUserRouterConfig, maybeHandleUserRequest, shouldHandleUserPath } from './user/userRouter.js';
 import { getSystemAdminRouterConfig, maybeHandleSystemAdminRequest, shouldHandleSystemAdminPath } from './admin/systemAdminRouter.js';
 import { getStickerSiteRouterConfig, maybeHandleStickerSiteRequest, shouldHandleStickerSitePath } from './sticker/stickerSiteRouter.js';
@@ -76,6 +77,16 @@ const loadEmailAutomationConfigSafe = async () => {
   }
 };
 
+const loadPaymentsConfigSafe = async () => {
+  try {
+    return await getPaymentsRouterConfig();
+  } catch {
+    return {
+      apiBasePath: '/api/payments',
+    };
+  }
+};
+
 const loadStickerSiteConfigSafe = async () => {
   try {
     return await getStickerSiteRouterConfig();
@@ -129,10 +140,11 @@ const loadGrafanaProxyConfigSafe = async () => {
 
 export const getIndexRouteConfigs = async () => {
   if (!indexRouteConfigsPromise) {
-    indexRouteConfigsPromise = Promise.all([loadUserConfigSafe(), loadSystemAdminConfigSafe(), loadEmailAutomationConfigSafe(), loadStickerSiteConfigSafe(), loadStickerDataConfigSafe(), loadStickerApiConfigSafe(), loadGrafanaProxyConfigSafe()]).then(([userConfig, systemAdminConfig, emailAutomationConfig, stickerSiteConfig, stickerDataConfig, stickerApiConfig, grafanaProxyConfig]) => ({
+    indexRouteConfigsPromise = Promise.all([loadUserConfigSafe(), loadSystemAdminConfigSafe(), loadEmailAutomationConfigSafe(), loadPaymentsConfigSafe(), loadStickerSiteConfigSafe(), loadStickerDataConfigSafe(), loadStickerApiConfigSafe(), loadGrafanaProxyConfigSafe()]).then(([userConfig, systemAdminConfig, emailAutomationConfig, paymentsConfig, stickerSiteConfig, stickerDataConfig, stickerApiConfig, grafanaProxyConfig]) => ({
       userConfig,
       systemAdminConfig,
       emailAutomationConfig,
+      paymentsConfig,
       grafanaProxyConfig,
       stickerConfig: {
         ...stickerSiteConfig,
@@ -156,6 +168,7 @@ export const routeRequest = async (req, res, { pathname, url, metricsPath = '/me
   const userConfig = resolvedConfigs?.userConfig || null;
   const systemAdminConfig = resolvedConfigs?.systemAdminConfig || null;
   const emailAutomationConfig = resolvedConfigs?.emailAutomationConfig || null;
+  const paymentsConfig = resolvedConfigs?.paymentsConfig || null;
   const grafanaProxyConfig = resolvedConfigs?.grafanaProxyConfig || null;
   const stickerConfig = resolvedConfigs?.stickerConfig || null;
 
@@ -180,14 +193,21 @@ export const routeRequest = async (req, res, { pathname, url, metricsPath = '/me
     return sendNotFound(req, res);
   }
 
-  // 4) Grafana proxy (/api/grafana e alias /grafana)
+  // 4) Payments API
+  if (shouldHandlePaymentsPath(pathname, paymentsConfig)) {
+    const handled = await maybeHandlePaymentsRequest(req, res, { pathname, url });
+    if (handled) return true;
+    return sendNotFound(req, res);
+  }
+
+  // 5) Grafana proxy (/api/grafana e alias /grafana)
   if (shouldHandleGrafanaProxyPath(pathname, grafanaProxyConfig)) {
     const handled = await maybeHandleGrafanaProxyRequest(req, res, { pathname, url, config: grafanaProxyConfig });
     if (handled) return true;
     return sendNotFound(req, res);
   }
 
-  // 5) User
+  // 6) User
   const systemAdminCandidate = shouldHandleSystemAdminStep(pathname, systemAdminConfig);
   if (shouldHandleUserStep(pathname, userConfig)) {
     const handled = await maybeHandleUserRequest(req, res, { pathname, url });
@@ -197,14 +217,14 @@ export const routeRequest = async (req, res, { pathname, url, metricsPath = '/me
     if (!systemAdminCandidate) return sendNotFound(req, res);
   }
 
-  // 6) System admin + legacy /stickers/admin
+  // 7) System admin + legacy /stickers/admin
   if (systemAdminCandidate) {
     const handled = await maybeHandleSystemAdminRequest(req, res, { pathname, url });
     if (handled) return true;
     return sendNotFound(req, res);
   }
 
-  // 7) Sticker catalog apenas nos prefixes permitidos
+  // 8) Sticker catalog apenas nos prefixes permitidos
   if (shouldHandleStickerSitePath(pathname, stickerConfig)) {
     const handled = await maybeHandleStickerSiteRequest(req, res, { pathname, url });
     if (handled) return true;
@@ -236,14 +256,14 @@ export const routeRequest = async (req, res, { pathname, url, metricsPath = '/me
     return sendNotFound(req, res);
   }
 
-  // 8) Paginas estaticas (templates em public/pages)
+  // 9) Paginas estaticas (templates em public/pages)
   if (shouldHandleStaticPagePath(pathname)) {
     const handled = await maybeHandleStaticPageRequest(req, res, { pathname });
     if (handled) return true;
     return sendNotFound(req, res);
   }
 
-  // 9) 404 global
+  // 10) 404 global
   return sendNotFound(req, res);
 };
 
