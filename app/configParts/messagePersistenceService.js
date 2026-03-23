@@ -1,7 +1,7 @@
 import { now as __timeNow, nowIso as __timeNowIso, toUnixMs as __timeNowMs } from '#time';
 import { baileysConnectionLogger as logger } from './loggerConfig.js';
 import { queueMessageInsert } from '../services/infra/dbWriteQueue.js';
-import { parseEnvBool, parseEnvInt, normalizeJid, isGroupJid, isStatusJid, isBroadcastJid, isNewsletterJid, normalizeWAPresence } from './baileysConfig.js';
+import { parseEnvBool, parseEnvInt, normalizeJid, isGroupJid, isStatusJid, isBroadcastJid, isNewsletterJid, normalizeWAPresence, isLidJid, isWhatsAppJid, normalizePnToJid, resolveUserId } from './baileysConfig.js';
 import { getOwner as getGroupOwner, tryAcquire as tryAcquireGroupOwner } from '../services/multiSession/groupOwnershipService.js';
 
 const BAILEYS_SEND_RETRY_ATTEMPTS = parseEnvInt(process.env.BAILEYS_SEND_RETRY_ATTEMPTS, 2, 1, 5);
@@ -12,6 +12,7 @@ const BAILEYS_REPLY_PRESENCE_SUBSCRIBE = parseEnvBool(process.env.BAILEYS_REPLY_
 const BAILEYS_REPLY_PRESENCE_DELAY_MS = parseEnvInt(process.env.BAILEYS_REPLY_PRESENCE_DELAY_MS, 280, 0, 3_000);
 const BAILEYS_REPLY_PRESENCE_BEFORE = normalizeWAPresence(process.env.BAILEYS_REPLY_PRESENCE_BEFORE, 'composing');
 const BAILEYS_REPLY_PRESENCE_AFTER = normalizeWAPresence(process.env.BAILEYS_REPLY_PRESENCE_AFTER, 'paused');
+const BAILEYS_SEND_PREFER_PN_FOR_LID = parseEnvBool(process.env.BAILEYS_SEND_PREFER_PN_FOR_LID, true);
 const GROUP_WRITE_PERMISSION_CACHE_TTL_MS = parseEnvInt(process.env.GROUP_OWNER_WRITE_CACHE_TTL_MS, 8_000, 1_000, 60_000);
 
 const isPlainObject = (value) => Object.prototype.toString.call(value) === '[object Object]';
@@ -225,6 +226,42 @@ const shouldSendReplyPresence = (jid, content, runtimeOptions) => {
   return true;
 };
 
+const isDirectUserJid = (jid) => {
+  if (!jid) return false;
+  if (isGroupJid(jid)) return false;
+  if (isStatusJid(jid)) return false;
+  if (isBroadcastJid(jid)) return false;
+  if (isNewsletterJid(jid)) return false;
+  return true;
+};
+
+const resolvePreferredSendJid = async (normalizedJid) => {
+  if (!normalizedJid) return normalizedJid;
+  if (!BAILEYS_SEND_PREFER_PN_FOR_LID) return normalizedJid;
+  if (!isDirectUserJid(normalizedJid)) return normalizedJid;
+  if (!isLidJid(normalizedJid)) return normalizedJid;
+
+  try {
+    const resolvedIdentity = await resolveUserId({
+      lid: normalizedJid,
+      jid: normalizedJid,
+    });
+    const normalizedResolved = normalizeJid(String(resolvedIdentity || '').trim());
+    const candidatePnJid = normalizePnToJid(normalizedResolved || String(resolvedIdentity || '').trim());
+    if (candidatePnJid && isWhatsAppJid(candidatePnJid)) {
+      return candidatePnJid;
+    }
+  } catch (error) {
+    logger.debug('Falha ao resolver PN para envio com destino LID. Mantendo destino original.', {
+      action: 'resolve_preferred_send_jid_failed',
+      jid: normalizedJid,
+      error: error?.message,
+    });
+  }
+
+  return normalizedJid;
+};
+
 const sendPresenceSilently = async (sock, type, jid, subscribeFirst = false) => {
   if (!sock || typeof sock.sendPresenceUpdate !== 'function') return;
   try {
@@ -325,16 +362,16 @@ export async function sendAndStore(sock, jid, content, options) {
     throw new TypeError(`Payload de mensagem inválido. Chaves recebidas: ${payloadKeys.join(', ') || 'nenhuma'}`);
   }
 
-  const normalizedJid = normalizeJid(jid) || String(jid).trim();
+  const normalizedInputJid = normalizeJid(jid) || String(jid).trim();
   const runtimeOptions = resolveRuntimeSendOptions(options);
   const runtimeSessionId = runtimeOptions.sessionId || normalizeSessionId(sock?.__omnizapSessionId);
   let resolvedGroupWritePermission = null;
 
-  if (isGroupJid(normalizedJid)) {
+  if (isGroupJid(normalizedInputJid)) {
     if (runtimeOptions.allowGroupWrite === false) {
       logger.debug('Envio para grupo ignorado por bloqueio explícito de escrita.', {
         action: 'send_group_blocked_explicit',
-        groupJid: normalizedJid,
+        groupJid: normalizedInputJid,
         sessionId: runtimeSessionId,
       });
       return undefined;
@@ -347,11 +384,11 @@ export async function sendAndStore(sock, jid, content, options) {
         reason: 'explicit_allow',
       };
     } else {
-      resolvedGroupWritePermission = await resolveGroupWritePermission(normalizedJid, runtimeSessionId);
+      resolvedGroupWritePermission = await resolveGroupWritePermission(normalizedInputJid, runtimeSessionId);
       if (!resolvedGroupWritePermission.allowed) {
         logger.info('Envio para grupo bloqueado por sessão não-owner.', {
           action: 'send_group_blocked_non_owner',
-          groupJid: normalizedJid,
+          groupJid: normalizedInputJid,
           sessionId: runtimeSessionId,
           ownerSessionId: resolvedGroupWritePermission.ownerSessionId,
           reason: resolvedGroupWritePermission.reason,
@@ -359,6 +396,16 @@ export async function sendAndStore(sock, jid, content, options) {
         return undefined;
       }
     }
+  }
+
+  const normalizedJid = await resolvePreferredSendJid(normalizedInputJid);
+  if (normalizedJid !== normalizedInputJid) {
+    logger.debug('Destino LID convertido para PN antes do envio.', {
+      action: 'send_target_lid_to_pn',
+      from: normalizedInputJid,
+      to: normalizedJid,
+      sessionId: runtimeSessionId,
+    });
   }
 
   const normalizedOptions = normalizeSendOptions(runtimeOptions.sendOptions);
@@ -427,7 +474,7 @@ export async function sendAndStore(sock, jid, content, options) {
   if (sent?.key?.id) {
     try {
       const messageData = buildMessageData(sent, senderId, runtimeSessionId);
-      const targetGroupJid = normalizeJid(messageData.chat_id || normalizedJid);
+      const targetGroupJid = normalizeJid(messageData.chat_id || normalizedInputJid);
       if (isGroupJid(targetGroupJid)) {
         const allowGroupWrite = runtimeOptions.allowGroupWrite === true || resolvedGroupWritePermission?.allowed === true;
         messageData.allow_group_write = allowGroupWrite;

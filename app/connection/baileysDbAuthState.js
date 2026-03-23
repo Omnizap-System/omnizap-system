@@ -1,4 +1,4 @@
-import { initAuthCreds, proto } from '@whiskeysockets/baileys';
+import { initAuthCreds, makeCacheableSignalKeyStore, proto } from '@whiskeysockets/baileys';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -11,6 +11,14 @@ const CREDS_ITEM_ID = 'default';
 const AUTH_FILE_EXTENSION = '.json';
 const KNOWN_SIGNAL_KEY_TYPES = ['pre-key', 'session', 'sender-key', 'sender-key-memory', 'app-state-sync-key', 'app-state-sync-version', 'lid-mapping', 'device-list', 'tctoken'];
 const KNOWN_SIGNAL_KEY_TYPES_SORTED = [...KNOWN_SIGNAL_KEY_TYPES].sort((left, right) => right.length - left.length);
+const parseEnvBool = (value, fallback) => {
+  if (value === undefined || value === null || value === '') return fallback;
+  const normalized = String(value).trim().toLowerCase();
+  if (['1', 'true', 'yes', 'y', 'on'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'n', 'off'].includes(normalized)) return false;
+  return fallback;
+};
+const BAILEYS_AUTH_KEYS_CACHE_ENABLED = parseEnvBool(process.env.BAILEYS_AUTH_KEYS_CACHE_ENABLED, true);
 
 let ensureTablePromise = null;
 
@@ -331,11 +339,13 @@ export async function useDbAuthState(options = {}) {
   }
 
   const creds = (await readCredsFromDb(sessionId)) || initAuthCreds();
+  const keyStore = createDbSignalKeyStore(sessionId);
+  const wrappedKeyStore = BAILEYS_AUTH_KEYS_CACHE_ENABLED ? makeCacheableSignalKeyStore(keyStore, logger) : keyStore;
 
   return {
     state: {
       creds,
-      keys: createDbSignalKeyStore(sessionId),
+      keys: wrappedKeyStore,
     },
     saveCreds: async () => {
       await upsertAuthRow(sessionId, CREDS_CATEGORY, CREDS_ITEM_ID, creds);
