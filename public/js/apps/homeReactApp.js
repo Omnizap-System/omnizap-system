@@ -802,7 +802,7 @@ const App = () => {
                 <div className="absolute top-6 right-6 px-3 py-1 rounded-full bg-primary text-[#020617] text-[10px] font-black uppercase tracking-widest group-hover:scale-110 transition-transform">Recomendado</div>
                 <div className="mb-8">
                   <h3 className="text-xl font-bold mb-2 text-primary">Plano Premium</h3>
-                  <div className="text-4xl font-black mb-4 text-white group-hover:scale-105 origin-left transition-transform duration-500">R$ 14,90<span className="text-sm text-white/20 font-medium italic">/mês</span></div>
+                  <div className="text-4xl font-black mb-4 text-white group-hover:scale-105 origin-left transition-transform duration-500">R$ 19,90<span className="text-sm text-white/20 font-medium italic">/mês</span></div>
                   <p className="text-sm text-white/40">Potência máxima para administradores profissionais.</p>
                 </div>
                 <ul className="space-y-4 mb-10 flex-1">
@@ -815,7 +815,7 @@ const App = () => {
                     `,
                   )}
                 </ul>
-                <a href=${botMenuUrl} className="btn btn-primary rounded-xl font-black shadow-lg shadow-primary/20 group-hover:shadow-primary/40 transition-all hover:scale-105">Quero ser Premium</a>
+                <a href="/pagamentos/" className="btn btn-primary rounded-xl font-black shadow-lg shadow-primary/20 group-hover:shadow-primary/40 transition-all hover:scale-105">Quero ser Premium</a>
               </div>
             </div>
           </div>
