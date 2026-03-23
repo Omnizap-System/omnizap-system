@@ -197,6 +197,7 @@ CREATE TABLE IF NOT EXISTS `lid_map` (
 
 CREATE TABLE IF NOT EXISTS `message_analysis_event` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `session_id` varchar(64) NOT NULL DEFAULT 'default',
   `message_id` varchar(255) DEFAULT NULL,
   `chat_id` varchar(255) DEFAULT NULL,
   `sender_id` varchar(255) DEFAULT NULL,
@@ -220,6 +221,10 @@ CREATE TABLE IF NOT EXISTS `message_analysis_event` (
   `created_at` timestamp NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   KEY `idx_message_analysis_created` (`created_at`),
+  KEY `idx_message_analysis_session_created` (`session_id`,`created_at`),
+  KEY `idx_message_analysis_session_chat_created` (`session_id`,`chat_id`,`created_at`),
+  KEY `idx_message_analysis_session_sender_created` (`session_id`,`sender_id`,`created_at`),
+  KEY `idx_message_analysis_session_command_created` (`session_id`,`command_name`,`created_at`),
   KEY `idx_message_analysis_chat_created` (`chat_id`,`created_at`),
   KEY `idx_message_analysis_sender_created` (`sender_id`,`created_at`),
   KEY `idx_message_analysis_command_created` (`command_name`,`created_at`),
@@ -230,6 +235,7 @@ CREATE TABLE IF NOT EXISTS `message_analysis_event` (
 
 CREATE TABLE IF NOT EXISTS `baileys_event_journal` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `session_id` varchar(64) NOT NULL DEFAULT 'default',
   `event_name` varchar(64) NOT NULL,
   `socket_generation` int(10) unsigned DEFAULT NULL,
   `chat_id` varchar(255) DEFAULT NULL,
@@ -240,6 +246,10 @@ CREATE TABLE IF NOT EXISTS `baileys_event_journal` (
   `created_at` timestamp NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   KEY `idx_baileys_event_created` (`created_at`),
+  KEY `idx_baileys_event_session_created` (`session_id`,`created_at`),
+  KEY `idx_baileys_event_session_name_created` (`session_id`,`event_name`,`created_at`),
+  KEY `idx_baileys_event_session_chat_created` (`session_id`,`chat_id`,`created_at`),
+  KEY `idx_baileys_event_session_message_created` (`session_id`,`message_id`,`created_at`),
   KEY `idx_baileys_event_name_created` (`event_name`,`created_at`),
   KEY `idx_baileys_event_chat_created` (`chat_id`,`created_at`),
   KEY `idx_baileys_event_message_created` (`message_id`,`created_at`),
@@ -257,9 +267,61 @@ CREATE TABLE IF NOT EXISTS `baileys_auth_state` (
   KEY `idx_baileys_auth_state_category_updated` (`category`,`updated_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS `wa_session_registry` (
+  `session_id` varchar(64) NOT NULL,
+  `bot_jid` varchar(255) DEFAULT NULL,
+  `status` varchar(24) NOT NULL DEFAULT 'offline',
+  `capacity_weight` int(10) unsigned NOT NULL DEFAULT 1,
+  `current_score` decimal(12,4) NOT NULL DEFAULT 0.0000,
+  `last_heartbeat_at` datetime DEFAULT NULL,
+  `last_connected_at` datetime DEFAULT NULL,
+  `last_disconnected_at` datetime DEFAULT NULL,
+  `metadata` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`metadata`)),
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`session_id`),
+  KEY `idx_wa_session_registry_status_updated` (`status`,`updated_at`),
+  KEY `idx_wa_session_registry_heartbeat` (`last_heartbeat_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `group_assignment` (
+  `group_jid` varchar(255) NOT NULL,
+  `owner_session_id` varchar(64) NOT NULL,
+  `lease_expires_at` datetime NOT NULL,
+  `cooldown_until` datetime DEFAULT NULL,
+  `assignment_version` bigint(20) unsigned NOT NULL DEFAULT 1,
+  `pinned` tinyint(1) NOT NULL DEFAULT 0,
+  `last_reason` varchar(64) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`group_jid`),
+  KEY `idx_group_assignment_owner_lease` (`owner_session_id`,`lease_expires_at`),
+  KEY `idx_group_assignment_lease` (`lease_expires_at`),
+  KEY `idx_group_assignment_cooldown` (`cooldown_until`),
+  KEY `idx_group_assignment_pinned_updated` (`pinned`,`updated_at`),
+  CONSTRAINT `fk_group_assignment_owner_session` FOREIGN KEY (`owner_session_id`) REFERENCES `wa_session_registry` (`session_id`) ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `group_assignment_history` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `group_jid` varchar(255) NOT NULL,
+  `previous_session_id` varchar(64) DEFAULT NULL,
+  `new_session_id` varchar(64) NOT NULL,
+  `change_reason` varchar(64) DEFAULT NULL,
+  `changed_by` varchar(64) NOT NULL DEFAULT 'system',
+  `assignment_version` bigint(20) unsigned NOT NULL,
+  `metadata` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`metadata`)),
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_group_assignment_history_group_created` (`group_jid`,`created_at`),
+  KEY `idx_group_assignment_history_new_session_created` (`new_session_id`,`created_at`),
+  KEY `idx_group_assignment_history_prev_session_created` (`previous_session_id`,`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `messages` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `message_id` varchar(255) NOT NULL,
+  `session_id` varchar(64) NOT NULL DEFAULT 'default',
   `chat_id` varchar(255) NOT NULL,
   `sender_id` varchar(255) DEFAULT NULL,
   `canonical_sender_id` varchar(255) DEFAULT NULL,
@@ -269,6 +331,10 @@ CREATE TABLE IF NOT EXISTS `messages` (
   `created_at` timestamp NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `message_id` (`message_id`),
+  KEY `idx_messages_session_message_id` (`session_id`,`message_id`),
+  KEY `idx_messages_session_chat_timestamp` (`session_id`,`chat_id`,`timestamp`),
+  KEY `idx_messages_session_sender_timestamp` (`session_id`,`sender_id`,`timestamp`),
+  KEY `idx_messages_session_canonical_sender_timestamp` (`session_id`,`canonical_sender_id`,`timestamp`),
   KEY `idx_chat_timestamp` (`chat_id`,`timestamp`),
   KEY `idx_sender` (`sender_id`),
   KEY `idx_timestamp` (`timestamp`),
